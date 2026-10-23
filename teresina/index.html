@@ -66,6 +66,7 @@
         <button data-page="icm"><span>▥</span> Itens, causas e medidas</button>
         <button data-page="deadlines"><span>◷</span> Planos e prazos</button>
         <button data-page="orders"><span>≡</span> Ordens de manutenção</button>
+        <button data-page="stops"><span>⏸</span> Paradas</button>
       </nav>
       <div class="rail-bottom">
         <div id="userChip" class="user-chip" hidden>
@@ -383,7 +384,60 @@
           </div>
         </section>
 
-        <!-- 5. ORDENS DE MANUTENÇÃO -->
+        <!-- 5. PARADAS -->
+        <section data-view="stops" hidden>
+          <div class="section-intro">
+            <div>
+              <span class="eyebrow blue">PARADAS · CONFIABILIDADE OPERACIONAL</span>
+              <h2>Onde as paradas se concentram.</h2>
+              <p>Leitura por ano, planta, ativo e motivo usando a data de entrada da ordem.</p>
+            </div>
+            <div class="section-actions">
+              <button id="exportStopsBtn">↓ Exportar paradas (CSV)</button>
+            </div>
+          </div>
+
+          <div id="stopKpis" class="kpis"></div>
+
+          <div class="overview-bottom">
+            <article class="card">
+              <div class="card-top">
+                <div>
+                  <span class="eyebrow">MOTIVOS IDENTIFICADOS</span>
+                  <h2>Por que a parada foi registrada?</h2>
+                </div>
+                <span class="small-note">Ordens distintas</span>
+              </div>
+              <div id="stopReasons"></div>
+            </article>
+
+            <article class="card">
+              <div class="card-top">
+                <div>
+                  <span class="eyebrow">EVOLUÇÃO ANUAL</span>
+                  <h2>Paradas por ano</h2>
+                </div>
+                <span class="small-note">Data de entrada</span>
+              </div>
+              <div id="stopYears" class="table-wrap"></div>
+            </article>
+          </div>
+
+          <article class="card" style="margin-top:20px">
+            <div class="card-top">
+              <div>
+                <span class="eyebrow">PLANTA · ATIVO · MOTIVO</span>
+                <h2>Detalhamento das paradas</h2>
+              </div>
+              <span class="small-note">Clique na quantidade para ver as ordens</span>
+            </div>
+            <div id="stopGroups" class="table-wrap"></div>
+          </article>
+
+          <p class="small-note" style="margin-top:12px">Critério aplicado: a ordem entra nesta análise quando o texto, problema ou causa indica parada, desligamento, falha ou indisponibilidade. A base atual não informa a duração da parada.</p>
+        </section>
+
+        <!-- 6. ORDENS DE MANUTENÇÃO -->
         <section data-view="orders" hidden>
           <article class="card">
             <div class="card-top">
