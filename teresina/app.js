@@ -384,55 +384,74 @@
 
   function renderStops() {
     const records = P.stopRecords(data, rows);
-    const reasons = new Map(), years = new Map(), groups = new Map(), assets = new Set(), plants = new Set();
+    const reasons = new Map(), years = new Map(), assets = new Map(), groups = new Map(), plants = new Set();
     for (const r of records) {
-      reasons.set(r.reason, (reasons.get(r.reason) || 0) + 1);
-      years.set(r.year, (years.get(r.year) || 0) + 1);
-      assets.add(r.asset);
+      const add = (map, key) => {
+        if (!map.has(key)) map.set(key, { total: 0, confirmed: 0 });
+        const item = map.get(key);
+        item.total++;
+        if (r.status === 'Confirmada') item.confirmed++;
+      };
+      add(reasons, r.reason);
+      add(years, r.year);
+      add(assets, r.asset);
       plants.add(r.tag);
       const key = [r.year, r.tag, r.asset, r.reason].join('\\u0000');
-      if (!groups.has(key)) groups.set(key, { year: r.year, tag: r.tag, plant: r.plant, asset: r.asset, reason: r.reason, ids: new Set() });
-      groups.get(key).ids.add(r.id);
+      if (!groups.has(key)) groups.set(key, { year: r.year, tag: r.tag, plant: r.plant, asset: r.asset, reason: r.reason, ids: new Set(), total: 0, confirmed: 0, durations: [] });
+      const group = groups.get(key);
+      group.ids.add(r.id);
+      group.total++;
+      if (r.status === 'Confirmada') group.confirmed++;
+      if (r.durationDays != null) group.durations.push(r.durationDays);
     }
-    const reasonList = [...reasons].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'pt-BR'));
+    const reasonList = [...reasons].sort((a, b) => b[1].total - a[1].total || a[0].localeCompare(b[0], 'pt-BR'));
     const yearList = [...years].sort((a, b) => b[0].localeCompare(a[0]));
-    const groupList = [...groups.values()].map(g => ({ ...g, count: g.ids.size, ids: [...g.ids] }))
-      .sort((a, b) => b.count - a.count || b.year.localeCompare(a.year) || a.plant.localeCompare(b.plant, 'pt-BR') || a.asset.localeCompare(b.asset, 'pt-BR'));
+    const assetList = [...assets].sort((a, b) => b[1].total - a[1].total || a[0].localeCompare(b[0], 'pt-BR')).slice(0, 10);
+    const groupList = [...groups.values()].map(g => ({ ...g, ids: [...g.ids], avgDuration: g.durations.length ? g.durations.reduce((sum, value) => sum + value, 0) / g.durations.length : null }))
+      .sort((a, b) => b.total - a.total || b.year.localeCompare(a.year) || a.plant.localeCompare(b.plant, 'pt-BR') || a.asset.localeCompare(b.asset, 'pt-BR'));
 
-    const topReason = reasonList[0]?.[0] || '—';
+    const confirmedCount = records.filter(r => r.status === 'Confirmada').length;
     $('#stopKpis').innerHTML =
       kpi('Paradas identificadas', num(records.length), 'Ordens distintas no período', '#c43650') +
-      kpi('Plantas atingidas', num(plants.size), 'Instalações com indicação de parada', '#c2780c') +
-      kpi('Ativos envolvidos', num(assets.size), 'Ativos com ocorrência identificada', '#0027bd') +
-      kpi('Motivo mais frequente', topReason, reasonList.length ? num(reasonList[0][1]) + ' ordens' : 'Sem registros', '#0f8a68');
+      kpi('Paradas confirmadas', num(confirmedCount), records.length ? pct(confirmedCount / records.length) + ' do total' : 'Sem registros', '#0f8a68') +
+      kpi('Plantas atingidas', num(plants.size), 'Instalações com ocorrência', '#c2780c') +
+      kpi('Ativos envolvidos', num(assets.size), 'Ativos com ocorrência', '#0027bd');
 
-    const maxReason = reasonList[0]?.[1] || 1;
+    const maxReason = reasonList[0]?.[1].total || 1;
     $('#stopReasons').innerHTML = reasonList.length
-      ? '<div class="type-list">' + reasonList.map(([reason, count]) =>
+      ? '<div class="type-list">' + reasonList.map(([reason, item]) =>
           '<div class="type-row">' +
-          '<div class="row-head"><b>' + esc(reason) + '</b><span>' + num(count) + ' OS</span></div>' +
-          '<div class="row-sub"><span>Indicações encontradas no texto, problema ou causa</span></div>' +
-          '<span class="mini-track"><i style="width:' + (count / maxReason * 100) + '%;background:var(--red)"></i></span>' +
+          '<div class="row-head"><b>' + esc(reason) + '</b><span>' + num(item.total) + ' OS</span></div>' +
+          '<div class="row-sub"><span>' + num(item.confirmed) + ' confirmadas · ' + num(item.total - item.confirmed) + ' identificadas</span></div>' +
+          '<span class="mini-track"><i style="width:' + (item.total / maxReason * 100) + '%;background:var(--red)"></i></span>' +
           '</div>'
         ).join('') + '</div>'
       : emptyHTML;
 
     $('#stopYears').innerHTML = yearList.length
-      ? '<table><thead><tr><th>Ano</th><th>Paradas identificadas</th></tr></thead><tbody>' +
-        yearList.map(([year, count]) => '<tr><td><b>' + esc(year) + '</b></td><td>' + num(count) + '</td></tr>').join('') +
+      ? '<table><thead><tr><th>Ano</th><th>Paradas</th><th>Confirmadas</th></tr></thead><tbody>' +
+        yearList.map(([year, item]) => '<tr><td><b>' + esc(year) + '</b></td><td>' + num(item.total) + '</td><td>' + num(item.confirmed) + '</td></tr>').join('') +
         '</tbody></table>'
       : emptyHTML;
 
+    $('#stopAssets').innerHTML = assetList.length
+      ? '<div class="type-list">' + assetList.map(([asset, item]) =>
+          '<div class="type-row"><div class="row-head"><b>' + esc(asset) + '</b><span>' + num(item.total) + ' OS</span></div><div class="row-sub"><span>' + num(item.confirmed) + ' confirmadas</span></div><span class="mini-track"><i style="width:' + (item.total / (assetList[0][1].total || 1) * 100) + '%;background:var(--amber)"></i></span></div>'
+        ).join('') + '</div>'
+      : emptyHTML;
+
     $('#stopGroups').innerHTML = groupList.length
-      ? '<table><thead><tr><th>Ano</th><th>Planta</th><th>Ativo</th><th>Motivo</th><th>Ordens</th></tr></thead><tbody>' +
+      ? '<table><thead><tr><th>Ano</th><th>Planta</th><th>Ativo</th><th>Motivo</th><th>Paradas</th><th>Confirmadas</th><th>Duração média</th></tr></thead><tbody>' +
         groupList.map(g => {
-          const key = rankEvidence.push({ name: g.year + ' · ' + g.plant + ' · ' + g.asset + ' · ' + g.reason, count: g.count, ids: g.ids }) - 1;
+          const key = rankEvidence.push({ name: g.year + ' · ' + g.plant + ' · ' + g.asset + ' · ' + g.reason, count: g.total, ids: g.ids }) - 1;
           return '<tr>' +
             '<td><b>' + esc(g.year) + '</b></td>' +
             '<td>' + esc(g.plant) + '</td>' +
             '<td>' + esc(g.asset) + '</td>' +
             '<td>' + esc(g.reason) + '</td>' +
-            '<td><button class="link" data-rank="' + key + '">' + num(g.count) + ' OS ↗</button></td>' +
+            '<td><button class="link" data-rank="' + key + '">' + num(g.total) + ' OS ↗</button></td>' +
+            '<td>' + num(g.confirmed) + '</td>' +
+            '<td>' + (g.avgDuration == null ? '—' : g.avgDuration.toFixed(1) + ' dias') + '</td>' +
             '</tr>';
         }).join('') + '</tbody></table>'
       : emptyHTML;
@@ -848,8 +867,8 @@
     if (!data) return;
     const records = P.stopRecords(data, rows);
     const lines = [
-      ['Ano', 'Data de entrada', 'Planta', 'Ativo', 'Motivo', 'Ordem', 'Descrição'].map(safeCsvCell).join(';'),
-      ...records.map(r => [r.year, r.created, r.plant, r.asset, r.reason, r.id, r.text].map(safeCsvCell).join(';'))
+      ['Ano', 'Data de entrada', 'Planta', 'Ativo', 'Motivo', 'Status', 'Duração (dias)', 'Impacto', 'Ordem', 'Descrição'].map(safeCsvCell).join(';'),
+      ...records.map(r => [r.year, r.created, r.plant, r.asset, r.reason, r.status, r.durationDays == null ? '' : r.durationDays, r.impact, r.id, r.text].map(safeCsvCell).join(';'))
     ];
     downloadCsvFile('Paradas_Aguas_de_Teresina_' + today() + '.csv', lines);
   }
