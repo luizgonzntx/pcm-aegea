@@ -35,11 +35,19 @@ A primeira linha é usada como cabeçalho. Arquivos devem ser XLSX e ter no máx
 Datas inválidas, identificadores divergentes e coordenadas inválidas impedem a carga.
 O conjunto normalizado tem limite de 19 MB na interface / 20 MB no banco.
 
-## Critérios
+## Critérios e Funcionalidades Analíticas
 - Centro PITE é o filtro interno para Águas de Teresina. O código não é apresentado na interface.
 - NEXE prevalece sobre ENTE; ENTE classifica execução; ENCE isolado não comprova execução.
 - Aderência: ordens executadas com plano preenchido / ordens do plano com referência dentro do intervalo. Ordens abertas e não executadas permanecem no denominador.
 - Indicador complementar: execução com início real no próprio intervalo.
+- Semáforo de saúde das instalações (Mapa e Lista): Verde (aderência ≥ 85% sem ordens vencidas), Âmbar (60% a 84%), Vermelho (< 60% ou ordens vencidas em aberto) e Azul (sem plano no período).
+- Análises de PCM integradas:
+  - Distribuição por Tipo de Ordem (com filtro rápido em 1 clique).
+  - Top Ativos Críticos com maior volume de intervenções executadas.
+  - Matriz Cruzada Item (Componente) × Problema × Causa × Medida para diagnóstico de falhas recorrentes.
+- Atalhos rápidos de período (Mês, 90 dias, Ano, Tudo), filtro por Prioridade e busca rápida de instalações.
+- Importação com suporte a arrastar e soltar (Drag-and-Drop) e checklist de validação dos 4 arquivos `.xlsx`.
+- Exportação CSV nas abas de Ordens, ICM (Matriz Cruzada) e Planos/Prazos (Aderência por Instalação).
 - Data de entrada é criação; referência define competência; início real define começo do serviço.
 - No prazo exige conclusão real <= prazo programado. Sem as datas, não avaliável.
 - ICM conta ordens executadas distintas por item, causa ou medida. Não faz produto cartesiano entre tabelas.
@@ -60,3 +68,4 @@ A chave no config.js é pública e só autoriza o que as políticas RLS permitem
 database/schema.sql registra o esquema aplicado pela migração pcm_teresina_private_dataset.
 Apenas a coluna payload é editável por administradores autenticados. Revisão, autor e data da alteração são definidos no banco.
 A mesma instância atende outros aplicativos; esta implantação usa somente tabelas pcm_teresina_*.
+
