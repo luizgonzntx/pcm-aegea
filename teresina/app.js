@@ -1,90 +1,978 @@
-(()=>{
-'use strict';
-const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],P=window.PCM;
-const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const num=v=>Number(v||0).toLocaleString('pt-BR'),pct=v=>v==null?'—':(v*100).toLocaleString('pt-BR',{maximumFractionDigits:1})+'%',fmt=v=>P.validDate(v||'')?v.split('-').reverse().join('/'):'Não informada';
-const today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
-let db,data=null,revision=0,user=null,role='',page='overview',pageNo=1,pending=null,pendingRevision=0,worker=null,toastTimer,map,markers,fitBounds,rows=[],rankEvidence=[],modalMode='',loading=false;
-const f={from:today().slice(0,4)+'-01-01',to:today().slice(0,4)+'-12-31',dateField:'date',tag:'',asset:'',type:''};
-const emptyHTML='<div class="no-data">Sem registros para os filtros selecionados.</div>';
-function notify(message){$('#toast').textContent=message;$('#toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').hidden=true,6000);}
-function errorText(e){if(e?.message==='Invalid login credentials')return 'E-mail ou senha não conferem.';return e?.message||'Não foi possível concluir. Tente novamente.';}
-function loginMessage(message,isError=false){$('#loginMessage').textContent=message;$('#loginMessage').classList.toggle('error',isError);}
-function setPage(next){page=next;const titles={overview:'Visão dos sistemas',icm:'Itens, causas e medidas',deadlines:'Planos e prazos',orders:'Ordens de manutenção'};$('#pageTitle').textContent=titles[next];$$('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===next));$$('[data-view]').forEach(v=>v.hidden=v.dataset.view!==next);if(next==='overview'&&map)setTimeout(()=>map.invalidateSize(),60);window.scrollTo({top:0,behavior:'smooth'});}
-function selectOptions(id,values,label,selected){const el=$(id);el.innerHTML='<option value="">'+esc(label)+'</option>'+values.map(([v,n])=>'<option value="'+esc(v)+'">'+esc(n)+'</option>').join('');el.value=selected||'';return el.value;}
-function options(){if(!data)return;f.tag=selectOptions('#system',data.systems.map(s=>[s.tag,s.name]),'Todos os sistemas',f.tag);f.type=selectOptions('#type',[...new Set(data.orders.map(o=>o.type).filter(Boolean))].sort().map(t=>[t,t]),'Todos os tipos',f.type);assets();}
-function assets(){if(!data)return;const list=[...new Set(data.orders.filter(o=>!f.tag||o.tag===f.tag).map(o=>o.asset).filter(Boolean))].sort();f.asset=selectOptions('#asset',list.map(v=>[v,v]),'Todos os ativos',f.asset);}
-function field(label,value){return '<div><dt>'+esc(label)+'</dt><dd>'+esc(value||'Não informado')+'</dd></div>';}
-function kpi(title,value,note,accent){return '<article class="kpi"'+(accent?' style="--accent:'+accent+'"':'')+'><span>'+esc(title)+'</span><strong>'+esc(value)+'</strong><small>'+esc(note)+'</small></article>';}
-function render(){
- if(!data){$('#empty').hidden=false;$('#dashboard').hidden=true;$('#scope').textContent='';return;}
- $('#empty').hidden=true;$('#dashboard').hidden=false;
- rows=P.filter(data,f);pageNo=1;const s=P.stats(rows),a=P.adherence(data,f);
- $('#kpis').innerHTML=kpi('Ordens no período',num(s.total),'Instalações e ativos selecionados')+kpi('Ordens executadas',num(s.done),pct(s.total?s.done/s.total:null)+' do total','#148668')+kpi('Em aberto',num(s.open),'Aguardando execução','#b97710')+kpi('Não executadas',num(s.notdone),'Mantidas na base do plano','#bb4056');
- $('#scope').textContent=(f.tag?'1 instalação':num(data.systems.length)+' instalações')+' · '+fmt(f.from)+' a '+fmt(f.to);
- $('#systemCount').textContent=num(data.systems.length);
- $('#systemsList').innerHTML=data.systems.map(s=>{const selected=P.filter(data,{...f,tag:s.tag,asset:f.tag&&f.tag!==s.tag?'':f.asset}),a=P.adherence(data,{...f,tag:s.tag,asset:f.tag&&f.tag!==s.tag?'':f.asset}),n=P.stats(selected);return '<button class="system-row" data-system="'+esc(s.tag)+'"><b>'+esc(s.name)+'</b><span class="system-meta"><span>'+num(n.done)+' executadas</span><span>'+pct(a.rate)+' do plano</span></span><span class="mini-track"><i style="width:'+(a.rate==null?0:a.rate*100)+'%"></i></span></button>';}).join('');
- $('#planSummary').innerHTML='<strong class="plan-number">'+pct(a.rate)+'</strong><div class="sub">'+num(a.done)+' executadas de '+num(a.total)+' ordens do plano</div><div class="sub" style="margin-top:10px">'+pct(a.withinRate)+' com início real dentro do período</div>';
- renderMonthly();renderICM();renderDeadlines();renderOrders();renderMap();
-}
-function renderMonthly(){const buckets=new Map;for(const o of rows){const key=o[f.dateField].slice(0,7);if(!buckets.has(key))buckets.set(key,{total:0,done:0});const b=buckets.get(key);b.total++;if(P.status(o)==='done')b.done++;}const list=[...buckets].sort((a,b)=>a[0].localeCompare(b[0]));const max=Math.max(1,...list.map(v=>v[1].total));$('#monthly').innerHTML=list.length?'<div class="monthly">'+list.map(([m,v])=>'<div class="month" title="'+esc(m)+': '+v.done+' executadas / '+v.total+' ordens"><strong>'+num(v.total)+'</strong><div class="column" style="height:'+Math.max(2,v.total/max*115)+'px"><i style="height:'+(v.done/v.total*100)+'%"></i></div><small>'+m.slice(5)+'/'+m.slice(2,4)+'</small></div>').join('')+'</div>':emptyHTML;}
-function ranks(kind,source=rows){return kind==='action'?P.rank(data.actions,source,'action'):P.rank(data.items,source,kind);}
-function rankHTML(list){if(!list.length)return emptyHTML;const max=list[0].count;return '<div class="rank-list">'+list.slice(0,8).map(r=>{const key=rankEvidence.push(r)-1;return '<button class="rank" data-rank="'+key+'"><span class="rank-label"><span>'+esc(r.name)+'</span><b>'+num(r.count)+' OS</b></span><span class="rank-bar"><i style="width:'+(r.count/max*100)+'%"></i></span></button>';}).join('')+'</div>';}
-function renderICM(){rankEvidence=[];$('#icmCards').innerHTML=[['component','ITENS','Itens que mais falharam'],['cause','CAUSAS','Causas registradas'],['action','MEDIDAS','Intervenções realizadas']].map(([k,e,h])=>'<article class="card"><div class="card-top"><div><span class="eyebrow">'+e+'</span><h2>'+h+'</h2></div></div>'+rankHTML(ranks(k))+'</article>').join('');}
-function renderDeadlines(){const cohort=P.filter(data,f,true),a=P.adherence(data,f),t=P.timing(cohort,today());$('#deadlineCards').innerHTML=kpi('Aderência ao plano',pct(a.rate),num(a.done)+' de '+num(a.total)+' ordens')+kpi('Executadas no prazo',num(t.onTime),'Conclusão até o prazo programado','#148668')+kpi('Executadas fora do prazo',num(t.late),'Conclusão após o prazo programado','#bb4056')+kpi('Prazo não avaliável',num(t.unassessed),'Datas ou situação insuficientes','#b97710');
- $('#planTable').innerHTML='<table><thead><tr><th>Instalação</th><th>Ordens do plano</th><th>Executadas</th><th>Aderência</th><th>Início dentro do período</th></tr></thead><tbody>'+data.systems.filter(s=>!f.tag||f.tag===s.tag).map(s=>{const a=P.adherence(data,{...f,tag:s.tag});return '<tr><td><button class="link" data-system="'+esc(s.tag)+'">'+esc(s.name)+'</button></td><td>'+num(a.total)+'</td><td>'+num(a.done)+'</td><td><strong>'+pct(a.rate)+'</strong></td><td>'+num(a.within)+'</td></tr>';}).join('')+'</tbody></table>';
- $('#comparison').innerHTML=[['Início anterior à referência',t.before],['Início na referência',t.same],['Início após a referência',t.after],['Sem datas para comparação',t.withoutComparison],['Ordens abertas com prazo vencido',t.overdue],['Ordens abertas dentro do prazo',t.upcoming],['Ordens não executadas',t.notdone]].map(([n,v])=>'<div class="comparison-row"><span>'+n+'</span><b>'+num(v)+'</b></div>').join('');
-}
-function orderRows(){const q=$('#search').value.toLocaleLowerCase('pt-BR'),s=$('#statusFilter').value;return rows.filter(o=>(!s||P.status(o)===s)&&(!q||[o.id,o.text,o.asset,o.equipment].join(' ').toLocaleLowerCase('pt-BR').includes(q))).sort((a,b)=>(b[f.dateField]||'').localeCompare(a[f.dateField]||'')||b.id.localeCompare(a.id));}
-function table(list){if(!list.length)return emptyHTML;return '<table><thead><tr><th>Ordem</th><th>Descrição</th><th>Instalação / ativo</th><th>Referência</th><th>Início real</th><th>Situação</th></tr></thead><tbody>'+list.map(o=>'<tr><td><button class="link" data-order="'+esc(o.id)+'">'+esc(o.id)+'</button></td><td class="description">'+esc(o.text)+'</td><td>'+esc(o.asset||o.tag)+'</td><td>'+fmt(o.date)+'</td><td>'+fmt(o.start)+'</td><td><span class="badge '+P.status(o)+'">'+P.labels[P.status(o)]+'</span></td></tr>').join('')+'</tbody></table>';}
-function renderOrders(){const all=orderRows(),pages=Math.max(1,Math.ceil(all.length/30));pageNo=Math.max(1,Math.min(pageNo,pages));$('#ordersTable').innerHTML=table(all.slice((pageNo-1)*30,pageNo*30));$('#pageInfo').textContent='Página '+pageNo+' de '+pages+' · '+num(all.length)+' ordens';$('#prevPage').disabled=pageNo===1;$('#nextPage').disabled=pageNo===pages;}
-function openDetail(html,eyebrow){$('#modalEyebrow').textContent=eyebrow;$('#detailBody').innerHTML=html;if(!$('#detail').open)$('#detail').showModal();}
-function showSystem(tag){const s=data.systems.find(s=>s.tag===tag);if(!s)return;modalMode='system';const filter={...f,tag},source=P.filter(data,filter),n=P.stats(source),a=P.adherence(data,filter);
- const blocks=[['component','Itens que mais falharam'],['cause','Causas registradas'],['action','Medidas realizadas']].map(([k,title])=>'<div class="detail-block"><h3>'+title+'</h3>'+rankHTML(ranks(k,source))+'</div>').join('');
- const photo=/^https:\/\//i.test(s.photo)?'<p><a href="'+esc(s.photo)+'" target="_blank" rel="noopener noreferrer">Abrir imagem cadastrada ↗</a></p>':'';
- openDetail('<div class="detail-heading"><h2>'+esc(s.name)+'</h2><p>'+esc(s.tag)+' · '+esc(s.address||s.district||'Endereço não informado')+'</p></div><div class="detail-kpis"><div><small>Ordens executadas</small><b>'+num(n.done)+'</b></div><div><small>Aderência ao plano</small><b>'+pct(a.rate)+'</b></div><div><small>Ordens no período</small><b>'+num(n.total)+'</b></div></div><dl class="order-info">'+field('Situação operacional',s.status)+field('Criticidade',s.critical)+field('Tipo cadastrado',s.type)+field('Latitude',s.lat)+field('Longitude',s.lng)+field('Bairro',s.district)+'</dl>'+photo+'<h3 class="detail-section">Itens, Causas e Medidas</h3><div class="detail-grid">'+blocks+'</div><h3 class="detail-section">Ordens mais recentes no período</h3><div class="table-wrap">'+table([...source].sort((a,b)=>(b[f.dateField]||'').localeCompare(a[f.dateField]||'')).slice(0,50))+'</div>','INSTALAÇÃO · ÁGUAS DE TERESINA');}
-function showOrder(id){const o=data.orders.find(o=>o.id===id);if(!o)return;modalMode='order';const items=data.items.filter(i=>i.order===id),actions=data.actions.filter(i=>i.order===id),s=data.systems.find(s=>s.tag===o.tag);openDetail('<div class="detail-heading"><h2>Ordem '+esc(o.id)+'</h2><p>'+esc(o.text)+'</p></div><span class="badge '+P.status(o)+'">'+P.labels[P.status(o)]+'</span><dl class="order-info">'+field('Instalação',s?.name||o.tag)+field('Ativo',o.asset)+field('Equipamento',o.equipment)+field('Data de entrada',fmt(o.created))+field('Data de referência',fmt(o.date))+field('Início real',fmt(o.start))+field('Prazo programado',fmt(o.due))+field('Conclusão real',fmt(o.finished))+field('Plano de manutenção',o.plan)+field('Tipo da ordem',o.type)+field('Prioridade',o.priority)+field('Nota',o.note)+'</dl><h3 class="detail-section">Itens e causas registrados</h3>'+(items.length?'<div class="detail-grid">'+items.map(i=>'<div class="detail-block"><h3>'+esc(i.component||'Item não informado')+'</h3><p><b>Problema:</b> '+esc(i.problem||'Não informado')+'</p><p><b>Causa registrada:</b> '+esc(i.cause||'Não informada')+'</p></div>').join('')+'</div>':emptyHTML)+'<h3 class="detail-section">Medidas realizadas</h3>'+(actions.length?actions.map(i=>'<div class="detail-block" style="margin:8px 0">'+esc(i.action||'Não informada')+'</div>').join(''):emptyHTML),'EVIDÊNCIAS DA MANUTENÇÃO');}
-function showEvidence(index){const r=rankEvidence[index];if(!r)return;const ids=new Set(r.ids),list=data.orders.filter(o=>ids.has(o.id));modalMode='evidence';openDetail('<div class="detail-heading"><h2>'+esc(r.name)+'</h2><p>'+num(list.length)+' ordens executadas distintas nos filtros selecionados.</p></div><div class="table-wrap">'+table(list)+'</div>','ICM · ORDENS RELACIONADAS');}
-function renderMap(){
- if(!window.L){$('#map').innerHTML='<div class="no-data">Não foi possível carregar o mapa. Consulte as instalações na lista ao lado.</div>';return;}
- if(!map){map=L.map('map',{scrollWheelZoom:false}).setView([-5.09,-42.8],12);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).on('tileerror',()=>$('#mapWarning').hidden=false).addTo(map);markers=L.layerGroup().addTo(map);}
- markers.clearLayers();const systems=data.systems.filter(s=>!f.tag||s.tag===f.tag),coords=[];
- systems.forEach((s,i)=>{if(!Number.isFinite(s.lat)||!Number.isFinite(s.lng))return;coords.push([s.lat,s.lng]);const n=P.stats(P.filter(data,{...f,tag:s.tag})),a=P.adherence(data,{...f,tag:s.tag}),source=P.filter(data,{...f,tag:s.tag}),top=ranks('component',source)[0],cause=ranks('cause',source)[0],act=ranks('action',source)[0];
- const marker=L.marker([s.lat,s.lng],{icon:L.divIcon({className:'',html:'<div class="map-pin"></div>',iconSize:[15,15],iconAnchor:[7,7]}),title:s.name}).addTo(markers);
- marker.bindTooltip(esc(s.name),{permanent:true,direction:i%2?'right':'left',offset:[i%2?11:-11,(i%3-1)*12],className:'point-label'});
- const html='<div class="hover-title"><b>'+esc(s.name)+'</b></div><small>'+esc(s.status||'Situação não informada')+'</small><div class="hover-grid"><div><small>Ordens executadas</small><b>'+num(n.done)+'</b></div><div><small>Aderência ao plano</small><b>'+pct(a.rate)+'</b></div></div><div class="hover-footer"><b>Item:</b> '+esc(top?.name||'Sem registro')+'<br><b>Causa:</b> '+esc(cause?.name||'Sem registro')+'<br><b>Medida:</b> '+esc(act?.name||'Sem registro')+'</div><div class="hover-footer">Clique no ponto para abrir a instalação.</div>';
- marker.bindPopup(html,{closeButton:false,autoPan:false});marker.on('mouseover',()=>marker.openPopup());marker.on('mouseout',()=>marker.closePopup());marker.on('click',()=>showSystem(s.tag));
- });fitBounds=coords.length?L.latLngBounds(coords):null;setTimeout(()=>{map.invalidateSize();if(fitBounds)map.fitBounds(fitBounds,{padding:[70,60],maxZoom:14});},50);
-}
-async function loadData(){if(loading)return;loading=true;$('#refreshBtn').disabled=true;try{const {data:row,error}=await db.from('pcm_teresina_dataset').select('payload,revision,updated_at').eq('id','principal').maybeSingle();if(error)throw error;if(!row)throw Error('Sua conta não tem acesso a este painel.');revision=row.revision;data=row.payload;options();render();$('#loadStatus').textContent=data?'Base atualizada em '+new Date(row.updated_at).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}):'Nenhum conjunto importado';$('#footerDate').textContent=data?'Revisão '+revision+' · '+num(data.orders.length)+' ordens na base':'Aguardando primeira importação';}finally{loading=false;$('#refreshBtn').disabled=false;}}
-async function enter(session){if(!session)return;user=session.user;const {data:member,error}=await db.from('pcm_teresina_members').select('role').eq('user_id',user.id).maybeSingle();if(error)throw error;if(!member)throw Error('Esta conta ainda não está autorizada no painel de Teresina.');role=member.role;$('#access').hidden=true;$('#shell').hidden=false;$('#importBtn').hidden=role!=='admin';$('#emptyImport').hidden=role!=='admin';await loadData();}
-function lock(){user=null;data=null;pending=null;role='';rows=[];$('#access').hidden=false;$('#shell').hidden=true;$('#detail').close();$('#importDialog').close();$('#detailBody').innerHTML='';if(markers)markers.clearLayers();loginMessage('');}
-function openImport(){if(role!=='admin')return notify('Seu acesso permite apenas consulta.');pending=null;$('#files').value='';$('#importReview').innerHTML='';$('#importMessage').textContent='';$('#saveImport').hidden=true;$('#validateImport').hidden=false;$('#importDialog').showModal();}
-function importMessage(msg,error=false){$('#importMessage').textContent=msg;$('#importMessage').classList.toggle('error',error);}
-async function validateImport(){pending=null;$('#saveImport').hidden=true;const files=[...$('#files').files];if(files.length!==4)return importMessage('Selecione exatamente quatro arquivos: sistemas, ordens, itens e medidas.',true);if(files.some(f=>!/\.xlsx$/i.test(f.name)||f.size>25*1024*1024))return importMessage('Use arquivos .xlsx de até 25 MB cada.',true);$('#validateImport').disabled=true;$('#files').disabled=true;$('#closeImport').disabled=true;pendingRevision=revision;
- try{importMessage('Preparando leitura das planilhas…');const buffers=await Promise.all(files.map(async file=>({name:file.name,buffer:await file.arrayBuffer()})));
- const result=await new Promise((resolve,reject)=>{worker=new Worker('import-worker.js');const timeout=setTimeout(()=>{worker.terminate();reject(Error('A leitura excedeu três minutos. Reduza o tamanho do conjunto.'));},180000);worker.onmessage=({data:r})=>{if(r.progress)return importMessage(r.progress);clearTimeout(timeout);worker.terminate();worker=null;if(r.error)reject(Error(r.error));else resolve(r.result);};worker.onerror=()=>{clearTimeout(timeout);worker.terminate();worker=null;reject(Error('Falha ao ler as planilhas. Verifique sua conexão e o formato dos arquivos.'));};worker.postMessage(buffers,buffers.map(f=>f.buffer));});
- if(new Blob([JSON.stringify(result)]).size>19*1024*1024)throw Error('O conjunto processado excede o limite de 19 MB. Reduza o intervalo da exportação.');
- pending=result;$('#importReview').innerHTML='<div class="detail-kpis"><div><small>Instalações</small><b>'+num(result.systems.length)+'</b></div><div><small>Ordens válidas</small><b>'+num(result.orders.length)+'</b></div><div><small>Itens / medidas</small><b>'+num(result.items.length)+' / '+num(result.actions.length)+'</b></div></div><p class="small-note">'+num(result.meta.excluded)+' ordens fora do escopo; '+num(result.meta.missingReference)+' sem data de referência. A base atual será substituída integralmente após salvar.</p>';importMessage('Validação concluída. Confira os totais e salve a atualização.');$('#saveImport').hidden=false;
- }catch(e){importMessage(errorText(e),true);}finally{$('#validateImport').disabled=false;$('#files').disabled=false;$('#closeImport').disabled=false;}}
-async function saveImport(){if(!pending||role!=='admin')return;$('#saveImport').disabled=true;$('#closeImport').disabled=true;$('#validateImport').disabled=true;$('#files').disabled=true;try{importMessage('Salvando a base compartilhada…');const {data:saved,error}=await db.from('pcm_teresina_dataset').update({payload:pending}).eq('id','principal').eq('revision',pendingRevision).select('revision,updated_at').maybeSingle();if(error)throw error;if(!saved)throw Error('A base foi atualizada por outra sessão. Feche esta janela, atualize o painel e valide novamente.');pending=null;$('#saveImport').hidden=true;await loadData();$('#importDialog').close();notify('Base salva. Mapa e indicadores atualizados.');}catch(e){importMessage(errorText(e),true);}finally{$('#saveImport').disabled=false;$('#closeImport').disabled=false;$('#validateImport').disabled=false;$('#files').disabled=false;}}
-function exportCSV(){const list=orderRows(),fields=[['Ordem','id'],['Descrição','text'],['Instalação','tag'],['Ativo','asset'],['Entrada','created'],['Referência','date'],['Início real','start'],['Plano','plan'],['Prazo programado','due'],['Conclusão real','finished']];const safe=v=>{let s=String(v??'');if(/^[=+\-@\t\r]/.test(s))s="'"+s;return '"'+s.replaceAll('"','""')+'"';};const lines=[fields.map(v=>v[0]).concat('Situação').map(safe).join(';'),...list.map(o=>fields.map(v=>o[v[1]]).concat(P.labels[P.status(o)]).map(safe).join(';'))];const url=URL.createObjectURL(new Blob(['\ufeff'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='Ordens_Aguas_de_Teresina_'+today()+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
-function rules(){openDetail('<div class="detail-heading"><h2>Critérios dos indicadores</h2><p>Regras aplicadas a todos os sistemas e filtros.</p></div><div class="explanation"><h3>Ordens executadas</h3><p>Ordens com encerramento técnico. O registro de não execução tem prioridade quando as situações coexistem. Encerramento administrativo, isoladamente, não comprova execução.</p><h3>Aderência ao plano</h3><p>Ordens executadas do plano divididas pelas ordens existentes com plano preenchido e referência no período. Ordens abertas e não executadas permanecem no denominador. O indicador complementar restringe o início real ao mesmo intervalo.</p><h3>Três datas, três perguntas</h3><p><b>Entrada:</b> quando a ordem foi criada. <b>Referência:</b> competência usada no recorte do plano. <b>Início real:</b> quando o serviço começou. Alterar a data do volume não altera a base da aderência.</p><h3>Execução no prazo</h3><p>Conclusão real até o prazo programado. Sem essas duas datas, não há classificação oficial de pontualidade. Início real versus referência é apresentado apenas como comparação descritiva.</p><h3>Itens, Causas e Medidas</h3><p>Ordens executadas distintas por item, causa ou medida. Uma mesma ordem pode ter vários itens e aparecer em mais de uma categoria. Registros de falha inexistente e de não executar são excluídos dos rankings correspondentes. As causas são as cadastradas, sem inferência de causa raiz.</p><h3>Escopo e atualização</h3><p>Somente Águas de Teresina e as instalações presentes na planilha de sistemas. Duplicatas idênticas de ordens são consolidadas; duplicatas divergentes impedem a carga. Cada importação substitui o conjunto completo.</p><h3>Suspensões</h3><p>Não há mapeamento validado de suspensão nesta versão. A situação de não execução é tratada separadamente e não é presumida como suspensão.</p></div>','METODOLOGIA');}
-function bind(){
- $('#from').value=f.from;$('#to').value=f.to;
- $$('[data-page]').forEach(b=>b.onclick=()=>setPage(b.dataset.page));$$('[data-go]').forEach(b=>b.onclick=()=>setPage(b.dataset.go));
- for(const [id,key] of [['from','from'],['to','to'],['dateField','dateField'],['system','tag'],['asset','asset'],['type','type']])$('#'+id).onchange=()=>{if((id==='from'||id==='to')&&(!P.validDate($('#from').value)||!P.validDate($('#to').value)||$('#from').value>$('#to').value)){$('#from').value=f.from;$('#to').value=f.to;notify('Informe um intervalo de datas válido.');return;}f[key]=$('#'+id).value;if(key==='tag'){f.asset='';assets();}if(data)render();};
- $('#clearFilters').onclick=()=>{Object.assign(f,{from:today().slice(0,4)+'-01-01',to:today().slice(0,4)+'-12-31',dateField:'date',tag:'',asset:'',type:''});$('#from').value=f.from;$('#to').value=f.to;$('#dateField').value='date';$('#search').value='';$('#statusFilter').value='';options();render();};
- document.addEventListener('click',event=>{const s=event.target.closest('[data-system]'),o=event.target.closest('[data-order]'),r=event.target.closest('[data-rank]');if(s&&data)showSystem(s.dataset.system);else if(o&&data)showOrder(o.dataset.order);else if(r&&data)showEvidence(Number(r.dataset.rank));});
- $('#search').oninput=()=>{pageNo=1;if(data)renderOrders();};$('#statusFilter').onchange=()=>{pageNo=1;if(data)renderOrders();};$('#prevPage').onclick=()=>{pageNo--;renderOrders();};$('#nextPage').onclick=()=>{pageNo++;renderOrders();};
- $('#closeDetail').onclick=()=>$('#detail').close();$('#rulesBtn').onclick=rules;$('#fitMap').onclick=()=>{if(map&&fitBounds)map.fitBounds(fitBounds,{padding:[70,60],maxZoom:14});};
- $('#refreshBtn').onclick=async()=>{try{await loadData();notify('Informações atualizadas.');}catch(e){notify(errorText(e));}};
- $('#importBtn').onclick=openImport;$('#emptyImport').onclick=openImport;$('#closeImport').onclick=()=>$('#importDialog').close();$('#validateImport').onclick=validateImport;$('#saveImport').onclick=saveImport;$('#exportBtn').onclick=exportCSV;
- $('#files').onchange=()=>{pending=null;$('#saveImport').hidden=true;$('#importReview').innerHTML='';importMessage('');};
- $('#importDialog').addEventListener('cancel',e=>{if($('#closeImport').disabled)e.preventDefault();});
- $('#logoutTop').onclick=$('#logoutBtn').onclick=async()=>{const {error}=await db.auth.signOut({scope:'local'});if(error)notify(errorText(error));else lock();};
- $('#loginForm').onsubmit=async event=>{event.preventDefault();$('#loginBtn').disabled=true;loginMessage('Entrando…');try{const {data:auth,error}=await db.auth.signInWithPassword({email:$('#email').value.trim(),password:$('#password').value});if(error)throw error;$('#password').value='';await enter(auth.session);loginMessage('');}catch(e){$('#access').hidden=false;$('#shell').hidden=true;loginMessage(errorText(e),true);}finally{$('#loginBtn').disabled=false;}};
-}
-async function boot(){bind();if(!window.supabase||!P){loginMessage('Não foi possível carregar os recursos. Verifique sua conexão e recarregue a página.',true);return;}db=window.supabase.createClient(window.PCM_CONFIG.url,window.PCM_CONFIG.key,{auth:{storageKey:'pcm-teresina-session',persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});db.auth.onAuthStateChange(event=>{if(event==='SIGNED_OUT')lock();});try{const {data:auth,error}=await db.auth.getSession();if(error)throw error;if(auth.session)await enter(auth.session);}catch(e){loginMessage(errorText(e),true);$('#access').hidden=false;$('#shell').hidden=true;}}
-boot();
+(() => {
+  'use strict';
+  const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)], P = window.PCM;
+  const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const num = v => Number(v || 0).toLocaleString('pt-BR'), pct = v => v == null ? '—' : (v * 100).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + '%', fmt = v => P.validDate(v || '') ? v.split('-').reverse().join('/') : 'Não informada';
+  const today = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+
+  let db, data = null, revision = 0, user = null, role = '', page = 'overview', pageNo = 1, pending = null, pendingRevision = 0, worker = null, toastTimer, map, markers, fitBounds, rows = [], rankEvidence = [], modalMode = '', loading = false, selectedFiles = [];
+  const f = { from: today().slice(0, 4) + '-01-01', to: today().slice(0, 4) + '-12-31', dateField: 'date', tag: '', asset: '', type: '', priority: '' };
+  const emptyHTML = '<div class="no-data">Sem registros para os filtros selecionados.</div>';
+
+  function notify(message) {
+    $('#toast').textContent = message;
+    $('#toast').hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => $('#toast').hidden = true, 6000);
+  }
+
+  function errorText(e) {
+    if (e?.message === 'Invalid login credentials') return 'E-mail ou senha não conferem.';
+    return e?.message || 'Não foi possível concluir. Tente novamente.';
+  }
+
+  function loginMessage(message, isError = false) {
+    $('#loginMessage').textContent = message;
+    $('#loginMessage').classList.toggle('error', isError);
+  }
+
+  function setPage(next) {
+    page = next;
+    const titles = {
+      overview: 'Visão dos sistemas',
+      intelligence: 'Engenharia & Decisão',
+      icm: 'Itens, causas e medidas',
+      deadlines: 'Planos e prazos',
+      orders: 'Ordens de manutenção'
+    };
+    $('#pageTitle').textContent = titles[next] || 'Visão dos sistemas';
+    $$('[data-page]').forEach(b => b.classList.toggle('active', b.dataset.page === next));
+    $$('[data-view]').forEach(v => v.hidden = v.dataset.view !== next);
+    if (next === 'overview' && map) setTimeout(() => map.invalidateSize(), 60);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function selectOptions(id, values, label, selected) {
+    const el = $(id);
+    if (!el) return '';
+    el.innerHTML = '<option value="">' + esc(label) + '</option>' + values.map(([v, n]) => '<option value="' + esc(v) + '">' + esc(n) + '</option>').join('');
+    el.value = selected || '';
+    return el.value;
+  }
+
+  function options() {
+    if (!data) return;
+    f.tag = selectOptions('#system', data.systems.map(s => [s.tag, s.name]), 'Todos os sistemas', f.tag);
+    f.type = selectOptions('#type', [...new Set(data.orders.map(o => o.type).filter(Boolean))].sort().map(t => [t, P.typeLabel(t)]), 'Todos os tipos', f.type);
+    f.priority = selectOptions('#priority', [...new Set(data.orders.map(o => o.priority).filter(Boolean))].sort().map(p => [p, p]), 'Todas as prioridades', f.priority);
+    assets();
+  }
+
+  function assets() {
+    if (!data) return;
+    const list = [...new Set(data.orders.filter(o => !f.tag || o.tag === f.tag).map(o => o.asset).filter(Boolean))].sort();
+    f.asset = selectOptions('#asset', list.map(v => [v, v]), 'Todos os ativos', f.asset);
+  }
+
+  function field(label, value) {
+    return '<div><dt>' + esc(label) + '</dt><dd>' + esc(value || 'Não informado') + '</dd></div>';
+  }
+
+  function kpi(title, value, note, accent) {
+    return '<article class="kpi"' + (accent ? ' style="--accent:' + accent + '"' : '') + '><span>' + esc(title) + '</span><strong>' + esc(value) + '</strong><small>' + esc(note) + '</small></article>';
+  }
+
+  function renderSystemsList() {
+    if (!data) return;
+    const q = ($('#systemSearch')?.value || '').trim().toLocaleLowerCase('pt-BR');
+    const filteredSystems = data.systems.filter(s => !q || [s.name, s.tag, s.district, s.address].join(' ').toLocaleLowerCase('pt-BR').includes(q));
+    $('#systemCount').textContent = num(filteredSystems.length);
+    if (!filteredSystems.length) {
+      $('#systemsList').innerHTML = emptyHTML;
+      return;
+    }
+    const asOf = today();
+    $('#systemsList').innerHTML = filteredSystems.map(s => {
+      const sysFilter = { ...f, tag: s.tag, asset: f.tag && f.tag !== s.tag ? '' : f.asset };
+      const selected = P.filter(data, sysFilter);
+      const a = P.adherence(data, sysFilter);
+      const n = P.stats(selected);
+      const t = P.timing(P.filter(data, sysFilter, true), asOf);
+      const health = P.systemHealth(a.rate, t.overdue);
+      const badgeLabel = a.rate == null ? 'Sem plano' : pct(a.rate);
+      return '<button class="system-row" data-system="' + esc(s.tag) + '">' +
+        '<div class="system-row-top"><b>' + esc(s.name) + '</b><span class="badge ' + health + '">' + esc(badgeLabel) + '</span></div>' +
+        '<span class="system-meta"><span>' + num(n.done) + ' executadas de ' + num(n.total) + '</span><span>' + (t.overdue ? num(t.overdue) + ' vencida(s)' : esc(s.district || s.tag)) + '</span></span>' +
+        '<span class="mini-track"><i class="' + health + '" style="width:' + (a.rate == null ? 0 : a.rate * 100) + '%"></i></span>' +
+        '</button>';
+    }).join('');
+  }
+
+  function render() {
+    if (!data) {
+      $('#empty').hidden = false;
+      $('#dashboard').hidden = true;
+      $('#scope').textContent = '';
+      return;
+    }
+    $('#empty').hidden = true;
+    $('#dashboard').hidden = false;
+    rows = P.filter(data, f);
+    rankEvidence = [];
+    pageNo = 1;
+    const s = P.stats(rows), a = P.adherence(data, f);
+    $('#kpis').innerHTML =
+      kpi('Ordens no período', num(s.total), 'Instalações e ativos selecionados') +
+      kpi('Ordens executadas', num(s.done), pct(s.total ? s.done / s.total : null) + ' do total', '#0f8a68') +
+      kpi('Em aberto', num(s.open), 'Aguardando execução', '#c2780c') +
+      kpi('Não executadas', num(s.notdone), 'Mantidas na base do plano', '#c43650');
+
+    $('#scope').textContent = (f.tag ? '1 instalação' : num(data.systems.length) + ' instalações') + ' · ' + fmt(f.from) + ' a ' + fmt(f.to);
+    renderSystemsList();
+    $('#planSummary').innerHTML =
+      '<strong class="plan-number">' + pct(a.rate) + '</strong>' +
+      '<div class="sub">' + num(a.done) + ' executadas de ' + num(a.total) + ' ordens do plano</div>' +
+      '<div class="sub" style="margin-top:10px">' + pct(a.withinRate) + ' com início real dentro do período</div>';
+
+    renderMonthly();
+    renderTypeDistribution();
+    renderIntelligence();
+    renderICM();
+    renderTopAssets();
+    renderDeadlines();
+    renderOrders();
+    renderMap();
+  }
+
+  function renderMonthly() {
+    const buckets = new Map();
+    for (const o of rows) {
+      const key = (o[f.dateField] || '').slice(0, 7);
+      if (!key) continue;
+      if (!buckets.has(key)) buckets.set(key, { total: 0, done: 0 });
+      const b = buckets.get(key);
+      b.total++;
+      if (P.status(o) === 'done') b.done++;
+    }
+    const list = [...buckets].sort((a, b) => a[0].localeCompare(b[0]));
+    const max = Math.max(1, ...list.map(v => v[1].total));
+    $('#monthly').innerHTML = list.length
+      ? '<div class="monthly">' + list.map(([m, v]) => {
+          const execPct = Math.round((v.done / v.total) * 100);
+          return '<div class="month" title="' + esc(m) + ': ' + v.done + ' executadas / ' + v.total + ' ordens (' + execPct + '%)">' +
+            '<strong>' + num(v.total) + '</strong>' +
+            '<span class="pct-tag">' + execPct + '%</span>' +
+            '<div class="column" style="height:' + Math.max(4, v.total / max * 110) + 'px"><i style="height:' + (v.done / v.total * 100) + '%"></i></div>' +
+            '<small>' + m.slice(5) + '/' + m.slice(2, 4) + '</small>' +
+            '</div>';
+        }).join('') + '</div>'
+      : emptyHTML;
+  }
+
+  function renderTypeDistribution() {
+    const el = $('#typeDistribution');
+    if (!el) return;
+    const types = P.byType(rows);
+    if (!types.length) {
+      el.innerHTML = emptyHTML;
+      return;
+    }
+    const max = types[0].total;
+    el.innerHTML = '<div class="type-list">' + types.slice(0, 8).map(t => {
+      const isSelected = f.type && f.type === t.type;
+      return '<button type="button" class="type-row' + (isSelected ? ' active-filter' : '') + '" data-type-filter="' + esc(t.type) + '">' +
+        '<div class="row-head"><b>' + esc(t.label) + '</b><span>' + num(t.total) + ' ordens (' + pct(t.rate) + ' exec.)</span></div>' +
+        '<div class="row-sub"><span>' + num(t.done) + ' executadas · ' + num(t.open) + ' em aberto · ' + num(t.notdone) + ' não exec.</span><span>' + num(t.planned) + ' com plano</span></div>' +
+        '<span class="mini-track"><i style="width:' + (t.total / max * 100) + '%"></i></span>' +
+        '</button>';
+    }).join('') + '</div>';
+  }
+
+  function renderTopAssets() {
+    const list = P.topAssets(rows).slice(0, 8);
+    const sysNameByTag = new Map((data?.systems || []).map(s => [s.tag, s.name]));
+    const html = list.length
+      ? '<div class="asset-list">' + list.map(a => {
+          const key = rankEvidence.push({ name: 'Ativo ' + a.asset + ' · ' + a.equipment, count: a.total, ids: a.ids }) - 1;
+          const sysName = sysNameByTag.get(a.tag) || a.tag;
+          const max = list[0].total || 1;
+          return '<button type="button" class="asset-row" data-rank="' + key + '">' +
+            '<div class="row-head"><b>' + esc(a.asset) + '</b><span>' + num(a.done) + ' exec. / ' + num(a.total) + ' OS (' + num(a.corrective) + ' corr.)</span></div>' +
+            '<div class="row-sub"><span>' + esc(a.equipment) + ' · ' + esc(sysName) + '</span><span>' + num(a.open) + ' aberta(s)</span></div>' +
+            '<span class="mini-track"><i style="width:' + (a.total / max * 100) + '%"></i></span>' +
+            '</button>';
+        }).join('') + '</div>'
+      : emptyHTML;
+    if ($('#topAssetsOverview')) $('#topAssetsOverview').innerHTML = html;
+    if ($('#topAssetsIcm')) $('#topAssetsIcm').innerHTML = html;
+  }
+
+  function renderIntelligence() {
+    const kpiEl = $('#engKpis');
+    if (!kpiEl) return;
+    const asOf = today();
+    const m = P.engineeringMetrics(data, rows, asOf);
+    const insights = P.decisionInsights(data, rows, f);
+    const actors = P.badActors(rows).slice(0, 20);
+    const sysNameByTag = new Map((data?.systems || []).map(s => [s.tag, s.name]));
+
+    kpiEl.innerHTML =
+      kpi('Índice de Manutenção Proativa', pct(m.proactiveRate), num(m.proactive) + ' preventivas/preditivas · Meta SMRP ≥ 80%', m.proactiveRate >= 0.75 ? '#0f8a68' : m.proactiveRate >= 0.60 ? '#c2780c' : '#c43650') +
+      kpi('Taxa de Emergência Operacional', pct(m.emergencyRate), num(m.prioEmerg) + ' emergenciais · Meta SMRP ≤ 10%', m.emergencyRate <= 0.10 ? '#0f8a68' : m.emergencyRate <= 0.20 ? '#c2780c' : '#c43650') +
+      kpi('Índice de Paliativos (Efeito Reset)', pct(m.palliativeRate), num(m.palliativeCount) + ' ordens com Reset/Rearme/Parâmetros', m.palliativeRate <= 0.12 ? '#0f8a68' : '#c43650') +
+      kpi('Cobertura ICM nas Corretivas', pct(m.icmCoverageRate), num(m.corrWithIcm) + ' de ' + num(m.correctiveDoneTotal) + ' corretivas com catálogo completo', '#0027bd');
+
+    const mixEl = $('#maintenanceMixBar');
+    if (mixEl) {
+      if (!m.total) {
+        mixEl.innerHTML = emptyHTML;
+      } else {
+        const segs = [
+          ['prev', 'Preventiva (ZTPF/ZTPC)', m.preventive, '#0027bd'],
+          ['pred', 'Preditiva (ZTPD)', m.predictive, '#00b6df'],
+          ['eng', 'Engenharia (ZTEN)', m.engineering, '#0f8a68'],
+          ['cplan', 'Corretiva Prog. (ZNTP/ZTCO)', m.correctivePlan, '#c2780c'],
+          ['serv', 'Serviços/Telemetria (ZNTS)', m.service, '#8592ad'],
+          ['cemerg', 'Corretiva Emergencial (ZNTE)', m.correctiveEmerg, '#c43650']
+        ];
+        mixEl.innerHTML =
+          '<div class="mix-bar-track">' +
+          segs.filter(s => s[2] > 0).map(s => '<div class="mix-seg ' + s[0] + '" style="width:' + (s[2] / m.total * 100) + '%" title="' + esc(s[1]) + ': ' + num(s[2]) + '"></div>').join('') +
+          '</div>' +
+          '<div class="mix-legend">' +
+          segs.map(s =>
+            '<div class="mix-item">' +
+            '<div class="mix-item-head"><span><i class="dot" style="background:' + s[3] + '"></i>' + esc(s[1]) + '</span><b>' + pct(s[2] / m.total) + '</b></div>' +
+            '<small>' + num(s[2]) + ' ordens no período</small>' +
+            '</div>'
+          ).join('') +
+          '<div class="mix-item">' +
+          '<div class="mix-item-head"><span>Lead Time Médio (Entrada → Início)</span><b>' + (m.avgLeadDays == null ? '—' : m.avgLeadDays.toFixed(1) + ' d') + '</b></div>' +
+          '<small>Emergenciais: ' + (m.avgEmergLeadDays == null ? '—' : m.avgEmergLeadDays.toFixed(1) + ' d') + ' · Carteira &gt; 30d: ' + num(m.agedOpen30d) + ' OS</small>' +
+          '</div>' +
+          '</div>';
+      }
+    }
+
+    const decEl = $('#decisionCards');
+    if (decEl) {
+      decEl.innerHTML = insights.length
+        ? insights.map(ins => {
+            let btn = '';
+            if (ins.ids && ins.ids.length) {
+              const key = rankEvidence.push({ name: ins.title, count: ins.ids.length, ids: ins.ids }) - 1;
+              btn = '<button type="button" data-rank="' + key + '">Ver ' + num(ins.ids.length) + ' OS ↗</button>';
+            }
+            return '<article class="decision-card ' + ins.severity + '">' +
+              '<div><span class="eyebrow blue">' + esc(ins.category) + '</span><h3>' + esc(ins.title) + '</h3><p>' + esc(ins.body) + '</p></div>' +
+              '<div class="decision-action"><div><b>Plano de ação recomendado:</b> ' + esc(ins.action) + '</div>' + btn + '</div>' +
+              '</article>';
+          }).join('')
+        : emptyHTML;
+    }
+
+    const actorsEl = $('#badActorsTable');
+    if (actorsEl) {
+      actorsEl.innerHTML = actors.length
+        ? '<table><thead><tr><th>TAG Ativo</th><th>Equipamento / Objeto Técnico</th><th>Instalação</th><th>Total OS</th><th>Corretivas</th><th>Emergenciais</th><th>Retrabalho (&lt; 30d)</th><th>MTBF Estimado</th></tr></thead><tbody>' +
+          actors.map(a => {
+            const key = rankEvidence.push({ name: 'Bad Actor: ' + a.asset + ' (' + a.equipment + ')', count: a.total, ids: a.ids }) - 1;
+            const sysName = sysNameByTag.get(a.tag) || a.tag;
+            const mtbfText = a.mtbfDays == null ? '—' : Math.round(a.mtbfDays) + ' dias';
+            const reworkBadge = a.rework30d > 0 ? '<span class="badge critical">' + num(a.rework30d) + ' reincidência(s)</span>' : '<span class="badge good">0</span>';
+            return '<tr>' +
+              '<td><button class="link" data-rank="' + key + '">' + esc(a.asset) + ' ↗</button></td>' +
+              '<td><b>' + esc(a.equipment) + '</b></td>' +
+              '<td><button class="link" data-system="' + esc(a.tag) + '">' + esc(sysName) + '</button></td>' +
+              '<td>' + num(a.total) + '</td>' +
+              '<td><b>' + num(a.corrective) + '</b></td>' +
+              '<td>' + num(a.emergency) + '</td>' +
+              '<td>' + reworkBadge + '</td>' +
+              '<td><strong>' + esc(mtbfText) + '</strong></td>' +
+              '</tr>';
+          }).join('') + '</tbody></table>'
+        : emptyHTML;
+    }
+  }
+
+  function ranks(kind, source = rows) {
+    return kind === 'action' ? P.rank(data.actions, source, 'action') : P.rank(data.items, source, kind);
+  }
+
+  function rankHTML(list) {
+    if (!list.length) return emptyHTML;
+    const max = list[0].count;
+    return '<div class="rank-list">' + list.slice(0, 8).map(r => {
+      const key = rankEvidence.push(r) - 1;
+      return '<button class="rank" data-rank="' + key + '"><span class="rank-label"><span>' + esc(r.name) + '</span><b>' + num(r.count) + ' OS</b></span><span class="rank-bar"><i style="width:' + (r.count / max * 100) + '%"></i></span></button>';
+    }).join('') + '</div>';
+  }
+
+  function renderICM() {
+    $('#icmCards').innerHTML = [
+      ['component', 'ITENS', 'Itens que mais falharam'],
+      ['cause', 'CAUSAS', 'Causas registradas'],
+      ['action', 'MEDIDAS', 'Intervenções realizadas']
+    ].map(([k, e, h]) =>
+      '<article class="card"><div class="card-top"><div><span class="eyebrow">' + e + '</span><h2>' + h + '</h2></div></div>' + rankHTML(ranks(k)) + '</article>'
+    ).join('');
+
+    const matrix = P.icmMatrix(data, rows).slice(0, 15);
+    const matrixEl = $('#icmMatrixTable');
+    if (matrixEl) {
+      matrixEl.innerHTML = matrix.length
+        ? '<table><thead><tr><th>Item (Componente)</th><th>Problema</th><th>Causa registrada</th><th>Medida realizada</th><th>OS Exec.</th></tr></thead><tbody>' +
+          matrix.map(m => {
+            const key = rankEvidence.push({ name: m.component + ' → ' + m.cause + ' → ' + m.action, count: m.count, ids: m.ids }) - 1;
+            return '<tr>' +
+              '<td><b>' + esc(m.component) + '</b></td>' +
+              '<td>' + esc(m.problem) + '</td>' +
+              '<td>' + esc(m.cause) + '</td>' +
+              '<td>' + esc(m.action) + '</td>' +
+              '<td><button class="link" data-rank="' + key + '">' + num(m.count) + ' OS ↗</button></td>' +
+              '</tr>';
+          }).join('') + '</tbody></table>'
+        : emptyHTML;
+    }
+  }
+
+  function renderDeadlines() {
+    const cohort = P.filter(data, f, true), a = P.adherence(data, f), asOf = today(), t = P.timing(cohort, asOf);
+    $('#deadlineCards').innerHTML =
+      kpi('Aderência ao plano', pct(a.rate), num(a.done) + ' de ' + num(a.total) + ' ordens') +
+      kpi('Executadas no prazo', num(t.onTime), 'Conclusão até o prazo programado', '#0f8a68') +
+      kpi('Executadas fora do prazo', num(t.late), 'Conclusão após o prazo programado', '#c43650') +
+      kpi('Prazo não avaliável', num(t.unassessed), 'Datas ou situação insuficientes', '#c2780c');
+
+    const systemStats = data.systems
+      .filter(s => !f.tag || f.tag === s.tag)
+      .map(s => {
+        const sysFilter = { ...f, tag: s.tag };
+        const adh = P.adherence(data, sysFilter);
+        const tim = P.timing(P.filter(data, sysFilter, true), asOf);
+        return { s, adh, tim, health: P.systemHealth(adh.rate, tim.overdue) };
+      })
+      .sort((x, y) => (y.adh.total - x.adh.total) || x.s.name.localeCompare(y.s.name, 'pt-BR'));
+
+    $('#planTable').innerHTML = '<table><thead><tr><th>Instalação</th><th>Ordens do plano</th><th>Executadas</th><th>Aderência</th><th>Início no período</th><th>Abertas vencidas</th></tr></thead><tbody>' +
+      systemStats.map(({ s, adh, tim, health }) =>
+        '<tr>' +
+        '<td><button class="link" data-system="' + esc(s.tag) + '">' + esc(s.name) + '</button></td>' +
+        '<td>' + num(adh.total) + '</td>' +
+        '<td>' + num(adh.done) + '</td>' +
+        '<td><div class="adherence-cell"><strong>' + pct(adh.rate) + '</strong><span class="adherence-bar"><i class="' + health + '" style="width:' + (adh.rate == null ? 0 : adh.rate * 100) + '%"></i></span></div></td>' +
+        '<td>' + num(adh.within) + '</td>' +
+        '<td>' + (tim.overdue > 0 ? '<span class="badge critical">' + num(tim.overdue) + ' vencida(s)</span>' : '<span class="badge good">0</span>') + '</td>' +
+        '</tr>'
+      ).join('') + '</tbody></table>';
+
+    $('#comparison').innerHTML = [
+      ['Início anterior à referência', t.before],
+      ['Início na referência', t.same],
+      ['Início após a referência', t.after],
+      ['Sem datas para comparação', t.withoutComparison],
+      ['Ordens abertas com prazo vencido', t.overdue],
+      ['Ordens abertas dentro do prazo', t.upcoming],
+      ['Ordens não executadas', t.notdone]
+    ].map(([n, v]) => '<div class="comparison-row"><span>' + n + '</span><b>' + num(v) + '</b></div>').join('');
+  }
+
+  function orderRows() {
+    const q = $('#search').value.toLocaleLowerCase('pt-BR');
+    const s = $('#statusFilter').value;
+    const pf = $('#planFilter')?.value || '';
+    return rows.filter(o =>
+      (!s || P.status(o) === s) &&
+      (!pf || (pf === 'planned' ? Boolean(P.text(o.plan)) : !P.text(o.plan))) &&
+      (!q || [o.id, o.text, o.asset, o.equipment, o.tag, o.type].join(' ').toLocaleLowerCase('pt-BR').includes(q))
+    ).sort((a, b) => (b[f.dateField] || '').localeCompare(a[f.dateField] || '') || b.id.localeCompare(a.id));
+  }
+
+  function table(list) {
+    if (!list.length) return emptyHTML;
+    return '<table><thead><tr><th>Ordem</th><th>Descrição</th><th>Classe</th><th>Instalação / ativo</th><th>Referência</th><th>Início real</th><th>Situação</th></tr></thead><tbody>' +
+      list.map(o =>
+        '<tr>' +
+        '<td><button class="link" data-order="' + esc(o.id) + '">' + esc(o.id) + '</button></td>' +
+        '<td class="description">' + esc(o.text) + '</td>' +
+        '<td>' + esc(P.typeLabel(o.type)) + '</td>' +
+        '<td>' + esc(o.asset || o.tag) + '</td>' +
+        '<td>' + fmt(o.date) + '</td>' +
+        '<td>' + fmt(o.start) + '</td>' +
+        '<td><span class="badge ' + P.status(o) + '">' + P.labels[P.status(o)] + '</span></td>' +
+        '</tr>'
+      ).join('') + '</tbody></table>';
+  }
+
+  function renderOrders() {
+    const all = orderRows(), pages = Math.max(1, Math.ceil(all.length / 30));
+    pageNo = Math.max(1, Math.min(pageNo, pages));
+    $('#ordersTable').innerHTML = table(all.slice((pageNo - 1) * 30, pageNo * 30));
+    $('#pageInfo').textContent = 'Página ' + pageNo + ' de ' + pages + ' · ' + num(all.length) + ' ordens';
+    $('#prevPage').disabled = pageNo === 1;
+    $('#nextPage').disabled = pageNo === pages;
+  }
+
+  function openDetail(html, eyebrow) {
+    $('#modalEyebrow').textContent = eyebrow;
+    $('#detailBody').innerHTML = html;
+    if (!$('#detail').open) $('#detail').showModal();
+  }
+
+  function showSystem(tag) {
+    const s = data.systems.find(s => s.tag === tag);
+    if (!s) return;
+    modalMode = 'system';
+    const filter = { ...f, tag }, source = P.filter(data, filter), n = P.stats(source), a = P.adherence(data, filter);
+    const blocks = [
+      ['component', 'Itens que mais falharam'],
+      ['cause', 'Causas registradas'],
+      ['action', 'Medidas realizadas']
+    ].map(([k, title]) => '<div class="detail-block"><h3>' + title + '</h3>' + rankHTML(ranks(k, source)) + '</div>').join('');
+    const photo = /^https:\/\//i.test(s.photo) ? '<p><a href="' + esc(s.photo) + '" target="_blank" rel="noopener noreferrer">Abrir imagem cadastrada ↗</a></p>' : '';
+    openDetail(
+      '<div class="detail-heading"><h2>' + esc(s.name) + '</h2><p>' + esc(s.tag) + ' · ' + esc(s.address || s.district || 'Endereço não informado') + '</p></div>' +
+      '<div class="detail-kpis"><div><small>Ordens executadas</small><b>' + num(n.done) + '</b></div><div><small>Aderência ao plano</small><b>' + pct(a.rate) + '</b></div><div><small>Ordens no período</small><b>' + num(n.total) + '</b></div></div>' +
+      '<dl class="order-info">' +
+      field('Situação operacional', s.status) +
+      field('Criticidade', s.critical) +
+      field('Tipo cadastrado', s.type) +
+      field('Latitude', s.lat) +
+      field('Longitude', s.lng) +
+      field('Bairro', s.district) +
+      '</dl>' + photo +
+      '<h3 class="detail-section">Itens, Causas e Medidas</h3><div class="detail-grid">' + blocks + '</div>' +
+      '<h3 class="detail-section">Ordens mais recentes no período</h3><div class="table-wrap">' + table([...source].sort((a, b) => (b[f.dateField] || '').localeCompare(a[f.dateField] || '')).slice(0, 50)) + '</div>',
+      'INSTALAÇÃO · ÁGUAS DE TERESINA'
+    );
+  }
+
+  function showOrder(id) {
+    const o = data.orders.find(o => o.id === id);
+    if (!o) return;
+    modalMode = 'order';
+    const items = data.items.filter(i => i.order === id), actions = data.actions.filter(i => i.order === id), s = data.systems.find(s => s.tag === o.tag);
+    openDetail(
+      '<div class="detail-heading"><h2>Ordem ' + esc(o.id) + '</h2><p>' + esc(o.text) + '</p></div>' +
+      '<span class="badge ' + P.status(o) + '">' + P.labels[P.status(o)] + '</span>' +
+      '<dl class="order-info">' +
+      field('Instalação', s?.name || o.tag) +
+      field('Ativo', o.asset) +
+      field('Equipamento', o.equipment) +
+      field('Data de entrada', fmt(o.created)) +
+      field('Data de referência', fmt(o.date)) +
+      field('Início real', fmt(o.start)) +
+      field('Prazo programado', fmt(o.due)) +
+      field('Conclusão real', fmt(o.finished)) +
+      field('Plano de manutenção', o.plan) +
+      field('Tipo da ordem', P.typeLabel(o.type)) +
+      field('Prioridade', o.priority) +
+      field('Nota', o.note) +
+      '</dl>' +
+      '<h3 class="detail-section">Itens e causas registrados</h3>' +
+      (items.length
+        ? '<div class="detail-grid">' + items.map(i => '<div class="detail-block"><h3>' + esc(i.component || 'Item não informado') + '</h3><p><b>Problema:</b> ' + esc(i.problem || 'Não informado') + '</p><p><b>Causa registrada:</b> ' + esc(i.cause || 'Não informada') + '</p></div>').join('') + '</div>'
+        : emptyHTML) +
+      '<h3 class="detail-section">Medidas realizadas</h3>' +
+      (actions.length
+        ? actions.map(i => '<div class="detail-block" style="margin:8px 0">' + esc(i.action || 'Não informada') + '</div>').join('')
+        : emptyHTML),
+      'EVIDÊNCIAS DA MANUTENÇÃO'
+    );
+  }
+
+  function showEvidence(index) {
+    const r = rankEvidence[index];
+    if (!r) return;
+    const ids = new Set(r.ids), list = data.orders.filter(o => ids.has(o.id));
+    modalMode = 'evidence';
+    openDetail(
+      '<div class="detail-heading"><h2>' + esc(r.name) + '</h2><p>' + num(list.length) + ' ordens distintas nos filtros selecionados.</p></div>' +
+      '<div class="table-wrap">' + table(list) + '</div>',
+      'ICM & ENGENHARIA · ORDENS RELACIONADAS'
+    );
+  }
+
+  function renderMap() {
+    if (!window.L) {
+      $('#map').innerHTML = '<div class="no-data">Não foi possível carregar o mapa. Consulte as instalações na lista ao lado.</div>';
+      return;
+    }
+    if (!map) {
+      map = L.map('map', { scrollWheelZoom: false }).setView([-5.09, -42.8], 12);
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+      }).on('tileerror', () => $('#mapWarning').hidden = false).addTo(map);
+      markers = L.layerGroup().addTo(map);
+    }
+    markers.clearLayers();
+    const systems = data.systems.filter(s => !f.tag || s.tag === f.tag), coords = [], asOf = today();
+    systems.forEach((s, i) => {
+      if (!Number.isFinite(s.lat) || !Number.isFinite(s.lng)) return;
+      coords.push([s.lat, s.lng]);
+      const sysFilter = { ...f, tag: s.tag };
+      const source = P.filter(data, sysFilter), n = P.stats(source), a = P.adherence(data, sysFilter), tim = P.timing(P.filter(data, sysFilter, true), asOf);
+      const health = P.systemHealth(a.rate, tim.overdue);
+      const top = ranks('component', source)[0], cause = ranks('cause', source)[0], act = ranks('action', source)[0];
+      const marker = L.marker([s.lat, s.lng], {
+        icon: L.divIcon({ className: '', html: '<div class="map-pin ' + health + '"></div>', iconSize: [16, 16], iconAnchor: [8, 8] }),
+        title: s.name
+      }).addTo(markers);
+      marker.bindTooltip(esc(s.name), { permanent: true, direction: i % 2 ? 'right' : 'left', offset: [i % 2 ? 11 : -11, (i % 3 - 1) * 12], className: 'point-label' });
+      const html =
+        '<div class="hover-title"><b>' + esc(s.name) + '</b></div>' +
+        '<small>' + esc(s.status || 'Situação não informada') + (s.critical ? ' · Criticidade: ' + esc(s.critical) : '') + '</small>' +
+        '<div class="hover-grid"><div><small>Ordens executadas</small><b>' + num(n.done) + '</b></div><div><small>Aderência ao plano</small><b>' + pct(a.rate) + '</b></div></div>' +
+        '<div class="hover-footer"><b>Item:</b> ' + esc(top?.name || 'Sem registro') + '<br><b>Causa:</b> ' + esc(cause?.name || 'Sem registro') + '<br><b>Medida:</b> ' + esc(act?.name || 'Sem registro') + '</div>' +
+        '<div class="hover-footer">Clique no ponto para abrir a instalação.</div>';
+      marker.bindPopup(html, { closeButton: false, autoPan: false });
+      marker.on('mouseover', () => marker.openPopup());
+      marker.on('mouseout', () => marker.closePopup());
+      marker.on('click', () => showSystem(s.tag));
+    });
+    fitBounds = coords.length ? L.latLngBounds(coords) : null;
+    setTimeout(() => {
+      map.invalidateSize();
+      if (fitBounds) map.fitBounds(fitBounds, { padding: [70, 60], maxZoom: 14 });
+    }, 50);
+  }
+
+  async function loadData() {
+    if (loading) return;
+    loading = true;
+    $('#refreshBtn').disabled = true;
+    try {
+      const { data: row, error } = await db.from('pcm_teresina_dataset').select('payload,revision,updated_at').eq('id', 'principal').maybeSingle();
+      if (error) throw error;
+      if (!row) throw Error('Sua conta não tem acesso a este painel.');
+      revision = row.revision;
+      data = row.payload;
+      options();
+      render();
+      $('#loadStatus').textContent = data ? 'Base atualizada em ' + new Date(row.updated_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : 'Nenhum conjunto importado';
+      $('#footerDate').textContent = data ? 'Revisão ' + revision + ' · ' + num(data.orders.length) + ' ordens na base' : 'Aguardando primeira importação';
+    } finally {
+      loading = false;
+      $('#refreshBtn').disabled = false;
+    }
+  }
+
+  async function enter(session) {
+    if (!session) return;
+    user = session.user;
+    const { data: member, error } = await db.from('pcm_teresina_members').select('role').eq('user_id', user.id).maybeSingle();
+    if (error) throw error;
+    if (!member) throw Error('Esta conta ainda não está autorizada no painel de Teresina.');
+    role = member.role;
+    $('#access').hidden = true;
+    $('#shell').hidden = false;
+    $('#importBtn').hidden = role !== 'admin';
+    $('#emptyImport').hidden = role !== 'admin';
+    if ($('#userChip')) {
+      $('#userChip').hidden = false;
+      $('#userRoleBadge').textContent = role === 'admin' ? 'ADMIN' : 'CONSULTA';
+      $('#userEmailLabel').textContent = user.email || '';
+    }
+    await loadData();
+  }
+
+  function lock() {
+    user = null;
+    data = null;
+    pending = null;
+    role = '';
+    rows = [];
+    $('#access').hidden = false;
+    $('#shell').hidden = true;
+    if ($('#userChip')) $('#userChip').hidden = true;
+    $('#detail').close();
+    $('#importDialog').close();
+    $('#detailBody').innerHTML = '';
+    if (markers) markers.clearLayers();
+    loginMessage('');
+  }
+
+  function renderFileChecklist(files) {
+    const el = $('#fileChecklist');
+    if (!el) return;
+    if (!files || !files.length) {
+      el.innerHTML = '';
+      return;
+    }
+    el.innerHTML = files.map(file => {
+      const sizeMb = (file.size / (1024 * 1024)).toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+      const valid = /\.xlsx$/i.test(file.name) && file.size <= 25 * 1024 * 1024;
+      return '<div class="file-check-item ' + (valid ? 'ready' : '') + '">' +
+        '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(file.name) + '</span>' +
+        '<b>' + sizeMb + ' MB</b>' +
+        '</div>';
+    }).join('');
+  }
+
+  function openImport() {
+    if (role !== 'admin') return notify('Seu acesso permite apenas consulta.');
+    pending = null;
+    selectedFiles = [];
+    $('#files').value = '';
+    renderFileChecklist([]);
+    $('#importReview').innerHTML = '';
+    $('#importMessage').textContent = '';
+    $('#saveImport').hidden = true;
+    $('#validateImport').hidden = false;
+    $('#importDialog').showModal();
+  }
+
+  function importMessage(msg, error = false) {
+    $('#importMessage').textContent = msg;
+    $('#importMessage').classList.toggle('error', error);
+  }
+
+  async function validateImport() {
+    pending = null;
+    $('#saveImport').hidden = true;
+    const files = selectedFiles.length ? selectedFiles : [...$('#files').files];
+    if (files.length !== 4) return importMessage('Selecione exatamente quatro arquivos: sistemas, ordens, itens e medidas.', true);
+    if (files.some(f => !/\.xlsx$/i.test(f.name) || f.size > 25 * 1024 * 1024)) return importMessage('Use arquivos .xlsx de até 25 MB cada.', true);
+    $('#validateImport').disabled = true;
+    $('#files').disabled = true;
+    $('#closeImport').disabled = true;
+    pendingRevision = revision;
+    try {
+      importMessage('Preparando leitura das planilhas…');
+      const buffers = await Promise.all(files.map(async file => ({ name: file.name, buffer: await file.arrayBuffer() })));
+      const result = await new Promise((resolve, reject) => {
+        worker = new Worker('import-worker.js');
+        const timeout = setTimeout(() => {
+          worker.terminate();
+          reject(Error('A leitura excedeu três minutos. Reduza o tamanho do conjunto.'));
+        }, 180000);
+        worker.onmessage = ({ data: r }) => {
+          if (r.progress) return importMessage(r.progress);
+          clearTimeout(timeout);
+          worker.terminate();
+          worker = null;
+          if (r.error) reject(Error(r.error));
+          else resolve(r.result);
+        };
+        worker.onerror = () => {
+          clearTimeout(timeout);
+          worker.terminate();
+          worker = null;
+          reject(Error('Falha ao ler as planilhas. Verifique sua conexão e o formato dos arquivos.'));
+        };
+        worker.postMessage(buffers, buffers.map(f => f.buffer));
+      });
+      if (new Blob([JSON.stringify(result)]).size > 19 * 1024 * 1024) throw Error('O conjunto processado excede o limite de 19 MB. Reduza o intervalo da exportação.');
+      pending = result;
+      $('#importReview').innerHTML =
+        '<div class="detail-kpis"><div><small>Instalações</small><b>' + num(result.systems.length) + '</b></div><div><small>Ordens válidas</small><b>' + num(result.orders.length) + '</b></div><div><small>Itens / medidas</small><b>' + num(result.items.length) + ' / ' + num(result.actions.length) + '</b></div></div>' +
+        '<p class="small-note">' + num(result.meta.excluded) + ' ordens fora do escopo; ' + num(result.meta.missingReference) + ' sem data de referência. A base atual será substituída integralmente após salvar.</p>';
+      importMessage('Validação concluída. Confira os totais e salve a atualização.');
+      $('#saveImport').hidden = false;
+    } catch (e) {
+      importMessage(errorText(e), true);
+    } finally {
+      $('#validateImport').disabled = false;
+      $('#files').disabled = false;
+      $('#closeImport').disabled = false;
+    }
+  }
+
+  async function saveImport() {
+    if (!pending || role !== 'admin') return;
+    $('#saveImport').disabled = true;
+    $('#closeImport').disabled = true;
+    $('#validateImport').disabled = true;
+    $('#files').disabled = true;
+    try {
+      importMessage('Salvando a base compartilhada…');
+      const { data: saved, error } = await db.from('pcm_teresina_dataset').update({ payload: pending }).eq('id', 'principal').eq('revision', pendingRevision).select('revision,updated_at').maybeSingle();
+      if (error) throw error;
+      if (!saved) throw Error('A base foi atualizada por outra sessão. Feche esta janela, atualize o painel e valide novamente.');
+      pending = null;
+      $('#saveImport').hidden = true;
+      await loadData();
+      $('#importDialog').close();
+      notify('Base salva. Mapa e indicadores atualizados.');
+    } catch (e) {
+      importMessage(errorText(e), true);
+    } finally {
+      $('#saveImport').disabled = false;
+      $('#closeImport').disabled = false;
+      $('#validateImport').disabled = false;
+      $('#files').disabled = false;
+    }
+  }
+
+  function downloadCsvFile(filename, lines) {
+    const url = URL.createObjectURL(new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  const safeCsvCell = v => {
+    let s = String(v ?? '');
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+    return '"' + s.replaceAll('"', '""') + '"';
+  };
+
+  function exportCSV() {
+    const list = orderRows();
+    const fields = [['Ordem', 'id'], ['Descrição', 'text'], ['Tipo', 'type'], ['Prioridade', 'priority'], ['Instalação', 'tag'], ['Ativo', 'asset'], ['Entrada', 'created'], ['Referência', 'date'], ['Início real', 'start'], ['Plano', 'plan'], ['Prazo programado', 'due'], ['Conclusão real', 'finished']];
+    const lines = [
+      fields.map(v => v[0]).concat('Situação').map(safeCsvCell).join(';'),
+      ...list.map(o => fields.map(v => o[v[1]]).concat(P.labels[P.status(o)]).map(safeCsvCell).join(';'))
+    ];
+    downloadCsvFile('Ordens_Aguas_de_Teresina_' + today() + '.csv', lines);
+  }
+
+  function exportIcmCSV() {
+    if (!data) return;
+    const matrix = P.icmMatrix(data, rows);
+    const lines = [
+      ['Item (Componente)', 'Problema', 'Causa Registrada', 'Medida Realizada', 'Ordens Executadas Distintas'].map(safeCsvCell).join(';'),
+      ...matrix.map(m => [m.component, m.problem, m.cause, m.action, m.count].map(safeCsvCell).join(';'))
+    ];
+    downloadCsvFile('ICM_Matriz_Aguas_de_Teresina_' + today() + '.csv', lines);
+  }
+
+  function exportDeadlinesCSV() {
+    if (!data) return;
+    const asOf = today();
+    const lines = [
+      ['TAG Instalação', 'Nome da Instalação', 'Ordens do Plano', 'Executadas', 'Aderência (%)', 'Início no Período', 'Abertas Vencidas'].map(safeCsvCell).join(';'),
+      ...data.systems.filter(s => !f.tag || f.tag === s.tag).map(s => {
+        const sysFilter = { ...f, tag: s.tag };
+        const adh = P.adherence(data, sysFilter);
+        const tim = P.timing(P.filter(data, sysFilter, true), asOf);
+        return [s.tag, s.name, adh.total, adh.done, adh.rate == null ? '' : (adh.rate * 100).toFixed(1), adh.within, tim.overdue].map(safeCsvCell).join(';');
+      })
+    ];
+    downloadCsvFile('Aderencia_Instalacoes_Aguas_de_Teresina_' + today() + '.csv', lines);
+  }
+
+  function exportBadActorsCSV() {
+    if (!data) return;
+    const actors = P.badActors(rows);
+    const sysNameByTag = new Map((data.systems || []).map(s => [s.tag, s.name]));
+    const lines = [
+      ['TAG Ativo', 'Equipamento', 'TAG Instalação', 'Instalação', 'Total OS', 'Ordens Executadas', 'Corretivas', 'Emergenciais', 'Retrabalho (<30 dias)', 'MTBF Estimado (dias)'].map(safeCsvCell).join(';'),
+      ...actors.map(a => [a.asset, a.equipment, a.tag, sysNameByTag.get(a.tag) || a.tag, a.total, a.done, a.corrective, a.emergency, a.rework30d, a.mtbfDays == null ? '' : Math.round(a.mtbfDays)].map(safeCsvCell).join(';'))
+    ];
+    downloadCsvFile('Bad_Actors_MTBF_Aguas_de_Teresina_' + today() + '.csv', lines);
+  }
+
+  function applyPeriodPreset(preset) {
+    const now = today();
+    const year = now.slice(0, 4);
+    const month = now.slice(0, 7);
+    if (preset === 'month') {
+      f.from = month + '-01';
+      f.to = now;
+    } else if (preset === '90d') {
+      const d = new Date(now + 'T00:00:00Z');
+      d.setUTCDate(d.getUTCDate() - 90);
+      f.from = d.toISOString().slice(0, 10);
+      f.to = now;
+    } else if (preset === 'year') {
+      f.from = year + '-01-01';
+      f.to = year + '-12-31';
+    } else if (preset === 'all') {
+      const dates = (data?.orders || []).map(o => o[f.dateField] || o.date).filter(P.validDate).sort();
+      f.from = dates[0] || '2020-01-01';
+      f.to = dates[dates.length - 1] || year + '-12-31';
+    }
+    $('#from').value = f.from;
+    $('#to').value = f.to;
+    $$('.preset-btn').forEach(b => b.classList.toggle('active', b.dataset.preset === preset));
+    if (data) render();
+  }
+
+  function rules() {
+    openDetail(
+      '<div class="detail-heading"><h2>Critérios dos indicadores e Engenharia de Manutenção</h2><p>Regras aplicadas a todos os sistemas, filtros e diagnósticos executivos (NBR 5462 / SMRP).</p></div>' +
+      '<div class="explanation">' +
+      '<h3>Ordens executadas</h3><p>Ordens com encerramento técnico (ENTE). O registro de não execução (NEXE) tem prioridade quando as situações coexistem. Encerramento administrativo (ENCE), isoladamente, não comprova execução.</p>' +
+      '<h3>Aderência ao plano</h3><p>Ordens executadas do plano divididas pelas ordens existentes com plano preenchido e referência no período. Ordens abertas e não executadas permanecem no denominador.</p>' +
+      '<h3>Mix Proativo × Reativo (Benchmark SMRP)</h3><p>Proativa soma Preventivas Sistemáticas/Condicionais (ZTPF/ZTPC), Preditivas (ZTPD) e Engenharia (ZTEN). Reativa agrupa Corretivas Emergenciais (ZNTE), Corretivas Programadas (ZNTP/ZTCO) e Serviços (ZNTS). A referência internacional SMRP é ≥ 80% de manutenção proativa.</p>' +
+      '<h3>Índice de Paliativos ("Efeito Reset")</h3><p>Proporção de ordens com medida apontada cujo encerramento foi apenas Rearme, Reset ou Ajuste de Parâmetros. Valores elevados indicam necessidade de investigação de qualidade de energia, proteção elétrica ou automação.</p>' +
+      '<h3>Bad Actors, Retrabalho (&lt; 30 dias) e MTBF</h3><p>Equipamentos são ranqueados pelo volume de intervenções corretivas. Falhas corretivas sucessivas no mesmo ativo em intervalo ≤ 30 dias são contabilizadas como retrabalho/reincidência prematura. O MTBF estimado calcula a média de dias entre intervenções corretivas consecutivas do ativo.</p>' +
+      '<h3>Itens, Causas e Medidas (ICM)</h3><p>Ordens executadas distintas por item, causa ou medida. Registros de falha inexistente e de não executar são excluídos dos rankings. As causas refletem o apontamento da ordem; a confirmação de causa raiz requer RCA.</p>' +
+      '</div>',
+      'METODOLOGIA · PCM AEGEA'
+    );
+  }
+
+  function bind() {
+    $('#from').value = f.from;
+    $('#to').value = f.to;
+    $$('[data-page]').forEach(b => b.onclick = () => setPage(b.dataset.page));
+    $$('[data-go]').forEach(b => b.onclick = () => setPage(b.dataset.go));
+    $$('.preset-btn').forEach(b => b.onclick = () => applyPeriodPreset(b.dataset.preset));
+
+    for (const [id, key] of [['from', 'from'], ['to', 'to'], ['dateField', 'dateField'], ['system', 'tag'], ['asset', 'asset'], ['type', 'type'], ['priority', 'priority']]) {
+      const el = $('#' + id);
+      if (!el) continue;
+      el.onchange = () => {
+        if ((id === 'from' || id === 'to') && (!P.validDate($('#from').value) || !P.validDate($('#to').value) || $('#from').value > $('#to').value)) {
+          $('#from').value = f.from;
+          $('#to').value = f.to;
+          notify('Informe um intervalo de datas válido.');
+          return;
+        }
+        if (id === 'from' || id === 'to') $$('.preset-btn').forEach(b => b.classList.remove('active'));
+        f[key] = el.value;
+        if (key === 'tag') {
+          f.asset = '';
+          assets();
+        }
+        if (data) render();
+      };
+    }
+
+    $('#clearFilters').onclick = () => {
+      Object.assign(f, { from: today().slice(0, 4) + '-01-01', to: today().slice(0, 4) + '-12-31', dateField: 'date', tag: '', asset: '', type: '', priority: '' });
+      $('#from').value = f.from;
+      $('#to').value = f.to;
+      $('#dateField').value = 'date';
+      $('#search').value = '';
+      $('#statusFilter').value = '';
+      if ($('#planFilter')) $('#planFilter').value = '';
+      if ($('#systemSearch')) $('#systemSearch').value = '';
+      $$('.preset-btn').forEach(b => b.classList.toggle('active', b.dataset.preset === 'year'));
+      options();
+      render();
+    };
+
+    if ($('#systemSearch')) {
+      $('#systemSearch').oninput = () => renderSystemsList();
+    }
+
+    document.addEventListener('click', event => {
+      const s = event.target.closest('[data-system]');
+      const o = event.target.closest('[data-order]');
+      const r = event.target.closest('[data-rank]');
+      const tf = event.target.closest('[data-type-filter]');
+      if (s && data) showSystem(s.dataset.system);
+      else if (o && data) showOrder(o.dataset.order);
+      else if (r && data) showEvidence(Number(r.dataset.rank));
+      else if (tf && data) {
+        const clickedType = tf.dataset.typeFilter;
+        f.type = f.type === clickedType ? '' : clickedType;
+        if ($('#type')) $('#type').value = f.type;
+        render();
+      }
+    });
+
+    $('#search').oninput = () => { pageNo = 1; if (data) renderOrders(); };
+    $('#statusFilter').onchange = () => { pageNo = 1; if (data) renderOrders(); };
+    if ($('#planFilter')) $('#planFilter').onchange = () => { pageNo = 1; if (data) renderOrders(); };
+    $('#prevPage').onclick = () => { pageNo--; renderOrders(); };
+    $('#nextPage').onclick = () => { pageNo++; renderOrders(); };
+    $('#closeDetail').onclick = () => $('#detail').close();
+    $('#rulesBtn').onclick = rules;
+    $('#fitMap').onclick = () => { if (map && fitBounds) map.fitBounds(fitBounds, { padding: [70, 60], maxZoom: 14 }); };
+
+    if ($('#fullscreenMap')) {
+      $('#fullscreenMap').onclick = () => {
+        const card = $('#mapCard');
+        const expanded = card.classList.toggle('is-fullscreen');
+        $('#fullscreenMap').textContent = expanded ? 'Reduzir ⤡' : 'Expandir ⤢';
+        if (map) setTimeout(() => { map.invalidateSize(); if (fitBounds) map.fitBounds(fitBounds, { padding: [70, 60], maxZoom: 14 }); }, 80);
+      };
+    }
+
+    $('#refreshBtn').onclick = async () => {
+      try {
+        await loadData();
+        notify('Informações atualizadas.');
+      } catch (e) {
+        notify(errorText(e));
+      }
+    };
+
+    $('#importBtn').onclick = openImport;
+    $('#emptyImport').onclick = openImport;
+    $('#closeImport').onclick = () => $('#importDialog').close();
+    $('#validateImport').onclick = validateImport;
+    $('#saveImport').onclick = saveImport;
+    $('#exportBtn').onclick = exportCSV;
+    if ($('#exportIcmBtn')) $('#exportIcmBtn').onclick = exportIcmCSV;
+    if ($('#exportDeadlinesBtn')) $('#exportDeadlinesBtn').onclick = exportDeadlinesCSV;
+    if ($('#exportBadActorsBtn')) $('#exportBadActorsBtn').onclick = exportBadActorsCSV;
+
+    $('#files').onchange = () => {
+      selectedFiles = [...$('#files').files];
+      pending = null;
+      $('#saveImport').hidden = true;
+      $('#importReview').innerHTML = '';
+      renderFileChecklist(selectedFiles);
+      importMessage('');
+    };
+
+    const dropZone = $('#dropZone');
+    if (dropZone) {
+      ['dragenter', 'dragover'].forEach(evt => dropZone.addEventListener(evt, e => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+      }));
+      ['dragleave', 'drop'].forEach(evt => dropZone.addEventListener(evt, e => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+      }));
+      dropZone.addEventListener('drop', e => {
+        const dropped = [...(e.dataTransfer?.files || [])];
+        if (!dropped.length) return;
+        selectedFiles = dropped;
+        pending = null;
+        $('#saveImport').hidden = true;
+        $('#importReview').innerHTML = '';
+        renderFileChecklist(selectedFiles);
+        importMessage('');
+      });
+    }
+
+    $('#importDialog').addEventListener('cancel', e => { if ($('#closeImport').disabled) e.preventDefault(); });
+    $('#logoutTop').onclick = $('#logoutBtn').onclick = async () => {
+      const { error } = await db.auth.signOut({ scope: 'local' });
+      if (error) notify(errorText(error));
+      else lock();
+    };
+    $('#loginForm').onsubmit = async event => {
+      event.preventDefault();
+      $('#loginBtn').disabled = true;
+      loginMessage('Entrando…');
+      try {
+        const { data: auth, error } = await db.auth.signInWithPassword({ email: $('#email').value.trim(), password: $('#password').value });
+        if (error) throw error;
+        $('#password').value = '';
+        await enter(auth.session);
+        loginMessage('');
+      } catch (e) {
+        $('#access').hidden = false;
+        $('#shell').hidden = true;
+        loginMessage(errorText(e), true);
+      } finally {
+        $('#loginBtn').disabled = false;
+      }
+    };
+  }
+
+  async function boot() {
+    bind();
+    if (!window.supabase || !P) {
+      loginMessage('Não foi possível carregar os recursos. Verifique sua conexão e recarregue a página.', true);
+      return;
+    }
+    db = window.supabase.createClient(window.PCM_CONFIG.url, window.PCM_CONFIG.key, {
+      auth: { storageKey: 'pcm-teresina-session', persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+    });
+    db.auth.onAuthStateChange(event => { if (event === 'SIGNED_OUT') lock(); });
+    try {
+      const { data: auth, error } = await db.auth.getSession();
+      if (error) throw error;
+      if (auth.session) await enter(auth.session);
+    } catch (e) {
+      loginMessage(errorText(e), true);
+      $('#access').hidden = false;
+      $('#shell').hidden = true;
+    }
+  }
+
+  boot();
 })();
+
