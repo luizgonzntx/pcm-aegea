@@ -6,8 +6,58 @@
   const today = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 
   let db, data = null, revision = 0, user = null, role = '', page = 'overview', pageNo = 1, pending = null, pendingRevision = 0, worker = null, toastTimer, map, markers, fitBounds, rows = [], rankEvidence = [], modalMode = '', loading = false, selectedFiles = [];
-  const f = { from: today().slice(0, 4) + '-01-01', to: today().slice(0, 4) + '-12-31', dateField: 'date', tag: '', asset: '', type: '', priority: '' };
+  // O recorte operacional sempre usa a data de entrada da ordem.
+  const f = { from: today().slice(0, 4) + '-01-01', to: today().slice(0, 4) + '-12-31', dateField: 'created', tag: [], asset: [], type: [], priority: [] };
   const emptyHTML = '<div class="no-data">Sem registros para os filtros selecionados.</div>';
+
+  const filterLabels = {
+    tag: { options: '#systemOptions', summary: '#systemSummary', all: 'Todos os sistemas' },
+    asset: { options: '#assetOptions', summary: '#assetSummary', all: 'Todos os ativos' },
+    type: { options: '#typeOptions', summary: '#typeSummary', all: 'Todos os tipos' },
+    priority: { options: '#priorityOptions', summary: '#prioritySummary', all: 'Todas as prioridades' }
+  };
+
+  function selectedValues(key) {
+    const value = f[key];
+    return Array.isArray(value) ? value : (value ? [value] : []);
+  }
+
+  function matchesFilter(value, selected) {
+    const list = Array.isArray(selected) ? selected : (selected ? [selected] : []);
+    return !list.length || list.includes(value);
+  }
+
+  function filterSummary(key, values) {
+    const cfg = filterLabels[key], count = values.length;
+    if (!count) return cfg.all;
+    if (count === 1) {
+      const input = [...document.querySelectorAll(cfg.options + ' input')].find(item => item.value === values[0]);
+      return input?.dataset.label || values[0];
+    }
+    return count + ' selecionados';
+  }
+
+  function renderFilterPicker(key, list) {
+    const cfg = filterLabels[key], el = $(cfg.options);
+    if (!el) return;
+    const selected = selectedValues(key);
+    el.innerHTML = list.length
+      ? list.map(([value, label]) => '<label class="filter-option"><input type="checkbox" class="filter-check" data-filter-key="' + key + '" value="' + esc(value) + '" data-label="' + esc(label) + '"' + (selected.includes(value) ? ' checked' : '') + '><span>' + esc(label) + '</span></label>').join('')
+      : '<span class="filter-empty">Nenhuma opção disponível</span>';
+    $(cfg.summary).textContent = filterSummary(key, selected);
+  }
+
+  function refreshFilterSummary(key) {
+    const cfg = filterLabels[key];
+    if ($(cfg.summary)) $(cfg.summary).textContent = filterSummary(key, selectedValues(key));
+  }
+
+  function toggleFilterValue(key, value) {
+    const selected = new Set(selectedValues(key));
+    if (selected.has(value)) selected.delete(value); else selected.add(value);
+    f[key] = [...selected];
+    refreshFilterSummary(key);
+  }
 
   function notify(message) {
     $('#toast').textContent = message;
@@ -52,16 +102,18 @@
 
   function options() {
     if (!data) return;
-    f.tag = selectOptions('#system', data.systems.map(s => [s.tag, s.name]), 'Todos os sistemas', f.tag);
-    f.type = selectOptions('#type', [...new Set(data.orders.map(o => o.type).filter(Boolean))].sort().map(t => [t, P.typeLabel(t)]), 'Todos os tipos', f.type);
-    f.priority = selectOptions('#priority', [...new Set(data.orders.map(o => o.priority).filter(Boolean))].sort().map(p => [p, p]), 'Todas as prioridades', f.priority);
+    renderFilterPicker('tag', data.systems.map(s => [s.tag, s.name]));
+    renderFilterPicker('type', [...new Set(data.orders.map(o => o.type).filter(Boolean))].sort().map(t => [t, P.typeLabel(t)]));
+    renderFilterPicker('priority', [...new Set(data.orders.map(o => o.priority).filter(Boolean))].sort().map(p => [p, p]));
     assets();
   }
 
   function assets() {
     if (!data) return;
-    const list = [...new Set(data.orders.filter(o => !f.tag || o.tag === f.tag).map(o => o.asset).filter(Boolean))].sort();
-    f.asset = selectOptions('#asset', list.map(v => [v, v]), 'Todos os ativos', f.asset);
+    const list = [...new Set(data.orders.filter(o => matchesFilter(o.tag, f.tag)).map(o => o.asset).filter(Boolean))].sort();
+    const available = new Set(list);
+    f.asset = selectedValues('asset').filter(value => available.has(value));
+    renderFilterPicker('asset', list.map(v => [v, v]));
   }
 
   function field(label, value) {
@@ -83,7 +135,7 @@
     }
     const asOf = today();
     $('#systemsList').innerHTML = filteredSystems.map(s => {
-      const sysFilter = { ...f, tag: s.tag, asset: f.tag && f.tag !== s.tag ? '' : f.asset };
+      const sysFilter = { ...f, tag: [s.tag], asset: selectedValues('tag').length && !selectedValues('tag').includes(s.tag) ? [] : selectedValues('asset') };
       const selected = P.filter(data, sysFilter);
       const a = P.adherence(data, sysFilter);
       const n = P.stats(selected);
@@ -117,7 +169,7 @@
       kpi('Em aberto', num(s.open), 'Aguardando execução', '#c2780c') +
       kpi('Não executadas', num(s.notdone), 'Mantidas na base do plano', '#c43650');
 
-    $('#scope').textContent = (f.tag ? '1 instalação' : num(data.systems.length) + ' instalações') + ' · ' + fmt(f.from) + ' a ' + fmt(f.to);
+    $('#scope').textContent = (f.tag.length ? num(f.tag.length) + ' instalação(ões)' : num(data.systems.length) + ' instalações') + ' · Entrada: ' + fmt(f.from) + ' a ' + fmt(f.to);
     renderSystemsList();
     $('#planSummary').innerHTML =
       '<strong class="plan-number">' + pct(a.rate) + '</strong>' +
@@ -137,7 +189,7 @@
   function renderMonthly() {
     const buckets = new Map();
     for (const o of rows) {
-      const key = (o[f.dateField] || '').slice(0, 7);
+      const key = (o.created || '').slice(0, 7);
       if (!key) continue;
       if (!buckets.has(key)) buckets.set(key, { total: 0, done: 0 });
       const b = buckets.get(key);
@@ -169,7 +221,7 @@
     }
     const max = types[0].total;
     el.innerHTML = '<div class="type-list">' + types.slice(0, 8).map(t => {
-      const isSelected = f.type && f.type === t.type;
+      const isSelected = selectedValues('type').includes(t.type);
       return '<button type="button" class="type-row' + (isSelected ? ' active-filter' : '') + '" data-type-filter="' + esc(t.type) + '">' +
         '<div class="row-head"><b>' + esc(t.label) + '</b><span>' + num(t.total) + ' ordens (' + pct(t.rate) + ' exec.)</span></div>' +
         '<div class="row-sub"><span>' + num(t.done) + ' executadas · ' + num(t.open) + ' em aberto · ' + num(t.notdone) + ' não exec.</span><span>' + num(t.planned) + ' com plano</span></div>' +
@@ -336,7 +388,7 @@
       kpi('Prazo não avaliável', num(t.unassessed), 'Datas ou situação insuficientes', '#c2780c');
 
     const systemStats = data.systems
-      .filter(s => !f.tag || f.tag === s.tag)
+      .filter(s => matchesFilter(s.tag, f.tag))
       .map(s => {
         const sysFilter = { ...f, tag: s.tag };
         const adh = P.adherence(data, sysFilter);
@@ -376,7 +428,7 @@
       (!s || P.status(o) === s) &&
       (!pf || (pf === 'planned' ? Boolean(P.text(o.plan)) : !P.text(o.plan))) &&
       (!q || [o.id, o.text, o.asset, o.equipment, o.tag, o.type].join(' ').toLocaleLowerCase('pt-BR').includes(q))
-    ).sort((a, b) => (b[f.dateField] || '').localeCompare(a[f.dateField] || '') || b.id.localeCompare(a.id));
+    ).sort((a, b) => (b.created || '').localeCompare(a.created || '') || b.id.localeCompare(a.id));
   }
 
   function table(list) {
@@ -433,7 +485,7 @@
       field('Bairro', s.district) +
       '</dl>' + photo +
       '<h3 class="detail-section">Itens, Causas e Medidas</h3><div class="detail-grid">' + blocks + '</div>' +
-      '<h3 class="detail-section">Ordens mais recentes no período</h3><div class="table-wrap">' + table([...source].sort((a, b) => (b[f.dateField] || '').localeCompare(a[f.dateField] || '')).slice(0, 50)) + '</div>',
+      '<h3 class="detail-section">Ordens mais recentes no período</h3><div class="table-wrap">' + table([...source].sort((a, b) => (b.created || '').localeCompare(a.created || '')).slice(0, 50)) + '</div>',
       'INSTALAÇÃO · ÁGUAS DE TERESINA'
     );
   }
@@ -498,7 +550,7 @@
       markers = L.layerGroup().addTo(map);
     }
     markers.clearLayers();
-    const systems = data.systems.filter(s => !f.tag || s.tag === f.tag), coords = [], asOf = today();
+    const systems = data.systems.filter(s => matchesFilter(s.tag, f.tag)), coords = [], asOf = today();
     systems.forEach((s, i) => {
       if (!Number.isFinite(s.lat) || !Number.isFinite(s.lng)) return;
       coords.push([s.lat, s.lng]);
@@ -738,7 +790,7 @@
     const asOf = today();
     const lines = [
       ['TAG Instalação', 'Nome da Instalação', 'Ordens do Plano', 'Executadas', 'Aderência (%)', 'Início no Período', 'Abertas Vencidas'].map(safeCsvCell).join(';'),
-      ...data.systems.filter(s => !f.tag || f.tag === s.tag).map(s => {
+      ...data.systems.filter(s => matchesFilter(s.tag, f.tag)).map(s => {
         const sysFilter = { ...f, tag: s.tag };
         const adh = P.adherence(data, sysFilter);
         const tim = P.timing(P.filter(data, sysFilter, true), asOf);
@@ -775,7 +827,7 @@
       f.from = year + '-01-01';
       f.to = year + '-12-31';
     } else if (preset === 'all') {
-      const dates = (data?.orders || []).map(o => o[f.dateField] || o.date).filter(P.validDate).sort();
+      const dates = (data?.orders || []).map(o => o.created).filter(P.validDate).sort();
       f.from = dates[0] || '2020-01-01';
       f.to = dates[dates.length - 1] || year + '-12-31';
     }
@@ -807,7 +859,7 @@
     $$('[data-go]').forEach(b => b.onclick = () => setPage(b.dataset.go));
     $$('.preset-btn').forEach(b => b.onclick = () => applyPeriodPreset(b.dataset.preset));
 
-    for (const [id, key] of [['from', 'from'], ['to', 'to'], ['dateField', 'dateField'], ['system', 'tag'], ['asset', 'asset'], ['type', 'type'], ['priority', 'priority']]) {
+    for (const [id, key] of [['from', 'from'], ['to', 'to']]) {
       const el = $('#' + id);
       if (!el) continue;
       el.onchange = () => {
@@ -819,19 +871,29 @@
         }
         if (id === 'from' || id === 'to') $$('.preset-btn').forEach(b => b.classList.remove('active'));
         f[key] = el.value;
-        if (key === 'tag') {
-          f.asset = '';
-          assets();
-        }
         if (data) render();
       };
     }
 
+    document.addEventListener('change', event => {
+      const input = event.target.closest('.filter-check');
+      if (!input) return;
+      const key = input.dataset.filterKey;
+      const selected = selectedValues(key).filter(value => value !== input.value);
+      if (input.checked) selected.push(input.value);
+      f[key] = [...new Set(selected)];
+      if (key === 'tag') {
+        f.asset = [];
+        assets();
+      }
+      refreshFilterSummary(key);
+      if (data) render();
+    });
+
     $('#clearFilters').onclick = () => {
-      Object.assign(f, { from: today().slice(0, 4) + '-01-01', to: today().slice(0, 4) + '-12-31', dateField: 'date', tag: '', asset: '', type: '', priority: '' });
+      Object.assign(f, { from: today().slice(0, 4) + '-01-01', to: today().slice(0, 4) + '-12-31', dateField: 'created', tag: [], asset: [], type: [], priority: [] });
       $('#from').value = f.from;
       $('#to').value = f.to;
-      $('#dateField').value = 'date';
       $('#search').value = '';
       $('#statusFilter').value = '';
       if ($('#planFilter')) $('#planFilter').value = '';
@@ -855,8 +917,9 @@
       else if (r && data) showEvidence(Number(r.dataset.rank));
       else if (tf && data) {
         const clickedType = tf.dataset.typeFilter;
-        f.type = f.type === clickedType ? '' : clickedType;
-        if ($('#type')) $('#type').value = f.type;
+        toggleFilterValue('type', clickedType);
+        const input = [...document.querySelectorAll('#typeOptions input')].find(item => item.value === clickedType);
+        if (input) input.checked = selectedValues('type').includes(clickedType);
         render();
       }
     });

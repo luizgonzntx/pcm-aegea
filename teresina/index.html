@@ -102,32 +102,41 @@
         </div>
       </header>
 
-      <section class="filters" aria-label="Filtros">
-        <label>De
+      <section class="filters" aria-label="Filtros por data de entrada e carteira">
+        <label>Entrada de
           <input type="date" id="from">
         </label>
-        <label>Até
+        <label>Entrada até
           <input type="date" id="to">
         </label>
-        <label>Data de corte
-          <select id="dateField">
-            <option value="date">Referência</option>
-            <option value="created">Entrada da ordem</option>
-            <option value="start">Início real</option>
-          </select>
-        </label>
-        <label>Instalação
-          <select id="system"><option value="">Todos os sistemas</option></select>
-        </label>
-        <label>Ativo
-          <select id="asset"><option value="">Todos os ativos</option></select>
-        </label>
-        <label>Tipo de ordem
-          <select id="type"><option value="">Todos os tipos</option></select>
-        </label>
-        <label>Prioridade
-          <select id="priority"><option value="">Todas as prioridades</option></select>
-        </label>
+        <div class="filter-picker" data-filter-key="tag">
+          <span class="filter-label">Instalação</span>
+          <details id="systemPicker">
+            <summary id="systemSummary">Todos os sistemas</summary>
+            <div id="systemOptions" class="filter-options" role="group" aria-label="Instalações"></div>
+          </details>
+        </div>
+        <div class="filter-picker" data-filter-key="asset">
+          <span class="filter-label">Ativo</span>
+          <details id="assetPicker">
+            <summary id="assetSummary">Todos os ativos</summary>
+            <div id="assetOptions" class="filter-options" role="group" aria-label="Ativos"></div>
+          </details>
+        </div>
+        <div class="filter-picker" data-filter-key="type">
+          <span class="filter-label">Tipo de ordem</span>
+          <details id="typePicker">
+            <summary id="typeSummary">Todos os tipos</summary>
+            <div id="typeOptions" class="filter-options" role="group" aria-label="Tipos de ordem"></div>
+          </details>
+        </div>
+        <div class="filter-picker" data-filter-key="priority">
+          <span class="filter-label">Prioridade</span>
+          <details id="priorityPicker">
+            <summary id="prioritySummary">Todas as prioridades</summary>
+            <div id="priorityOptions" class="filter-options" role="group" aria-label="Prioridades"></div>
+          </details>
+        </div>
         <button id="clearFilters" title="Limpar filtros">Limpar</button>
       </section>
 
