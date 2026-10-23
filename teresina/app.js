@@ -863,6 +863,65 @@
     downloadCsvFile('ICM_Matriz_Aguas_de_Teresina_' + today() + '.csv', lines);
   }
 
+  function printOverviewReport() {
+    if (!data) return;
+    const scopeRows = rows;
+    const stats = P.stats(scopeRows);
+    const adherence = P.adherence(data, f);
+    const asOf = today();
+    const systems = data.systems.filter(s => matchesFilter(s.tag, f.tag)).map(system => {
+      const source = scopeRows.filter(order => order.tag === system.tag);
+      const plan = P.adherence(data, { ...f, tag: system.tag });
+      const timing = P.timing(P.filter(data, { ...f, tag: system.tag }, true), asOf);
+      return { system, stats: P.stats(source), plan, timing };
+    }).sort((a, b) => b.stats.total - a.stats.total || a.system.name.localeCompare(b.system.name, 'pt-BR'));
+    const monthly = new Map();
+    for (const order of scopeRows) {
+      const month = (order.created || '').slice(0, 7);
+      if (!month) continue;
+      if (!monthly.has(month)) monthly.set(month, { total: 0, done: 0 });
+      const item = monthly.get(month);
+      item.total++;
+      if (P.status(order) === 'done') item.done++;
+    }
+    const typeList = P.byType(scopeRows);
+    const assetList = P.topAssets(scopeRows).slice(0, 10);
+    const generated = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date());
+    const period = fmt(f.from) + ' a ' + fmt(f.to);
+    const systemRows = systems.map(({ system, stats: item, plan, timing }) =>
+      '<tr><td><b>' + esc(system.name) + '</b><br><span class="muted">' + esc(system.tag) + '</span></td><td>' + num(item.total) + '</td><td>' + num(item.done) + '</td><td>' + num(item.open) + '</td><td>' + pct(plan.rate) + '</td><td>' + (timing.overdue ? num(timing.overdue) : '0') + '</td></tr>'
+    ).join('');
+    const monthRows = [...monthly].sort((a, b) => a[0].localeCompare(b[0])).map(([month, item]) =>
+      '<tr><td>' + esc(month.slice(5) + '/' + month.slice(0, 4)) + '</td><td>' + num(item.total) + '</td><td>' + num(item.done) + '</td><td>' + pct(item.total ? item.done / item.total : null) + '</td></tr>'
+    ).join('');
+    const typeRows = typeList.map(item =>
+      '<tr><td>' + esc(item.label) + '</td><td>' + num(item.total) + '</td><td>' + num(item.done) + '</td><td>' + pct(item.rate) + '</td></tr>'
+    ).join('');
+    const assetRows = assetList.map(item =>
+      '<tr><td>' + esc(item.asset) + '</td><td>' + esc(item.equipment) + '</td><td>' + esc(item.tag) + '</td><td>' + num(item.total) + '</td><td>' + num(item.corrective) + '</td></tr>'
+    ).join('');
+    const report = '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Visão dos Sistemas · Águas de Teresina</title><style>' +
+      '@page{size:A4 landscape;margin:12mm}*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#10234f;font-size:9px;line-height:1.35;margin:0}header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #0027bd;padding-bottom:9px;margin-bottom:12px}h1{font-size:21px;margin:0 0 3px;color:#0027bd}h2{font-size:13px;margin:14px 0 6px;color:#0027bd}.eyebrow{font-size:8px;letter-spacing:1.1px;text-transform:uppercase;color:#087f99;font-weight:700}.muted{color:#657594;font-size:8px}.logo{max-height:25px;max-width:155px}.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin:10px 0 13px}.kpi{border:1px solid #d7e1f2;border-radius:6px;padding:7px;background:#f7f9fd}.kpi span{display:block;color:#536585;font-size:8px;text-transform:uppercase}.kpi strong{display:block;font-size:17px;color:#0027bd;margin-top:3px}.columns{display:grid;grid-template-columns:1.25fr 1fr;gap:12px}.box{border:1px solid #d7e1f2;border-radius:6px;padding:9px}.box h2{margin-top:0}table{width:100%;border-collapse:collapse;margin-top:5px;font-size:8px}th{background:#eef3ff;color:#536585;text-align:left;text-transform:uppercase;font-size:7px;padding:5px}td{border-bottom:1px solid #e5eaf2;padding:5px;vertical-align:top}footer{border-top:1px solid #d7e1f2;margin-top:14px;padding-top:7px;color:#536585;font-size:8px}@media print{thead{display:table-header-group}tr{break-inside:avoid}.box{break-inside:avoid}}' +
+      '</style></head><body><header><div><div class="eyebrow">PCM · VISÃO EXECUTIVA</div><h1>Visão dos sistemas</h1><div class="muted">Águas de Teresina · Entrada: ' + esc(period) + '</div><div class="muted">Gerado em ' + esc(generated) + '</div></div><img class="logo" src="../aegea-assets/aguas-de-teresina-azul.png" alt="Águas de Teresina"></header>' +
+      '<div class="kpis"><div class="kpi"><span>Ordens no período</span><strong>' + num(stats.total) + '</strong></div><div class="kpi"><span>Executadas</span><strong>' + num(stats.done) + '</strong></div><div class="kpi"><span>Em aberto</span><strong>' + num(stats.open) + '</strong></div><div class="kpi"><span>Não executadas</span><strong>' + num(stats.notdone) + '</strong></div><div class="kpi"><span>Aderência ao plano</span><strong>' + pct(adherence.rate) + '</strong></div></div>' +
+      '<section class="box"><h2>Desempenho por instalação</h2><table><thead><tr><th>Instalação</th><th>Ordens</th><th>Executadas</th><th>Em aberto</th><th>Aderência</th><th>Vencidas</th></tr></thead><tbody>' + (systemRows || '<tr><td colspan="6">Sem instalações no recorte.</td></tr>') + '</tbody></table></section>' +
+      '<div class="columns"><section class="box"><h2>Evolução mensal</h2><table><thead><tr><th>Mês</th><th>Ordens</th><th>Executadas</th><th>Execução</th></tr></thead><tbody>' + (monthRows || '<tr><td colspan="4">Sem registros.</td></tr>') + '</tbody></table></section><section class="box"><h2>Distribuição por tipo de manutenção</h2><table><thead><tr><th>Tipo</th><th>Ordens</th><th>Executadas</th><th>Execução</th></tr></thead><tbody>' + (typeRows || '<tr><td colspan="4">Sem registros.</td></tr>') + '</tbody></table></section></div>' +
+      '<h2>Ativos com maior volume de intervenções</h2><table><thead><tr><th>Ativo</th><th>Equipamento</th><th>Instalação</th><th>Total</th><th>Corretivas</th></tr></thead><tbody>' + (assetRows || '<tr><td colspan="5">Sem registros.</td></tr>') + '</tbody></table>' +
+      '<footer>Relatório gerado a partir dos filtros ativos do painel. A aderência considera ordens do plano no período; a execução mensal usa a data de entrada.</footer></body></html>';
+    const popup = window.open('', '_blank');
+    if (!popup) {
+      notify('O navegador bloqueou a janela do relatório. Permita pop-ups para gerar o PDF.');
+      return;
+    }
+    popup.document.write(report);
+    popup.document.close();
+    popup.focus();
+    setTimeout(() => {
+      popup.print();
+      popup.onafterprint = () => popup.close();
+    }, 300);
+  }
+
   function printStopsReport() {
     if (!data) return;
     const records = P.stopRecords(data, rows);
@@ -1093,6 +1152,7 @@
     if ($('#exportBadActorsBtn')) $('#exportBadActorsBtn').onclick = exportBadActorsCSV;
     if ($('#exportStopsBtn')) $('#exportStopsBtn').onclick = exportStopsCSV;
     if ($('#printStopsBtn')) $('#printStopsBtn').onclick = printStopsReport;
+    if ($('#printOverviewBtn')) $('#printOverviewBtn').onclick = printOverviewReport;
 
     $('#files').onchange = () => {
       selectedFiles = [...$('#files').files];
