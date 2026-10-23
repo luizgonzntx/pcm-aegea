@@ -83,7 +83,8 @@
       intelligence: 'Engenharia & Decisão',
       icm: 'Itens, causas e medidas',
       deadlines: 'Planos e prazos',
-      orders: 'Ordens de manutenção'
+      orders: 'Ordens de manutenção',
+      stops: 'Paradas'
     };
     $('#pageTitle').textContent = titles[next] || 'Visão dos sistemas';
     $$('[data-page]').forEach(b => b.classList.toggle('active', b.dataset.page === next));
@@ -180,6 +181,7 @@
     renderTypeDistribution();
     renderIntelligence();
     renderICM();
+    renderStops();
     renderTopAssets();
     renderDeadlines();
     renderOrders();
@@ -378,6 +380,62 @@
           }).join('') + '</tbody></table>'
         : emptyHTML;
     }
+  }
+
+  function renderStops() {
+    const records = P.stopRecords(data, rows);
+    const reasons = new Map(), years = new Map(), groups = new Map(), assets = new Set(), plants = new Set();
+    for (const r of records) {
+      reasons.set(r.reason, (reasons.get(r.reason) || 0) + 1);
+      years.set(r.year, (years.get(r.year) || 0) + 1);
+      assets.add(r.asset);
+      plants.add(r.tag);
+      const key = [r.year, r.tag, r.asset, r.reason].join('\\u0000');
+      if (!groups.has(key)) groups.set(key, { year: r.year, tag: r.tag, plant: r.plant, asset: r.asset, reason: r.reason, ids: new Set() });
+      groups.get(key).ids.add(r.id);
+    }
+    const reasonList = [...reasons].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'pt-BR'));
+    const yearList = [...years].sort((a, b) => b[0].localeCompare(a[0]));
+    const groupList = [...groups.values()].map(g => ({ ...g, count: g.ids.size, ids: [...g.ids] }))
+      .sort((a, b) => b.count - a.count || b.year.localeCompare(a.year) || a.plant.localeCompare(b.plant, 'pt-BR') || a.asset.localeCompare(b.asset, 'pt-BR'));
+
+    const topReason = reasonList[0]?.[0] || '—';
+    $('#stopKpis').innerHTML =
+      kpi('Paradas identificadas', num(records.length), 'Ordens distintas no período', '#c43650') +
+      kpi('Plantas atingidas', num(plants.size), 'Instalações com indicação de parada', '#c2780c') +
+      kpi('Ativos envolvidos', num(assets.size), 'Ativos com ocorrência identificada', '#0027bd') +
+      kpi('Motivo mais frequente', topReason, reasonList.length ? num(reasonList[0][1]) + ' ordens' : 'Sem registros', '#0f8a68');
+
+    const maxReason = reasonList[0]?.[1] || 1;
+    $('#stopReasons').innerHTML = reasonList.length
+      ? '<div class="type-list">' + reasonList.map(([reason, count]) =>
+          '<div class="type-row">' +
+          '<div class="row-head"><b>' + esc(reason) + '</b><span>' + num(count) + ' OS</span></div>' +
+          '<div class="row-sub"><span>Indicações encontradas no texto, problema ou causa</span></div>' +
+          '<span class="mini-track"><i style="width:' + (count / maxReason * 100) + '%;background:var(--red)"></i></span>' +
+          '</div>'
+        ).join('') + '</div>'
+      : emptyHTML;
+
+    $('#stopYears').innerHTML = yearList.length
+      ? '<table><thead><tr><th>Ano</th><th>Paradas identificadas</th></tr></thead><tbody>' +
+        yearList.map(([year, count]) => '<tr><td><b>' + esc(year) + '</b></td><td>' + num(count) + '</td></tr>').join('') +
+        '</tbody></table>'
+      : emptyHTML;
+
+    $('#stopGroups').innerHTML = groupList.length
+      ? '<table><thead><tr><th>Ano</th><th>Planta</th><th>Ativo</th><th>Motivo</th><th>Ordens</th></tr></thead><tbody>' +
+        groupList.map(g => {
+          const key = rankEvidence.push({ name: g.year + ' · ' + g.plant + ' · ' + g.asset + ' · ' + g.reason, count: g.count, ids: g.ids }) - 1;
+          return '<tr>' +
+            '<td><b>' + esc(g.year) + '</b></td>' +
+            '<td>' + esc(g.plant) + '</td>' +
+            '<td>' + esc(g.asset) + '</td>' +
+            '<td>' + esc(g.reason) + '</td>' +
+            '<td><button class="link" data-rank="' + key + '">' + num(g.count) + ' OS ↗</button></td>' +
+            '</tr>';
+        }).join('') + '</tbody></table>'
+      : emptyHTML;
   }
 
   function renderDeadlines() {
@@ -786,6 +844,16 @@
     downloadCsvFile('ICM_Matriz_Aguas_de_Teresina_' + today() + '.csv', lines);
   }
 
+  function exportStopsCSV() {
+    if (!data) return;
+    const records = P.stopRecords(data, rows);
+    const lines = [
+      ['Ano', 'Data de entrada', 'Planta', 'Ativo', 'Motivo', 'Ordem', 'Descrição'].map(safeCsvCell).join(';'),
+      ...records.map(r => [r.year, r.created, r.plant, r.asset, r.reason, r.id, r.text].map(safeCsvCell).join(';'))
+    ];
+    downloadCsvFile('Paradas_Aguas_de_Teresina_' + today() + '.csv', lines);
+  }
+
   function exportDeadlinesCSV() {
     if (!data) return;
     const asOf = today();
@@ -961,6 +1029,7 @@
     if ($('#exportIcmBtn')) $('#exportIcmBtn').onclick = exportIcmCSV;
     if ($('#exportDeadlinesBtn')) $('#exportDeadlinesBtn').onclick = exportDeadlinesCSV;
     if ($('#exportBadActorsBtn')) $('#exportBadActorsBtn').onclick = exportBadActorsCSV;
+    if ($('#exportStopsBtn')) $('#exportStopsBtn').onclick = exportStopsCSV;
 
     $('#files').onchange = () => {
       selectedFiles = [...$('#files').files];
