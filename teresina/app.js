@@ -900,10 +900,10 @@
     popup.document.write(report);
     popup.document.close();
     popup.focus();
-    popup.onload = () => setTimeout(() => {
+    setTimeout(() => {
       popup.print();
       popup.onafterprint = () => popup.close();
-    }, 150);
+    }, 300);
   }
 
   function exportStopsCSV() {
