@@ -1,0 +1,32 @@
+name: Validate Teresina dashboard
+
+on:
+  push:
+    paths:
+      - "teresina/**"
+      - ".github/workflows/validate-teresina.yml"
+  pull_request:
+    paths:
+      - "teresina/**"
+      - ".github/workflows/validate-teresina.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test-teresina:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: teresina
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check JavaScript syntax
+        run: node --check app.js
+      - name: Run core tests
+        run: node test-core.cjs
