@@ -558,8 +558,10 @@
     role = member.role;
     $('#access').hidden = true;
     $('#shell').hidden = false;
-    $('#importBtn').hidden = role !== 'admin';
-    $('#emptyImport').hidden = role !== 'admin';
+    // A publicação da base acontece na área administrativa separada.
+    // Mantemos os controles antigos ocultos para não expor importação no painel operacional.
+    $('#importBtn').hidden = true;
+    $('#emptyImport').hidden = true;
     if ($('#userChip')) {
       $('#userChip').hidden = false;
       $('#userRoleBadge').textContent = role === 'admin' ? 'ADMIN' : 'CONSULTA';
