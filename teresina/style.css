@@ -126,53 +126,6 @@ small, .small-note {
   line-height: 1.6;
 }
 
-/* Guia visual de PCM inspirado nos materiais de treinamento da operação. */
-.pcm-guide {
-  margin-top: 22px;
-  background: var(--pcm-lilac);
-  border: 0;
-  overflow: hidden;
-}
-.pcm-guide .card-top { align-items: end; }
-.pcm-guide .card-top h2 { color: var(--blue); font-size: 25px; letter-spacing: -.7px; }
-.pcm-guide .small-note { color: #53618a; }
-.pcm-flow {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 112px minmax(0, 1fr);
-  align-items: center;
-  gap: 12px;
-  margin-top: 8px;
-}
-.pcm-box { background: rgba(255,255,255,.78); border: 1px solid rgba(5,37,104,.24); }
-.pcm-box-title { padding: 12px 16px; color: #fff; font-size: 20px; font-weight: 700; }
-.pcm-box-note .pcm-box-title { background: var(--pcm-teal); }
-.pcm-box-order .pcm-box-title { background: var(--pcm-sky); }
-.pcm-box p { min-height: 48px; padding: 12px 16px 3px; color: #25365e; }
-.pcm-items { display: flex; flex-wrap: wrap; gap: 7px; padding: 10px 16px 16px; }
-.pcm-items span { padding: 6px 9px; border-radius: 5px; background: #d7e8ef; color: #12345a; font-size: 12px; font-weight: 700; }
-.pcm-box-order .pcm-items span { background: #d8e6f7; }
-.pcm-arrow { display: grid; justify-items: center; color: var(--pcm-teal); font-weight: 700; }
-.pcm-arrow span { font-size: 38px; line-height: .8; }
-.pcm-arrow small { color: #3c5482; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
-.pcm-tactical-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 18px; }
-.pcm-tactical { background: var(--pcm-navy); color: #fff; padding: 18px 20px; border-radius: 0 20px 20px 0; }
-.pcm-tactical.tactical { border-radius: 20px 0 0 20px; background: #18247a; }
-.pcm-tactical > div { display: flex; align-items: center; gap: 12px; }
-.pcm-tactical strong { display: block; font-size: 18px; }
-.pcm-tactical small { display: block; color: #cbd6ff; margin-top: 3px; }
-.pcm-tactical p { margin-top: 12px; color: #eef2ff; font-size: 13px; line-height: 1.55; }
-.pcm-round { display: grid; place-items: center; width: 42px; height: 42px; border: 2px solid #fff; border-radius: 50%; color: #fff; font-weight: 700; }
-.pcm-checklist { display: grid; grid-template-columns: .8fr 1.2fr; gap: 18px; align-items: center; margin-top: 18px; padding: 14px 16px; background: rgba(255,255,255,.55); border-top: 1px solid rgba(5,37,104,.16); }
-.pcm-checklist strong { display: block; color: var(--blue); font-size: 16px; }
-.pcm-checklist p { color: #33456e; font-size: 13px; }
-@media (max-width: 820px) {
-  .pcm-flow { grid-template-columns: 1fr; }
-  .pcm-arrow { grid-template-columns: auto auto auto; gap: 8px; }
-  .pcm-arrow span { transform: rotate(90deg); }
-  .pcm-tactical-grid, .pcm-checklist { grid-template-columns: 1fr; }
-  .pcm-tactical, .pcm-tactical.tactical { border-radius: 0 16px 16px 0; }
-}
-
 .eyebrow {
   font-size: 10px;
   letter-spacing: 1.8px;
