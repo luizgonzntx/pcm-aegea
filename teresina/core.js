@@ -69,6 +69,36 @@ function topAssets(rows){
  }
  return [...map.values()].map(e=>({...e,ids:[...e.ids]})).sort((a,b)=>b.done-a.done||b.total-a.total||a.asset.localeCompare(b.asset,'pt-BR'));
 }
+function stopRecords(data,rows){
+ const itemsByOrder=new Map;
+ for(const item of (data.items||[])){
+  if(!itemsByOrder.has(item.order))itemsByOrder.set(item.order,[]);
+  itemsByOrder.get(item.order).push(item);
+ }
+ const systems=new Map((data.systems||[]).map(s=>[s.tag,s]));
+ return rows.map(o=>{
+  const linked=(itemsByOrder.get(o.id)||[]).flatMap(i=>[i.problem,i.cause,i.component]).filter(Boolean);
+  const hay=upper([o.text,...linked].join(' '));
+  let reason='';
+  if(/PARADA|PARADO|PAROU|DESLIG|SEM PRODU|SEM OPER|FORA DE OPER|INTERRUP/.test(hay)) reason='Parada ou desligamento';
+  else if(/FALHA|AVARIA|DEFEIT|QUEIM|TRAVAMENT|VAZAMENT|QUEBRA|CURTO|SOBRECARGA|ALARM/.test(hay)) reason='Falha ou avaria';
+  else if(/INDISPONIBIL|BAIXA PRESS|BAIXA VAZ|SEM VAZ|PANE|\bTRIP\b/.test(hay)) reason='Indisponibilidade operacional';
+  if(!reason)return null;
+  const system=systems.get(o.tag);
+  return {
+   id:o.id,
+   year:validDate(o.created)?o.created.slice(0,4):'Sem ano',
+   created:o.created||'',
+   tag:o.tag||'',
+   plant:system?.name||o.tag||'Instalação não informada',
+   asset:o.asset||o.equipment||'Ativo não informado',
+   equipment:o.equipment||'Equipamento não informado',
+   reason,
+   text:o.text||''
+  };
+ }).filter(Boolean);
+}
+
 function badActors(rows){
  const byAsset=new Map;
  for(const o of rows){
@@ -294,7 +324,7 @@ function normalize(tables,files){
  const actions=tables.actions.map(r=>({order:text(r.Ordem),note:text(r.Nota),action:text(r['Texto do código da medida']),item:text(r.Medida)})).filter(r=>ids.has(r.order));
  return {systems,orders,items,actions,meta:{loadedAt:new Date().toISOString(),files,sourceOrders:all.length,excluded:all.length-orders.length,missingReference:orders.filter(o=>!o.date).length}};
 }
-const api={text,upper,status,labels,typeLabels,typeLabel,typeGroup,orderClass,validDate,daysBetween,date,period,filter,stats,adherence,rank,timing,byType,topAssets,badActors,icmMatrix,engineeringMetrics,decisionInsights,systemHealth,dedupe,schemas,kind,normalize};
+const api={text,upper,status,labels,typeLabels,typeLabel,typeGroup,orderClass,validDate,daysBetween,date,period,filter,stats,adherence,rank,timing,byType,topAssets,badActors,icmMatrix,engineeringMetrics,decisionInsights,stopRecords,systemHealth,dedupe,schemas,kind,normalize};
 if(typeof module!=='undefined')module.exports=api;root.PCM=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
 
