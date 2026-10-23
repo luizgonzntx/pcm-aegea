@@ -1343,7 +1343,11 @@ header p {
 
 /* TABELAS */
 .table-wrap {
-  overflow: auto;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 table {
@@ -1396,6 +1400,41 @@ td button.link:hover {
 td.description {
   min-width: 210px;
   max-width: 360px;
+}
+
+/* A tabela dentro do detalhamento precisa caber na janela sem cortar a última coluna. */
+#detail .table-wrap {
+  padding-bottom: 6px;
+}
+
+#detail .table-wrap table {
+  table-layout: fixed;
+  min-width: 0;
+}
+
+#detail .table-wrap th,
+#detail .table-wrap td {
+  padding: 10px 8px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+#detail .table-wrap th:nth-child(1), #detail .table-wrap td:nth-child(1) { width: 12%; }
+#detail .table-wrap th:nth-child(2), #detail .table-wrap td:nth-child(2) { width: 22%; }
+#detail .table-wrap th:nth-child(3), #detail .table-wrap td:nth-child(3) { width: 15%; }
+#detail .table-wrap th:nth-child(4), #detail .table-wrap td:nth-child(4) { width: 16%; }
+#detail .table-wrap th:nth-child(5), #detail .table-wrap td:nth-child(5) { width: 11%; }
+#detail .table-wrap th:nth-child(6), #detail .table-wrap td:nth-child(6) { width: 11%; }
+#detail .table-wrap th:nth-child(7), #detail .table-wrap td:nth-child(7) { width: 13%; }
+
+#detail .table-wrap td.description {
+  min-width: 0;
+  max-width: none;
+}
+
+#detail .table-wrap .badge {
+  white-space: normal;
+  text-align: center;
 }
 
 .adherence-cell {
