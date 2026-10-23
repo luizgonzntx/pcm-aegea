@@ -218,12 +218,13 @@
         mixEl.innerHTML = emptyHTML;
       } else {
         const segs = [
-          ['prev', 'Preventiva (ZTPF/ZTPC)', m.preventive, '#0027bd'],
-          ['pred', 'Preditiva (ZTPD)', m.predictive, '#00b6df'],
-          ['eng', 'Engenharia (ZTEN)', m.engineering, '#0f8a68'],
-          ['cplan', 'Corretiva Prog. (ZNTP/ZTCO)', m.correctivePlan, '#c2780c'],
-          ['serv', 'Serviços/Telemetria (ZNTS)', m.service, '#8592ad'],
-          ['cemerg', 'Corretiva Emergencial (ZNTE)', m.correctiveEmerg, '#c43650']
+          ['prev', 'Preventiva', m.preventive, '#0027bd'],
+          ['pred', 'Preditiva', m.predictive, '#00b6df'],
+          ['eng', 'Engenharia de manutenção', m.engineering, '#0f8a68'],
+          ['cplan', 'Corretiva programada', m.correctivePlan, '#c2780c'],
+          ['serv', 'Serviços', m.service, '#8592ad'],
+          ['cemerg', 'Corretiva emergencial', m.correctiveEmerg, '#c43650'],
+          ['reactive', 'Reativa', m.reactive, '#7e4aa8']
         ];
         mixEl.innerHTML =
           '<div class="mix-bar-track">' +
@@ -426,7 +427,7 @@
       '<dl class="order-info">' +
       field('Situação operacional', s.status) +
       field('Criticidade', s.critical) +
-      field('Tipo cadastrado', s.type) +
+      field('Tipo de manutenção', P.typeLabel(s.type)) +
       field('Latitude', s.lat) +
       field('Longitude', s.lng) +
       field('Bairro', s.district) +
@@ -455,7 +456,7 @@
       field('Prazo programado', fmt(o.due)) +
       field('Conclusão real', fmt(o.finished)) +
       field('Plano de manutenção', o.plan) +
-      field('Tipo da ordem', P.typeLabel(o.type)) +
+      field('Tipo de manutenção', P.typeLabel(o.type)) +
       field('Prioridade', o.priority) +
       field('Nota', o.note) +
       '</dl>' +
@@ -712,10 +713,10 @@
 
   function exportCSV() {
     const list = orderRows();
-    const fields = [['Ordem', 'id'], ['Descrição', 'text'], ['Tipo', 'type'], ['Prioridade', 'priority'], ['Instalação', 'tag'], ['Ativo', 'asset'], ['Entrada', 'created'], ['Referência', 'date'], ['Início real', 'start'], ['Plano', 'plan'], ['Prazo programado', 'due'], ['Conclusão real', 'finished']];
+    const fields = [['Ordem', 'id'], ['Descrição', 'text'], ['Tipo de manutenção', 'typeLabel'], ['Prioridade', 'priority'], ['Instalação', 'tag'], ['Ativo', 'asset'], ['Entrada', 'created'], ['Referência', 'date'], ['Início real', 'start'], ['Plano', 'plan'], ['Prazo programado', 'due'], ['Conclusão real', 'finished']];
     const lines = [
       fields.map(v => v[0]).concat('Situação').map(safeCsvCell).join(';'),
-      ...list.map(o => fields.map(v => o[v[1]]).concat(P.labels[P.status(o)]).map(safeCsvCell).join(';'))
+      ...list.map(o => fields.map(v => v[1] === 'typeLabel' ? P.typeLabel(o.type) : o[v[1]]).concat(P.labels[P.status(o)]).map(safeCsvCell).join(';'))
     ];
     downloadCsvFile('Ordens_Aguas_de_Teresina_' + today() + '.csv', lines);
   }
@@ -786,9 +787,9 @@
     openDetail(
       '<div class="detail-heading"><h2>Critérios dos indicadores e Engenharia de Manutenção</h2><p>Regras aplicadas a todos os sistemas, filtros e diagnósticos executivos (NBR 5462 / SMRP).</p></div>' +
       '<div class="explanation">' +
-      '<h3>Ordens executadas</h3><p>Ordens com encerramento técnico (ENTE). O registro de não execução (NEXE) tem prioridade quando as situações coexistem. Encerramento administrativo (ENCE), isoladamente, não comprova execução.</p>' +
+      '<h3>Ordens executadas</h3><p>Consideramos executadas as ordens com encerramento técnico confirmado. Registros de não execução têm prioridade quando as situações coexistem; encerramento administrativo isolado não comprova a execução.</p>' +
       '<h3>Aderência ao plano</h3><p>Ordens executadas do plano divididas pelas ordens existentes com plano preenchido e referência no período. Ordens abertas e não executadas permanecem no denominador.</p>' +
-      '<h3>Mix Proativo × Reativo (Benchmark SMRP)</h3><p>Proativa soma Preventivas Sistemáticas/Condicionais (ZTPF/ZTPC), Preditivas (ZTPD) e Engenharia (ZTEN). Reativa agrupa Corretivas Emergenciais (ZNTE), Corretivas Programadas (ZNTP/ZTCO) e Serviços (ZNTS). A referência internacional SMRP é ≥ 80% de manutenção proativa.</p>' +
+      '<h3>Mix Proativo × Reativo (Benchmark SMRP)</h3><p>Proativa soma manutenção preventiva, preditiva e engenharia. Reativa agrupa corretivas emergenciais, corretivas programadas, controle operacional e serviços. A referência internacional SMRP é ≥ 80% de manutenção proativa.</p>' +
       '<h3>Índice de Paliativos ("Efeito Reset")</h3><p>Proporção de ordens com medida apontada cujo encerramento foi apenas Rearme, Reset ou Ajuste de Parâmetros. Valores elevados indicam necessidade de investigação de qualidade de energia, proteção elétrica ou automação.</p>' +
       '<h3>Bad Actors, Retrabalho (&lt; 30 dias) e MTBF</h3><p>Equipamentos são ranqueados pelo volume de intervenções corretivas. Falhas corretivas sucessivas no mesmo ativo em intervalo ≤ 30 dias são contabilizadas como retrabalho/reincidência prematura. O MTBF estimado calcula a média de dias entre intervenções corretivas consecutivas do ativo.</p>' +
       '<h3>Itens, Causas e Medidas (ICM)</h3><p>Ordens executadas distintas por item, causa ou medida. Registros de falha inexistente e de não executar são excluídos dos rankings. As causas refletem o apontamento da ordem; a confirmação de causa raiz requer RCA.</p>' +
