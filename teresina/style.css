@@ -1251,7 +1251,7 @@ header p {
 
 .mix-legend {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -1263,6 +1263,7 @@ header p {
   display: flex;
   flex-direction: column;
   gap: 3px;
+  min-height: 66px;
 }
 
 .mix-item-head {
@@ -1275,6 +1276,37 @@ header p {
 
 .mix-item small {
   font-size: 10px;
+}
+
+.mix-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.mix-summary-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 2px 14px;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, #f4f7ff 0%, #fbfcff 100%);
+  border: 1px solid #dce5f7;
+  border-radius: 10px;
+}
+
+.mix-summary-item span,
+.mix-summary-item small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.mix-summary-item strong {
+  grid-row: span 2;
+  color: var(--blue);
+  font-size: 18px;
+  white-space: nowrap;
 }
 
 .decision-grid {
@@ -1946,6 +1978,9 @@ dialog::backdrop {
   .overview-extra {
     grid-template-columns: 1fr;
   }
+  .mix-legend {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 950px) {
@@ -2006,6 +2041,10 @@ dialog::backdrop {
   }
   .kpi span {
     font-size: 10px;
+  }
+  .mix-legend,
+  .mix-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -2097,6 +2136,10 @@ dialog::backdrop {
     gap: 6px;
   }
   .order-info, .detail-kpis, .file-checklist {
+    grid-template-columns: 1fr;
+  }
+  .mix-legend,
+  .mix-summary {
     grid-template-columns: 1fr;
   }
   dialog {
