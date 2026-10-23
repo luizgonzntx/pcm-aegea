@@ -863,6 +863,49 @@
     downloadCsvFile('ICM_Matriz_Aguas_de_Teresina_' + today() + '.csv', lines);
   }
 
+  function printStopsReport() {
+    if (!data) return;
+    const records = P.stopRecords(data, rows);
+    const reasons = new Map(), assets = new Map(), groups = new Map();
+    for (const record of records) {
+      reasons.set(record.reason, (reasons.get(record.reason) || 0) + 1);
+      assets.set(record.asset, (assets.get(record.asset) || 0) + 1);
+      const key = [record.year, record.tag, record.asset, record.reason].join('\\u0000');
+      if (!groups.has(key)) groups.set(key, { year: record.year, plant: record.plant, asset: record.asset, reason: record.reason, total: 0, confirmed: 0 });
+      const group = groups.get(key);
+      group.total++;
+      if (record.status === 'Confirmada') group.confirmed++;
+    }
+    const reasonList = [...reasons].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'pt-BR'));
+    const assetList = [...assets].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'pt-BR')).slice(0, 10);
+    const groupList = [...groups.values()].sort((a, b) => b.total - a.total || a.plant.localeCompare(b.plant, 'pt-BR'));
+    const confirmed = records.filter(record => record.status === 'Confirmada').length;
+    const generated = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date());
+    const period = fmt(f.from) + ' a ' + fmt(f.to);
+    const rowsHtml = groupList.map(group => '<tr><td>' + esc(group.year) + '</td><td>' + esc(group.plant) + '</td><td>' + esc(group.asset) + '</td><td>' + esc(group.reason) + '</td><td>' + num(group.total) + '</td><td>' + num(group.confirmed) + '</td></tr>').join('');
+    const reasonHtml = reasonList.map(([reason, count]) => '<li><span>' + esc(reason) + '</span><b>' + num(count) + '</b></li>').join('');
+    const assetHtml = assetList.map(([asset, count]) => '<li><span>' + esc(asset) + '</span><b>' + num(count) + '</b></li>').join('');
+    const report = '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Relatório de Paradas · Águas de Teresina</title><style>' +
+      '@page{size:A4;margin:14mm}*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#10234f;font-size:10px;line-height:1.35;margin:0}header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #0027bd;padding-bottom:10px;margin-bottom:14px}h1{font-size:22px;margin:0 0 3px;color:#0027bd}h2{font-size:14px;margin:18px 0 8px;color:#0027bd}.eyebrow{font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:#087f99;font-weight:700}.meta{color:#536585;font-size:9px}.logo{max-height:26px;max-width:160px}.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:12px 0 16px}.kpi{border:1px solid #d7e1f2;border-radius:6px;padding:8px;background:#f7f9fd}.kpi span{display:block;color:#536585;font-size:8px;text-transform:uppercase}.kpi strong{display:block;font-size:18px;color:#0027bd;margin-top:3px}.columns{display:grid;grid-template-columns:1fr 1fr;gap:14px}.box{border:1px solid #d7e1f2;border-radius:6px;padding:10px}.box h2{margin-top:0}.list{padding:0;margin:0;list-style:none}.list li{display:flex;justify-content:space-between;border-bottom:1px solid #edf1f7;padding:5px 0}.list li:last-child{border-bottom:0}table{width:100%;border-collapse:collapse;margin-top:6px;font-size:9px}th{background:#eef3ff;color:#536585;text-align:left;text-transform:uppercase;font-size:8px;padding:6px}td{border-bottom:1px solid #e5eaf2;padding:6px;vertical-align:top}footer{border-top:1px solid #d7e1f2;margin-top:18px;padding-top:8px;color:#536585;font-size:8px}@media print{thead{display:table-header-group}tr{break-inside:avoid}.box{break-inside:avoid}}' +
+      '</style></head><body><header><div><div class="eyebrow">PCM · CONFIABILIDADE OPERACIONAL</div><h1>Relatório de Paradas</h1><div class="meta">Águas de Teresina · Período de entrada: ' + esc(period) + '</div><div class="meta">Gerado em ' + esc(generated) + '</div></div><img class="logo" src="../aegea-assets/aguas-de-teresina-azul.png" alt="Águas de Teresina"></header>' +
+      '<div class="kpis"><div class="kpi"><span>Paradas identificadas</span><strong>' + num(records.length) + '</strong></div><div class="kpi"><span>Paradas confirmadas</span><strong>' + num(confirmed) + '</strong></div><div class="kpi"><span>Plantas atingidas</span><strong>' + num(new Set(records.map(record => record.tag)).size) + '</strong></div><div class="kpi"><span>Ativos envolvidos</span><strong>' + num(new Set(records.map(record => record.asset)).size) + '</strong></div></div>' +
+      '<div class="columns"><section class="box"><h2>Pareto de motivos</h2><ul class="list">' + (reasonHtml || '<li>Sem registros</li>') + '</ul></section><section class="box"><h2>Pareto de ativos</h2><ul class="list">' + (assetHtml || '<li>Sem registros</li>') + '</ul></section></div>' +
+      '<h2>Detalhamento por ano, planta, ativo e motivo</h2><table><thead><tr><th>Ano</th><th>Planta</th><th>Ativo</th><th>Motivo</th><th>Paradas</th><th>Confirmadas</th></tr></thead><tbody>' + (rowsHtml || '<tr><td colspan="6">Sem registros para os filtros selecionados.</td></tr>') + '</tbody></table>' +
+      '<footer>Critério: ocorrência identificada por texto, problema ou causa. Confirmação e duração dependem dos campos opcionais da planilha. Este relatório considera ordens distintas e os filtros ativos do painel.</footer></body></html>';
+    const popup = window.open('', '_blank');
+    if (!popup) {
+      notify('O navegador bloqueou a janela do relatório. Permita pop-ups para gerar o PDF.');
+      return;
+    }
+    popup.document.write(report);
+    popup.document.close();
+    popup.focus();
+    setTimeout(() => {
+      popup.print();
+      popup.onafterprint = () => popup.close();
+    }, 300);
+  }
+
   function exportStopsCSV() {
     if (!data) return;
     const records = P.stopRecords(data, rows);
@@ -1049,6 +1092,7 @@
     if ($('#exportDeadlinesBtn')) $('#exportDeadlinesBtn').onclick = exportDeadlinesCSV;
     if ($('#exportBadActorsBtn')) $('#exportBadActorsBtn').onclick = exportBadActorsCSV;
     if ($('#exportStopsBtn')) $('#exportStopsBtn').onclick = exportStopsCSV;
+    if ($('#printStopsBtn')) $('#printStopsBtn').onclick = printStopsReport;
 
     $('#files').onchange = () => {
       selectedFiles = [...$('#files').files];
