@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Administração · PCM Teresina</title>
+  <link rel="stylesheet" href="style.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
+  <script defer src="config.js"></script>
+  <style>
+    .admin-page { min-height: 100vh; display: grid; place-items: center; padding: 28px; background: var(--bg); }
+    .admin-shell { width: min(960px, 100%); }
+    .admin-card { background: #fff; border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); padding: clamp(22px, 4vw, 42px); }
+    .admin-brand { display:flex; align-items:center; gap:14px; margin-bottom:28px; }
+    .admin-brand img { width: 154px; height:auto; }
+    .admin-brand strong { color:var(--blue); font-size:20px; }
+    .admin-grid { display:grid; grid-template-columns: 1fr 1fr; gap: 22px; align-items:start; }
+    .admin-grid > section { min-width:0; }
+    .admin-title { color:var(--blue); font-size:clamp(26px,4vw,40px); margin-bottom:8px; }
+    .admin-subtitle { color:var(--muted); margin-bottom:24px; }
+    .admin-form { display:grid; gap:12px; max-width:420px; }
+    .admin-form label { display:grid; gap:6px; font-weight:700; color:var(--ink); }
+    .admin-form button { margin-top:4px; }
+    .admin-status { min-height:22px; color:var(--muted); }
+    .admin-status.error { color:var(--red); }
+    .admin-status.success { color:var(--green); }
+    .admin-panel-head { display:flex; justify-content:space-between; gap:16px; align-items:start; margin-bottom:20px; }
+    .admin-panel-head h2 { color:var(--blue); }
+    .admin-meta { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:18px 0; }
+    .admin-meta div { padding:13px; background:#f5f7fc; border-radius:10px; }
+    .admin-meta small, .admin-meta b { display:block; }
+    .admin-meta b { color:var(--blue); font-size:20px; margin-top:4px; }
+    .admin-files { display:grid; gap:8px; margin:16px 0; }
+    .admin-file { display:flex; justify-content:space-between; gap:12px; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font-size:13px; }
+    .admin-actions { display:flex; flex-wrap:wrap; gap:10px; }
+    .admin-note { margin-top:18px; padding:14px 16px; background:#eef0fb; border-left:4px solid var(--blue); color:#33456e; border-radius:8px; font-size:13px; }
+    @media (max-width: 760px) { .admin-grid { grid-template-columns:1fr; } .admin-meta { grid-template-columns:1fr 1fr; } }
+  </style>
+</head>
+<body class="admin-page">
+  <main class="admin-shell">
+    <div class="admin-brand">
+      <img src="../aegea-assets/aguas-de-teresina-azul.png" alt="Águas de Teresina">
+      <strong>Administração da base PCM</strong>
+    </div>
+    <section class="admin-card">
+      <div id="loginPanel">
+        <h1 class="admin-title">Atualização administrativa</h1>
+        <p class="admin-subtitle">Esta área não aparece no painel operacional. Somente um membro com perfil ADMIN pode publicar uma nova base no Supabase.</p>
+        <form id="loginForm" class="admin-form">
+          <label>E-mail<input id="email" type="email" autocomplete="username" required></label>
+          <label>Senha<input id="password" type="password" autocomplete="current-password" required></label>
+          <button class="primary" type="submit">Entrar como administrador</button>
+          <p id="loginStatus" class="admin-status" role="status"></p>
+        </form>
+      </div>
+
+      <div id="adminPanel" hidden>
+        <div class="admin-panel-head">
+          <div><span class="eyebrow blue">ÁREA RESTRITA</span><h2>Publicar atualização da base</h2><p class="small-note" id="sessionLabel"></p></div>
+          <button id="logoutBtn" type="button">Sair</button>
+        </div>
+        <p class="admin-subtitle">Selecione os quatro arquivos XLSX. A validação acontece no navegador; a gravação só ocorre depois de sua revisão e confirmação.</p>
+        <input id="files" type="file" accept=".xlsx" multiple>
+        <div id="fileList" class="admin-files"></div>
+        <div id="review" hidden></div>
+        <div class="admin-actions"><button id="validateBtn" class="primary" type="button">Validar arquivos</button><button id="saveBtn" type="button" hidden>Publicar no Supabase</button></div>
+        <p id="adminStatus" class="admin-status" role="status"></p>
+        <div class="admin-note">A base atual será substituída integralmente. A publicação usa controle de revisão: se alguém atualizar antes de você, o sistema bloqueia a gravação para evitar sobrescrever dados novos.</div>
+      </div>
+    </section>
+  </main>
+  <script>
+    (() => {
+      'use strict';
+      const $ = s => document.querySelector(s);
+      let db, user, revision = 0, pending = null, worker = null;
+      const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      const msg = (text, kind = '') => { const el = $('#adminStatus'); el.textContent = text; el.className = 'admin-status ' + kind; };
+      const loginMsg = (text, kind = '') => { const el = $('#loginStatus'); el.textContent = text; el.className = 'admin-status ' + kind; };
+      function showLogin() { $('#loginPanel').hidden = false; $('#adminPanel').hidden = true; }
+      function files() { return [...($('#files').files || [])]; }
+      function renderFiles(list) { $('#fileList').innerHTML = list.map(f => '<div class="admin-file"><span>' + esc(f.name) + '</span><b>' + (f.size / 1048576).toLocaleString('pt-BR', {maximumFractionDigits:2}) + ' MB</b></div>').join(''); }
+      async function enter(session) {
+        if (!session) return showLogin();
+        const { data: member, error } = await db.from('pcm_teresina_members').select('role').eq('user_id', session.user.id).maybeSingle();
+        if (error) return loginMsg(error.message, 'error');
+        if (!member || member.role !== 'admin') { await db.auth.signOut(); return loginMsg('Esta conta não possui perfil ADMIN.', 'error'); }
+        user = session.user; $('#loginPanel').hidden = true; $('#adminPanel').hidden = false; $('#sessionLabel').textContent = user.email || '';
+        const { data: row } = await db.from('pcm_teresina_dataset').select('revision').eq('id','principal').maybeSingle();
+        revision = row?.revision || 0;
+      }
+      async function validate() {
+        const list = files();
+        if (list.length !== 4) return msg('Selecione exatamente quatro arquivos XLSX: sistemas, ordens, itens e medidas.', 'error');
+        if (list.some(f => !/\.xlsx$/i.test(f.name) || f.size > 25 * 1024 * 1024)) return msg('Cada arquivo deve ser XLSX e ter no máximo 25 MB.', 'error');
+        $('#validateBtn').disabled = true; $('#saveBtn').hidden = true; msg('Lendo e validando as planilhas…');
+        try {
+          const buffers = await Promise.all(list.map(async f => ({name:f.name, buffer:await f.arrayBuffer()})));
+          const result = await new Promise((resolve, reject) => {
+            worker = new Worker('import-worker.js');
+            const timeout = setTimeout(() => { worker.terminate(); reject(Error('A leitura excedeu três minutos.')); }, 180000);
+            worker.onmessage = e => { if (e.data.progress) return msg(e.data.progress); clearTimeout(timeout); worker.terminate(); worker=null; e.data.error ? reject(Error(e.data.error)) : resolve(e.data.result); };
+            worker.onerror = () => { clearTimeout(timeout); worker.terminate(); worker=null; reject(Error('Falha ao ler os arquivos.')); };
+            worker.postMessage(buffers, buffers.map(x => x.buffer));
+          });
+          pending = result;
+          $('#review').hidden = false;
+          $('#review').innerHTML = '<div class="admin-meta"><div><small>Instalações</small><b>' + result.systems.length.toLocaleString('pt-BR') + '</b></div><div><small>Ordens válidas</small><b>' + result.orders.length.toLocaleString('pt-BR') + '</b></div><div><small>Itens / medidas</small><b>' + result.items.length.toLocaleString('pt-BR') + ' / ' + result.actions.length.toLocaleString('pt-BR') + '</b></div></div><p class="small-note">' + result.meta.excluded.toLocaleString('pt-BR') + ' ordens fora do escopo. A publicação substitui a base atual.</p>';
+          $('#saveBtn').hidden = false; msg('Validação concluída. Revise os totais e publique quando estiver pronto.', 'success');
+        } catch (e) { msg(e.message || 'Não foi possível validar.', 'error'); }
+        finally { $('#validateBtn').disabled = false; }
+      }
+      async function save() {
+        if (!pending || !user) return;
+        $('#saveBtn').disabled = true; msg('Publicando no Supabase…');
+        const { data, error } = await db.from('pcm_teresina_dataset').update({payload:pending}).eq('id','principal').eq('revision',revision).select('revision,updated_at').maybeSingle();
+        if (error) msg(error.message, 'error');
+        else if (!data) msg('A base mudou durante a revisão. Atualize a página e valide novamente.', 'error');
+        else { revision=data.revision; pending=null; $('#saveBtn').hidden=true; msg('Base publicada com sucesso. Revisão ' + data.revision + '.', 'success'); }
+        $('#saveBtn').disabled = false;
+      }
+      window.addEventListener('DOMContentLoaded', async () => {
+        if (!window.supabase || !window.PCM_CONFIG) return loginMsg('Configuração indisponível.', 'error');
+        db = window.supabase.createClient(window.PCM_CONFIG.url, window.PCM_CONFIG.key);
+        $('#loginForm').addEventListener('submit', async e => { e.preventDefault(); loginMsg('Entrando…'); const {error}=await db.auth.signInWithPassword({email:$('#email').value,password:$('#password').value}); if(error) loginMsg(error.message,'error'); });
+        $('#logoutBtn').onclick = () => db.auth.signOut(); $('#files').onchange = () => renderFiles(files()); $('#validateBtn').onclick=validate; $('#saveBtn').onclick=save;
+        db.auth.onAuthStateChange((_event, session) => { setTimeout(() => enter(session), 0); });
+        const {data:{session}}=await db.auth.getSession(); await enter(session);
+      });
+    })();
+  </script>
+</body>
+</html>
+
