@@ -423,6 +423,25 @@
             </article>
           </div>
 
+          <div class="overview-extra">
+            <article class="card">
+              <div class="card-top">
+                <div>
+                  <span class="eyebrow">PARETO DE ATIVOS</span>
+                  <h2>Ativos com mais paradas</h2>
+                </div>
+                <span class="small-note">Ordens distintas</span>
+              </div>
+              <div id="stopAssets"></div>
+            </article>
+            <article class="card explanation">
+              <span class="eyebrow blue">QUALIDADE DO DADO</span>
+              <h2>Identificada × confirmada.</h2>
+              <p>Uma ocorrência é <strong>identificada</strong> quando o texto, problema ou causa aponta uma parada.</p>
+              <p>Ela passa a <strong>confirmada</strong> quando a planilha informa confirmação ou início e fim da parada.</p>
+            </article>
+          </div>
+
           <article class="card" style="margin-top:20px">
             <div class="card-top">
               <div>
@@ -434,7 +453,7 @@
             <div id="stopGroups" class="table-wrap"></div>
           </article>
 
-          <p class="small-note" style="margin-top:12px">Critério aplicado: a ordem entra nesta análise quando o texto, problema ou causa indica parada, desligamento, falha ou indisponibilidade. A base atual não informa a duração da parada.</p>
+          <p class="small-note" style="margin-top:12px">Critério aplicado: a ordem entra quando o texto, problema ou causa indica parada, desligamento, falha ou indisponibilidade. Campos opcionais de confirmação, início, fim, motivo e impacto são usados quando existirem. A duração só aparece para paradas com início e fim preenchidos.</p>
         </section>
 
         <!-- 6. ORDENS DE MANUTENÇÃO -->
