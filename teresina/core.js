@@ -4,17 +4,21 @@ const text=v=>v==null?'':String(v).trim();
 const upper=v=>text(v).toUpperCase();
 function status(o){const a=upper(o.status).split(/\s+/);return a.includes('NEXE')?'notdone':a.includes('ENTE')?'done':a.includes('ENCE')?'closed':a.some(v=>v==='ABER'||v==='LIB')?'open':'other';}
 const labels={done:'Ordens executadas',notdone:'Não executadas',closed:'Encerradas administrativamente',open:'Em aberto',other:'Outras situações'};
+// Os códigos SAP continuam na classificação interna, mas não aparecem na interface.
 const typeLabels={
- ZTPF:'ZTPF · Preventiva Sistemática',
- ZTPD:'ZTPD · Preditiva / Condição',
- ZTPC:'ZTPC · Preventiva Condicional',
- ZNTE:'ZNTE · Corretiva Emergencial',
- ZNTP:'ZNTP · Corretiva Programada',
- ZTCO:'ZTCO · Corretiva Operacional',
- ZNTS:'ZNTS · Serviços / Telemetria',
- ZTEN:'ZTEN · Engenharia / Calibração'
+ ZTPF:'Preventiva por frequência',
+ ZTPD:'Preditiva',
+ ZTPC:'Preventiva por condição',
+ ZNTE:'Corretiva emergencial',
+ ZNTP:'Corretiva programada',
+ ZTCO:'Controle operacional',
+ ZNTS:'Serviços',
+ ZTEN:'Engenharia de manutenção',
+ ZTRE:'Reativa'
 };
-function typeLabel(code){const k=upper(code);return typeLabels[k]||(text(code)||'Não classificado');}
+const typeGroups={ZNTS:'Não tática',ZNTP:'Não tática',ZNTE:'Não tática',ZTEN:'Tática',ZTPD:'Tática',ZTPF:'Tática',ZTPC:'Tática',ZTRE:'Tática',ZTCO:'Tática'};
+function typeLabel(code){const k=upper(code);return typeLabels[k]||(text(code)?'Tipo não classificado':'Não classificado');}
+function typeGroup(code){return typeGroups[upper(code)]||'Não classificada';}
 function orderClass(o){
  const t=upper(o.type);
  if(t==='ZTPF'||t==='ZTPC')return 'preventive';
@@ -23,6 +27,7 @@ function orderClass(o){
  if(t==='ZNTP'||t==='ZTCO')return 'corrective_planned';
  if(t==='ZTEN')return 'engineering';
  if(t==='ZNTS')return 'service';
+ if(t==='ZTRE')return 'reactive';
  return text(o.plan)?'preventive':'corrective_planned';
 }
 function validDate(s){if(!/^\d{4}-\d{2}-\d{2}$/.test(s))return false;const d=new Date(s+'T00:00:00Z');return Number.isFinite(+d)&&d.toISOString().slice(0,10)===s;}
@@ -45,7 +50,7 @@ function byType(rows){
   b[status(o)]++;
   if(text(o.plan))b.planned++;
  }
- return [...map.values()].map(b=>({...b,rate:b.total?b.done/b.total:null})).sort((a,b)=>b.total-a.total||a.type.localeCompare(b.type,'pt-BR'));
+ return [...map.values()].map(b=>({...b,group:typeGroup(b.type),rate:b.total?b.done/b.total:null})).sort((a,b)=>b.total-a.total||a.label.localeCompare(b.label,'pt-BR'));
 }
 function topAssets(rows){
  const map=new Map;
@@ -126,7 +131,7 @@ function icmMatrix(data,orders){
  return [...map.values()].map(r=>({component:r.component,problem:r.problem,cause:r.cause,action:r.action,count:r.ids.size,ids:[...r.ids]})).sort((a,b)=>b.count-a.count||a.component.localeCompare(b.component,'pt-BR'));
 }
 function engineeringMetrics(data,rows,asOf){
- let preventive=0,predictive=0,correctiveEmerg=0,correctivePlan=0,service=0,engineering=0;
+ let preventive=0,predictive=0,correctiveEmerg=0,correctivePlan=0,service=0,engineering=0,reactive=0;
  let prioEmerg=0,prioUrg=0,leadSum=0,leadCount=0,emergLeadSum=0,emergLeadCount=0,agedOpen30d=0;
  const doneIds=new Set,correctiveDoneIds=new Set;
  for(const o of rows){
@@ -137,6 +142,7 @@ function engineeringMetrics(data,rows,asOf){
   else if(cls==='corrective_planned')correctivePlan++;
   else if(cls==='service')service++;
   else if(cls==='engineering')engineering++;
+  else if(cls==='reactive')reactive++;
   if(p.includes('EMERG'))prioEmerg++;
   else if(p.includes('URG'))prioUrg++;
   if(s==='done'){
@@ -155,7 +161,7 @@ function engineeringMetrics(data,rows,asOf){
  }
  const total=rows.length;
  const proactive=preventive+predictive+engineering;
- const reactive=correctiveEmerg+correctivePlan+service;
+ const reactiveTotal=correctiveEmerg+correctivePlan+service+reactive;
  const proactiveRate=total?proactive/total:null;
  const predictiveRate=total?predictive/total:null;
  const emergencyRate=total?prioEmerg/total:null;
@@ -183,7 +189,7 @@ function engineeringMetrics(data,rows,asOf){
  const actors=badActors(rows);
  const totalRework30d=actors.reduce((s,a)=>s+a.rework30d,0);
  return {
-  total,preventive,predictive,engineering,correctiveEmerg,correctivePlan,service,proactive,reactive,
+  total,preventive,predictive,engineering,correctiveEmerg,correctivePlan,service,reactive,proactive,reactiveTotal,
   proactiveRate,predictiveRate,emergencyRate,prioEmerg,prioUrg,
   avgLeadDays:leadCount?leadSum/leadCount:null,
   avgEmergLeadDays:emergLeadCount?emergLeadSum/emergLeadCount:null,
@@ -206,8 +212,8 @@ function decisionInsights(data,rows,f){
    severity:pctVal>=75?'good':pctVal>=60?'warn':'critical',
    category:'MIX DE MANUTENÇÃO (NBR 5462 / SMRP)',
    title:pctVal>=75?'Matriz Proativa Saudável ('+pctVal+'%)':'Excesso de Demanda Reativa ('+(100-pctVal)+'% Corretiva/Serviços)',
-   body:'Das '+m.total.toLocaleString('pt-BR')+' ordens no recorte, '+m.proactive.toLocaleString('pt-BR')+' ('+pctVal+'%) são preventivas/preditivas/engenharia e '+m.reactive.toLocaleString('pt-BR')+' são corretivas ou serviços. O benchmark de classe mundial (SMRP) recomenda ≥ 80% de atuação proativa.',
-   action:'Converter os modos de falha recorrentes das corretivas ZNTE em listas de tarefas preventivas (ZTPF) e inspeções preditivas (ZTPD).'
+   body:'Das '+m.total.toLocaleString('pt-BR')+' ordens no recorte, '+m.proactive.toLocaleString('pt-BR')+' ('+pctVal+'%) são preventivas/preditivas/engenharia e '+m.reactiveTotal.toLocaleString('pt-BR')+' são corretivas, reativas ou serviços. O benchmark de classe mundial (SMRP) recomenda ≥ 80% de atuação proativa.',
+   action:'Converter os modos de falha recorrentes das corretivas emergenciais em listas de tarefas preventivas e inspeções preditivas.'
   });
  }
  if(m.palliativeCount>0){
@@ -249,7 +255,7 @@ function decisionInsights(data,rows,f){
    category:'GOVERNANÇA DE DADOS PCM (SAP)',
    title:'Cobertura de Apontamento ICM nas Corretivas: '+covPct+'%',
    body:'De '+m.correctiveDoneTotal.toLocaleString('pt-BR')+' ordens corretivas/serviços executadas, '+m.corrWithIcm.toLocaleString('pt-BR')+' possuem Item, Causa e Medida completos nas planilhas de catálogo.',
-   action:'Tornar obrigatório o preenchimento dos catálogos de Parte Objeto, Causa e Medida antes do encerramento técnico (ENTE) das ordens ZNTE e ZNTP.'
+   action:'Tornar obrigatório o preenchimento dos catálogos de parte, causa e medida antes do encerramento técnico das ordens corretivas.'
   });
  }
  if(adh.rate!=null){
@@ -288,7 +294,7 @@ function normalize(tables,files){
  const actions=tables.actions.map(r=>({order:text(r.Ordem),note:text(r.Nota),action:text(r['Texto do código da medida']),item:text(r.Medida)})).filter(r=>ids.has(r.order));
  return {systems,orders,items,actions,meta:{loadedAt:new Date().toISOString(),files,sourceOrders:all.length,excluded:all.length-orders.length,missingReference:orders.filter(o=>!o.date).length}};
 }
-const api={text,upper,status,labels,typeLabels,typeLabel,orderClass,validDate,daysBetween,date,period,filter,stats,adherence,rank,timing,byType,topAssets,badActors,icmMatrix,engineeringMetrics,decisionInsights,systemHealth,dedupe,schemas,kind,normalize};
+const api={text,upper,status,labels,typeLabels,typeLabel,typeGroup,orderClass,validDate,daysBetween,date,period,filter,stats,adherence,rank,timing,byType,topAssets,badActors,icmMatrix,engineeringMetrics,decisionInsights,systemHealth,dedupe,schemas,kind,normalize};
 if(typeof module!=='undefined')module.exports=api;root.PCM=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
 
