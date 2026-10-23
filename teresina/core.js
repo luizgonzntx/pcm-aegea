@@ -79,10 +79,13 @@ function stopRecords(data,rows){
  return rows.map(o=>{
   const linked=(itemsByOrder.get(o.id)||[]).flatMap(i=>[i.problem,i.cause,i.component]).filter(Boolean);
   const hay=upper([o.text,...linked].join(' '));
-  let reason='';
-  if(/PARADA|PARADO|PAROU|DESLIG|SEM PRODU|SEM OPER|FORA DE OPER|INTERRUP/.test(hay)) reason='Parada ou desligamento';
-  else if(/FALHA|AVARIA|DEFEIT|QUEIM|TRAVAMENT|VAZAMENT|QUEBRA|CURTO|SOBRECARGA|ALARM/.test(hay)) reason='Falha ou avaria';
-  else if(/INDISPONIBIL|BAIXA PRESS|BAIXA VAZ|SEM VAZ|PANE|\bTRIP\b/.test(hay)) reason='Indisponibilidade operacional';
+  const duration=daysBetween(o.stopStart,o.stopEnd);
+  const confirmed=o.stopConfirmed===true||(duration!=null&&duration>=0);
+  let reason=text(o.stopReason);
+  if(!reason&&/PARADA|PARADO|PAROU|DESLIG|SEM PRODU|SEM OPER|FORA DE OPER|INTERRUP/.test(hay)) reason='Parada ou desligamento';
+  else if(!reason&&/FALHA|AVARIA|DEFEIT|QUEIM|TRAVAMENT|VAZAMENT|QUEBRA|CURTO|SOBRECARGA|ALARM/.test(hay)) reason='Falha ou avaria';
+  else if(!reason&&/INDISPONIBIL|BAIXA PRESS|BAIXA VAZ|SEM VAZ|PANE|\bTRIP\b/.test(hay)) reason='Indisponibilidade operacional';
+  if(!reason&&confirmed) reason='Parada confirmada';
   if(!reason)return null;
   const system=systems.get(o.tag);
   return {
@@ -94,11 +97,13 @@ function stopRecords(data,rows){
    asset:o.asset||o.equipment||'Ativo não informado',
    equipment:o.equipment||'Equipamento não informado',
    reason,
+   status:confirmed?'Confirmada':'Identificada',
+   durationDays:duration,
+   impact:text(o.stopImpact)||'Não informado',
    text:o.text||''
   };
  }).filter(Boolean);
 }
-
 function badActors(rows){
  const byAsset=new Map;
  for(const o of rows){
@@ -318,7 +323,7 @@ function normalize(tables,files){
  for(const k of Object.keys(schemas))if(!Array.isArray(tables[k])||!tables[k].length)throw Error('Planilha ausente ou vazia: '+k);
  const coord=(v,min,max)=>{let n=Number(text(v).replace(',','.'));if(!text(v)||!Number.isFinite(n)||n<min||n>max)throw Error('Latitude ou longitude inválida: '+text(v));return n;};
  const systems=dedupe(tables.systems.map(r=>({tag:text(r.COD_INFORMACAO),name:text(r.NOME),type:text(r.COD_ELEMENTO),lat:coord(r.COD_LATITUDE,-90,90),lng:coord(r.COD_LONGITUDE,-180,180),status:text(r.SITUACAO_OPERACIONAL),critical:text(r.CRITICIDADE),address:text(r.ENDERECO_LOGRADOURO),district:text(r.ENDERECO_BAIRRO),photo:text(r.FOTO_FACHADA)})),'tag');
- const tags=new Set(systems.map(s=>s.tag)),all=dedupe(tables.orders.map(r=>({id:text(r.Ordem),note:text(r.Nota),tag:text(r['TAG Planta']),center:upper(r.Centro),date:date(r['Data de referência']),start:date(r['Dta.início real']),created:date(r['Data de entrada']),due:date(r['Prazo programado']),finished:date(r['Conclusão real']),type:text(r['Tipo de ordem']),text:text(r['Texto breve']),status:text(r['Status do sistema']),equipment:text(r['Denominação do objeto técnico']),asset:text(r['TAG Ativo']),plan:text(r['Plano de manutenção']),priority:text(r['Texto prioridade']),activity:text(r['Tipo atividad.manut.']),workCenter:text(r['CenTrabalho princ.'])})),'id');
+ const optionalDate=v=>text(v)?date(v):'';const tags=new Set(systems.map(s=>s.tag)),all=dedupe(tables.orders.map(r=>({id:text(r.Ordem),note:text(r.Nota),tag:text(r['TAG Planta']),center:upper(r.Centro),date:date(r['Data de referência']),start:date(r['Dta.início real']),created:date(r['Data de entrada']),due:date(r['Prazo programado']),finished:date(r['Conclusão real']),type:text(r['Tipo de ordem']),text:text(r['Texto breve']),status:text(r['Status do sistema']),equipment:text(r['Denominação do objeto técnico']),asset:text(r['TAG Ativo']),plan:text(r['Plano de manutenção']),priority:text(r['Texto prioridade']),activity:text(r['Tipo atividad.manut.']),workCenter:text(r['CenTrabalho princ.']),stopConfirmed:['SIM','S','YES','TRUE','1','CONFIRMADA','CONFIRMADO'].includes(upper(r['Parada confirmada']||r['Parada confirmada?'])),stopStart:optionalDate(r['Início da parada']||r['Inicio da parada']),stopEnd:optionalDate(r['Fim da parada']||r['Final da parada']),stopReason:text(r['Motivo da parada']||r['Motivo parada']),stopImpact:text(r['Impacto operacional']||r['Impacto da parada'])})),'id');
  const orders=all.filter(o=>o.center==='PITE'&&tags.has(o.tag)),ids=new Set(orders.map(o=>o.id));if(!orders.length)throw Error('Nenhuma ordem de Águas de Teresina corresponde às instalações informadas.');
  const items=tables.items.map(r=>({order:text(r.Ordem),note:text(r.Nota),cause:text(r['Texto code causa']),problem:text(r['Texto de code para problema']),component:text(r['Texto code parte objeto']),item:text(r.Item)})).filter(r=>ids.has(r.order));
  const actions=tables.actions.map(r=>({order:text(r.Ordem),note:text(r.Nota),action:text(r['Texto do código da medida']),item:text(r.Medida)})).filter(r=>ids.has(r.order));
