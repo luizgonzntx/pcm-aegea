@@ -289,10 +289,11 @@
             '<small>' + num(s[2]) + ' ordens no período</small>' +
             '</div>'
           ).join('') +
-          '<div class="mix-item">' +
-          '<div class="mix-item-head"><span>Lead Time Médio (Entrada → Início)</span><b>' + (m.avgLeadDays == null ? '—' : m.avgLeadDays.toFixed(1) + ' d') + '</b></div>' +
-          '<small>Emergenciais: ' + (m.avgEmergLeadDays == null ? '—' : m.avgEmergLeadDays.toFixed(1) + ' d') + ' · Carteira &gt; 30d: ' + num(m.agedOpen30d) + ' OS</small>' +
           '</div>' +
+          '<div class="mix-summary" aria-label="Indicadores de tempo da carteira">' +
+          '<div class="mix-summary-item"><span>Lead Time médio</span><strong>' + (m.avgLeadDays == null ? '—' : m.avgLeadDays.toFixed(1) + ' dias') + '</strong><small>Entrada → início</small></div>' +
+          '<div class="mix-summary-item"><span>Lead Time emergencial</span><strong>' + (m.avgEmergLeadDays == null ? '—' : m.avgEmergLeadDays.toFixed(1) + ' dias') + '</strong><small>Resposta das corretivas emergenciais</small></div>' +
+          '<div class="mix-summary-item"><span>Carteira acima de 30 dias</span><strong>' + num(m.agedOpen30d) + ' OS</strong><small>Ordens abertas aguardando atuação</small></div>' +
           '</div>';
       }
     }
