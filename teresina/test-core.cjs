@@ -66,9 +66,15 @@ assert.equal(reliability.length,1);
 assert.equal(reliability[0].events,5);
 assert.equal(reliability[0].mtbfHours,39);
 assert.equal(reliability[0].mttrHours,1.75);
+assert.equal(reliability[0].availability,39/(39+1.75));
 assert.equal(reliability[0].open,1);
 assert.equal(reliability[0].closed,2);
 assert.equal(reliability[0].incomplete,2);
+const availabilityWithoutMtbf=P.reliabilityByPlant({
+ orders:[o('single')],
+ stoppageNotes:[{order:'single',flag:'X',startDate:'2026-01-01',startTime:'00:00:00',endDate:'2026-01-01',endTime:'01:00:00',tag:'T1'}]
+},{from:'2026-01-01',to:'2026-01-31'});
+assert.equal(availabilityWithoutMtbf[0].availability,null);
 const t=P.timing([o('1',{due:'2026-01-11',finished:'2026-01-10'}),o('2',{due:'2026-01-10',finished:'2026-01-12'}),o('3',{status:'ABER',due:'2026-01-01'}),o('4')],'2026-01-15');
 assert.equal(t.onTime,1);assert.equal(t.late,1);assert.equal(t.overdue,1);assert.equal(t.unassessed,1);
 const filtered=P.filter(data,f);

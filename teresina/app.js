@@ -443,11 +443,11 @@
       kpi('Avarias no período', num(reliabilityEvents), 'Ordens com data de início e Parada = X', '#c43650') +
       kpi('Avarias abertas', num(reliabilityOpen), 'Sem data de fim', '#c2780c');
     $('#reliabilityTable').innerHTML = reliability.length
-      ? '<table><thead><tr><th>Planta</th><th>MTBF médio</th><th>Intervalos</th><th>MTTR médio</th><th>Fechadas</th><th>Abertas</th><th>Fim incompleto</th></tr></thead><tbody>' +
+      ? '<table><thead><tr><th>Planta</th><th>MTBF médio</th><th>Intervalos</th><th>MTTR médio</th><th>Disponibilidade estimada</th><th>Fechadas</th><th>Abertas</th><th>Fim incompleto</th></tr></thead><tbody>' +
         reliability.map(item => {
           return '<tr><td><b>' + esc(item.plant) + '</b><br><span class="small-note">' + esc(item.tag) + '</span></td>' +
             '<td>' + duration(item.mtbfHours) + '</td><td>' + num(item.intervals) + '</td>' +
-            '<td>' + duration(item.mttrHours) + '</td><td>' + num(item.closed) + '</td>' +
+            '<td>' + duration(item.mttrHours) + '</td><td><b>' + pct(item.availability) + '</b></td><td>' + num(item.closed) + '</td>' +
             '<td>' + num(item.open) + '</td>' +
             '<td>' + num(item.incomplete) + '</td></tr>';
         }).join('') + '</tbody></table>'
@@ -1032,8 +1032,8 @@
     if (!data) return;
     const metrics = P.reliabilityByPlant(data, f);
     const lines = [
-      ['TAG Planta', 'Planta', 'Avarias distintas', 'Intervalos entre avarias', 'MTBF (horas)', 'MTTR (horas)', 'Avarias fechadas', 'Avarias abertas', 'Fim incompleto'].map(safeCsvCell).join(';'),
-      ...metrics.map(item => [item.tag, item.plant, item.events, item.intervals, item.mtbfHours == null ? '' : item.mtbfHours.toFixed(2), item.mttrHours == null ? '' : item.mttrHours.toFixed(2), item.closed, item.open, item.incomplete].map(safeCsvCell).join(';'))
+      ['TAG Planta', 'Planta', 'Avarias distintas', 'Intervalos entre avarias', 'MTBF (horas)', 'MTTR (horas)', 'Disponibilidade estimada (%)', 'Avarias fechadas', 'Avarias abertas', 'Fim incompleto'].map(safeCsvCell).join(';'),
+      ...metrics.map(item => [item.tag, item.plant, item.events, item.intervals, item.mtbfHours == null ? '' : item.mtbfHours.toFixed(2), item.mttrHours == null ? '' : item.mttrHours.toFixed(2), item.availability == null ? '' : (item.availability * 100).toFixed(2), item.closed, item.open, item.incomplete].map(safeCsvCell).join(';'))
     ];
     downloadCsvFile('MTBF_MTTR_Plantas_Aguas_de_Teresina_' + today() + '.csv', lines);
   }

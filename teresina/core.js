@@ -152,9 +152,12 @@ function reliabilityByPlant(data,f){
    if(!Number.isFinite(event.start)||!Number.isFinite(event.end)||event.end<event.start){incomplete++;continue;}
    repairSum+=event.end-event.start;closed++;
   }
+  const mtbfHours=intervalCount?intervalSum/intervalCount/3600000:null;
+  const mttrHours=closed?repairSum/closed/3600000:null;
+  const availabilityDenominator=mtbfHours+mttrHours;
   return {tag:plant.tag,plant:plant.plant,events:events.length,intervals:intervalCount,closed,open,incomplete,
-   mtbfHours:intervalCount?intervalSum/intervalCount/3600000:null,
-   mttrHours:closed?repairSum/closed/3600000:null,
+   mtbfHours,mttrHours,
+   availability:mtbfHours!=null&&mttrHours!=null&&availabilityDenominator>0?mtbfHours/availabilityDenominator:null,
    ids:events.map(event=>event.order)};
  }).sort((a,b)=>b.events-a.events||a.plant.localeCompare(b.plant,'pt-BR'));
 }
