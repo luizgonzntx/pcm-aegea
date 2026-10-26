@@ -475,7 +475,7 @@
       : emptyHTML;
 
     const reliabilityEvents = reliability.reduce((sum, item) => sum + item.events, 0);
-    const reliabilityOpen = reliability.reduce((sum, item) => sum + item.open, 0);
+    const reliabilityClosed = reliability.reduce((sum, item) => sum + item.closed, 0);
     const duration = hours => {
       if (hours == null) return '—';
       return hours >= 24
@@ -483,32 +483,30 @@
         : hours.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' h';
     };
     $('#reliabilitySummary').innerHTML =
-      kpi('Avarias no período', num(reliabilityEvents), 'Ordens ZNTP/ZNTE com início e Parada = X', '#c43650') +
-      kpi('Avarias abertas', num(reliabilityOpen), 'Ordens com situação em aberto', '#c2780c');
+      kpi('Avarias encerradas tecnicamente', num(reliabilityEvents), 'Ordens ZNTP/ZNTE com Parada = X e início válido', '#c43650') +
+      kpi('Reparos com duração válida', num(reliabilityClosed), 'Ordens com início e fim da avaria válidos', '#0f8a68');
     $('#reliabilityTable').innerHTML = reliability.length
-      ? '<table><thead><tr><th>Planta</th><th>MTBF médio</th><th>Intervalos</th><th>MTTR médio</th><th>Disponibilidade estimada</th><th>Fechadas</th><th>Abertas</th></tr></thead><tbody>' +
+      ? '<table><thead><tr><th>Planta</th><th>Avarias consideradas</th><th>MTBF médio</th><th>Intervalos</th><th>MTTR médio</th><th>Reparos válidos</th><th>Disponibilidade estimada</th></tr></thead><tbody>' +
         reliability.map(item => {
           return '<tr><td><b>' + esc(item.plant) + '</b><br><span class="small-note">' + esc(item.tag) + '</span></td>' +
-            '<td>' + duration(item.mtbfHours) + '</td><td>' + num(item.intervals) + '</td>' +
-            '<td>' + duration(item.mttrHours) + '</td><td><b>' + pct(item.availability) + '</b></td><td>' + num(item.closed) + '</td>' +
-            '<td>' + num(item.open) + '</td></tr>';
+            '<td>' + num(item.events) + '</td><td>' + duration(item.mtbfHours) + '</td><td>' + num(item.intervals) + '</td>' +
+            '<td>' + duration(item.mttrHours) + '</td><td>' + num(item.closed) + '</td><td><b>' + pct(item.availability) + '</b></td></tr>';
         }).join('') + '</tbody></table>'
       : emptyHTML;
 
     const assetReliabilityEvents = assetReliability.reduce((sum, item) => sum + item.events, 0);
-    const assetReliabilityOpen = assetReliability.reduce((sum, item) => sum + item.open, 0);
+    const assetReliabilityClosed = assetReliability.reduce((sum, item) => sum + item.closed, 0);
     $('#assetReliabilitySummary').innerHTML =
       kpi('Ativos com avaria registrada', num(assetReliability.length), 'Ordens ZNTP/ZNTE agrupadas pela TAG do ativo', '#0027bd') +
-      kpi('Avarias abertas', num(assetReliabilityOpen), 'Ordens com situação em aberto', '#c2780c') +
-      kpi('Avarias analisadas', num(assetReliabilityEvents), 'Ordens ZNTP/ZNTE distintas com início válido', '#c43650');
+      kpi('Avarias encerradas tecnicamente', num(assetReliabilityEvents), 'Ordens ZNTP/ZNTE com Parada = X e início válido', '#c43650') +
+      kpi('Reparos com duração válida', num(assetReliabilityClosed), 'Ordens com início e fim da avaria válidos', '#0f8a68');
     $('#assetReliabilityTable').innerHTML = assetReliability.length
-      ? '<table><thead><tr><th>Ativo</th><th>Equipamento</th><th>Planta</th><th>MTBF médio</th><th>Intervalos</th><th>MTTR médio</th><th>Disponibilidade</th><th>Fechadas</th><th>Abertas</th></tr></thead><tbody>' +
+      ? '<table><thead><tr><th>Ativo</th><th>Equipamento</th><th>Planta</th><th>Avarias consideradas</th><th>MTBF médio</th><th>Intervalos</th><th>MTTR médio</th><th>Reparos válidos</th><th>Disponibilidade</th></tr></thead><tbody>' +
         assetReliability.map(item =>
           '<tr><td><b>' + esc(item.asset) + '</b></td><td>' + esc(item.equipment || 'Não informado') + '</td>' +
           '<td>' + esc(item.plant) + '<br><span class="small-note">' + esc(item.tag) + '</span></td>' +
-          '<td>' + duration(item.mtbfHours) + '</td><td>' + num(item.intervals) + '</td>' +
-          '<td>' + duration(item.mttrHours) + '</td><td><b>' + pct(item.availability) + '</b></td><td>' + num(item.closed) + '</td>' +
-          '<td>' + num(item.open) + '</td></tr>'
+          '<td>' + num(item.events) + '</td><td>' + duration(item.mtbfHours) + '</td><td>' + num(item.intervals) + '</td>' +
+          '<td>' + duration(item.mttrHours) + '</td><td>' + num(item.closed) + '</td><td><b>' + pct(item.availability) + '</b></td></tr>'
         ).join('') + '</tbody></table>'
       : emptyHTML;
 

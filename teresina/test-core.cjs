@@ -70,39 +70,42 @@ const reliability=P.reliabilityByPlant({
  orders:normalized.orders.map(order=>({...order,type:'ZNTE'}))
 },{from:'2026-01-01',to:'2026-01-31'});
 assert.equal(reliability.length,1);
-assert.equal(reliability[0].events,5);
-assert.equal(reliability[0].mtbfHours,39);
+assert.equal(reliability[0].events,2);
+assert.equal(reliability[0].mtbfHours,93);
 assert.equal(reliability[0].mttrHours,1.75);
-assert.equal(reliability[0].availability,39/(39+1.75));
-assert.equal(reliability[0].open,2);
+assert.equal(reliability[0].availability,93/(93+1.75));
 assert.equal(reliability[0].closed,2);
 assert.equal(reliability[0].incomplete,0);
 const statusValidatedReliability=P.reliabilityByPlant({
  orders:[
-  o('completed',{status:'ENTE',type:'ZNTE',start:'2026-02-01'}),
+  o('completed1',{status:'ENTE',type:'ZNTE',start:'2026-02-01'}),
+  o('completed2',{status:'ENTE',type:'ZNTP',start:'2026-02-01'}),
   o('open',{status:'ABER',type:'ZNTP'}),
   o('cancelled',{status:'ENCE',type:'ZNTE'}),
-  o('preventive',{status:'ENTE',type:'ZTPF'})
+  o('preventive',{status:'ENTE',type:'ZTPF'}),
+  o('notFlagged',{status:'ENTE',type:'ZNTE'})
  ],
  stoppageNotes:[
-  {order:'completed',flag:'X',tag:'T1',startDate:'2026-01-01',startTime:'01:00:00',endDate:'2026-01-01',endTime:'03:00:00'},
+  {order:'completed1',flag:'X',tag:'T1',startDate:'2026-01-01',startTime:'01:00:00',endDate:'2026-01-01',endTime:'03:00:00'},
+  {order:'completed2',flag:'X',tag:'T1',startDate:'2026-01-03',startTime:'01:00:00',endDate:'2026-01-03',endTime:'05:00:00'},
   {order:'open',flag:'X',tag:'T1',startDate:'2026-01-02',startTime:'01:00:00',endDate:'2026-01-02',endTime:'10:00:00'},
   {order:'cancelled',flag:'X',tag:'T1',startDate:'2026-01-03',startTime:'01:00:00',endDate:'2026-01-03',endTime:'04:00:00'},
-  {order:'preventive',flag:'X',tag:'T1',startDate:'2026-01-04',startTime:'01:00:00',endDate:'2026-01-04',endTime:'06:00:00'}
+  {order:'preventive',flag:'X',tag:'T1',startDate:'2026-01-04',startTime:'01:00:00',endDate:'2026-01-04',endTime:'06:00:00'},
+  {order:'notFlagged',flag:'',tag:'T1',startDate:'2026-01-05',startTime:'01:00:00',endDate:'2026-01-05',endTime:'06:00:00'}
  ]
 },{from:'2026-01-01',to:'2026-01-31'});
-assert.equal(statusValidatedReliability[0].mtbfHours,24);
-assert.equal(statusValidatedReliability[0].mttrHours,2);
-assert.equal(statusValidatedReliability[0].closed,1);
-assert.equal(statusValidatedReliability[0].open,1);
+assert.equal(statusValidatedReliability[0].events,2);
+assert.equal(statusValidatedReliability[0].mtbfHours,48);
+assert.equal(statusValidatedReliability[0].mttrHours,3);
+assert.equal(statusValidatedReliability[0].closed,2);
 assert.equal(statusValidatedReliability[0].incomplete,0);
 const assetReliability=P.reliabilityByAsset({
  orders:[
-  o('a1',{asset:'A1',equipment:'Bomba A',type:'ZNTE'}),
-  o('a2',{asset:'A1',equipment:'Bomba A',type:'ZNTP'}),
-  o('b1',{asset:'A2',equipment:'Bomba B',type:'ZNTE'}),
-  o('b2',{asset:'A2',equipment:'Bomba B',type:'ZNTP'}),
-  o('unknown',{asset:'',type:'ZNTE'})
+  o('a1',{asset:'A1',equipment:'Bomba A',type:'ZNTE',status:'ENTE'}),
+  o('a2',{asset:'A1',equipment:'Bomba A',type:'ZNTP',status:'ENTE'}),
+  o('b1',{asset:'A2',equipment:'Bomba B',type:'ZNTE',status:'ENTE'}),
+  o('b2',{asset:'A2',equipment:'Bomba B',type:'ZNTP',status:'ENTE'}),
+  o('unknown',{asset:'',type:'ZNTE',status:'ENTE'})
  ],
  stoppageNotes:[
   {order:'a1',flag:'X',tag:'T1',startDate:'2026-01-01',startTime:'00:00:00',endDate:'2026-01-01',endTime:'02:00:00'},
@@ -122,14 +125,14 @@ assert.equal(assetReliability[1].mtbfHours,48);
 assert.equal(assetReliability[1].mttrHours,2);
 assert.equal(assetReliability[1].availability,48/(48+2));
 assert.deepEqual(P.reliabilityByAsset({
- orders:[o('a1',{asset:'A1',type:'ZNTE'}),o('a2',{asset:'A2',type:'ZNTP'})],
+ orders:[o('a1',{asset:'A1',type:'ZNTE',status:'ENTE'}),o('a2',{asset:'A2',type:'ZNTP',status:'ENTE'})],
  stoppageNotes:[
   {order:'a1',flag:'X',tag:'T1',asset:'A1',startDate:'2026-01-01',startTime:'00:00:00',endDate:'2026-01-01',endTime:'01:00:00'},
   {order:'a2',flag:'X',tag:'T1',asset:'A2',startDate:'2026-01-01',startTime:'00:00:00',endDate:'2026-01-01',endTime:'01:00:00'}
  ]
 },{from:'2026-01-01',to:'2026-01-31',asset:['A2']}).map(item=>item.asset),['A2']);
 const availabilityWithoutMtbf=P.reliabilityByPlant({
- orders:[o('single',{type:'ZNTE'})],
+ orders:[o('single',{type:'ZNTE',status:'ENTE'})],
  stoppageNotes:[{order:'single',flag:'X',startDate:'2026-01-01',startTime:'00:00:00',endDate:'2026-01-01',endTime:'01:00:00',tag:'T1'}]
 },{from:'2026-01-01',to:'2026-01-31'});
 assert.equal(availabilityWithoutMtbf[0].availability,null);

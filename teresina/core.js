@@ -138,16 +138,17 @@ function reliabilityByGroup(data,f,byAsset){
  for(const note of (data.stoppageNotes||[])){
   if(upper(note.flag)!=='X'||!text(note.order)||!validDate(note.startDate||'')||!period(note.startDate,f||{}))continue;
   const order=ordersById.get(note.order);
-  if(!order||!['ZNTP','ZNTE'].includes(upper(order.type)))continue;
+  if(!order||status(order)!=='done'||!['ZNTP','ZNTE'].includes(upper(order.type)))continue;
   const tag=order.tag||note.tag;
   if(!tag||tag!==note.tag||!matches('tag',tag)||!matches('asset',note.asset||order?.asset)||!matches('type',order?.type)||!matches('priority',note.priority||order?.priority))continue;
   const asset=text(order?.asset)||text(note.asset);
   if(byAsset&&!asset)continue;
   const groupKey=byAsset?tag+'\u0000'+asset:tag;
   const start=note.startTime?Date.parse(note.startDate+'T'+note.startTime+'Z'):NaN;
+  if(!Number.isFinite(start))continue;
   if(!groups.has(groupKey))groups.set(groupKey,{tag,plant:text(note.plant)||tag,asset,equipment:text(order?.equipment),events:new Map});
   const group=groups.get(groupKey);
-  if(!group.events.has(note.order))group.events.set(note.order,{order:note.order,orderStatus:status(order||{}),start:NaN,end:NaN});
+  if(!group.events.has(note.order))group.events.set(note.order,{order:note.order,start:NaN,end:NaN});
   const event=group.events.get(note.order);
   if(Number.isFinite(start)&&(!Number.isFinite(event.start)||start<event.start))event.start=start;
   if(validDate(note.endDate||'')&&note.endTime){
@@ -158,18 +159,16 @@ function reliabilityByGroup(data,f,byAsset){
  return [...groups.values()].map(group=>{
   const events=[...group.events.values()];
   const validStarts=events.filter(event=>Number.isFinite(event.start)).sort((a,b)=>a.start-b.start);
-  let intervalSum=0,intervalCount=0,repairSum=0,closed=0,open=0,incomplete=0;
+  let intervalSum=0,intervalCount=0,repairSum=0,closed=0,incomplete=0;
   for(let i=1;i<validStarts.length;i++){const diff=validStarts[i].start-validStarts[i-1].start;if(diff>0){intervalSum+=diff;intervalCount++;}}
   for(const event of events){
-   if(event.orderStatus==='open'){open++;continue;}
-   if(event.orderStatus!=='done')continue;
    if(!Number.isFinite(event.start)||!Number.isFinite(event.end)||event.end<event.start){incomplete++;continue;}
    repairSum+=event.end-event.start;closed++;
   }
   const mtbfHours=intervalCount?intervalSum/intervalCount/3600000:null;
   const mttrHours=closed?repairSum/closed/3600000:null;
   const availabilityDenominator=mtbfHours+mttrHours;
-  return {tag:group.tag,plant:group.plant,asset:group.asset,equipment:group.equipment,events:events.length,intervals:intervalCount,closed,open,incomplete,
+  return {tag:group.tag,plant:group.plant,asset:group.asset,equipment:group.equipment,events:events.length,intervals:intervalCount,closed,incomplete,
    mtbfHours,mttrHours,
    availability:mtbfHours!=null&&mttrHours!=null&&availabilityDenominator>0?mtbfHours/availabilityDenominator:null,
    ids:events.map(event=>event.order)};
