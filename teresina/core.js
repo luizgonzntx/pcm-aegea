@@ -371,9 +371,15 @@ const schemas={
  orders:['Ordem','TAG Planta','Centro','Data de referência','Dta.início real','Data de entrada','Status do sistema','Plano de manutenção','Tipo de ordem'],
  items:['Ordem','Texto code causa','Texto code parte objeto','Texto de code para problema'],
  actions:['Ordem','Texto do código da medida'],
- stoppageNotes:['Ordem','Data da nota','TAG Planta','Parada','Início da avaria','Início da avaria (hora)','Fim da avaria','Fim da avaria (hora)']
+ stoppageNotes:['Ordem','Data da nota','TAG Planta','Parada']
 };
-function kind(headers){return Object.keys(schemas).find(k=>schemas[k].every(h=>headers.includes(h)));}
+const optionalSchemas={
+ stoppageNotes:['Início da avaria','Início da avaria (hora)','Fim da avaria','Fim da avaria (hora)']
+};
+function headerKey(value){return text(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();}
+const canonicalHeaders=new Map(Object.values(schemas).flat().concat(Object.values(optionalSchemas).flat()).map(h=>[headerKey(h),h]));
+function canonicalHeader(value){return canonicalHeaders.get(headerKey(value))||text(value);}
+function kind(headers){const keys=new Set(headers.map(headerKey));return Object.keys(schemas).find(k=>schemas[k].every(h=>keys.has(headerKey(h))));}
 function normalize(tables,files){
  for(const k of Object.keys(schemas))if(!Array.isArray(tables[k])||(k!=='stoppageNotes'&&!tables[k].length))throw Error('Planilha ausente ou vazia: '+k);
  const coord=(v,min,max)=>{let n=Number(text(v).replace(',','.'));if(!text(v)||!Number.isFinite(n)||n<min||n>max)throw Error('Latitude ou longitude inválida: '+text(v));return n;};
@@ -401,6 +407,6 @@ function normalize(tables,files){
  }
  return {systems,orders,items,actions,stoppageNotes,meta:{loadedAt:new Date().toISOString(),files,sourceOrders:all.length,excluded:all.length-orders.length,missingReference:orders.filter(o=>!o.date).length,stoppageOrders:new Set(stoppageNotes.map(n=>n.order)).size,excludedStoppageNotes,missingStoppageNoteDate}};
 }
-const api={text,upper,status,labels,typeLabels,typeLabel,typeGroup,orderClass,validDate,daysBetween,date,time,period,filter,stats,adherence,rank,timing,byType,topAssets,badActors,icmMatrix,engineeringMetrics,decisionInsights,stopRecords,flaggedStopOrders,reliabilityByPlant,systemHealth,dedupe,schemas,kind,normalize};
+const api={text,upper,status,labels,typeLabels,typeLabel,typeGroup,orderClass,validDate,daysBetween,date,time,period,filter,stats,adherence,rank,timing,byType,topAssets,badActors,icmMatrix,engineeringMetrics,decisionInsights,stopRecords,flaggedStopOrders,reliabilityByPlant,systemHealth,dedupe,schemas,optionalSchemas,headerKey,canonicalHeader,kind,normalize};
 if(typeof module!=='undefined')module.exports=api;root.PCM=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

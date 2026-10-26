@@ -31,8 +31,9 @@ Os campos opcionais Prazo programado e Conclusão real habilitam a avaliação d
 O arquivo de sistemas deve ter COD_INFORMACAO, NOME, COD_LATITUDE e COD_LONGITUDE.
 Itens: Ordem, Texto code causa, Texto code parte objeto, Texto de code para problema.
 Medidas: Ordem, Texto do código da medida.
-Notas de parada: Ordem, Data da nota, TAG Planta, Parada, Início da avaria, Início da avaria (hora), Fim da avaria e Fim da avaria (hora). A coluna `Parada` usa `X` para marcar ocorrências; Nota e Descrição são opcionais e mantidas para rastreabilidade.
-A primeira linha é usada como cabeçalho. Arquivos devem ser XLSX e ter no máximo 25 MB.
+Notas de parada: Ordem, Data da nota, TAG Planta e Parada. A coluna `Parada` usa `X` para marcar ocorrências; Nota e Descrição são opcionais e mantidas para rastreabilidade.
+Para MTBF/MTTR, inclua também Início da avaria, Início da avaria (hora), Fim da avaria e Fim da avaria (hora). Esses campos são opcionais para importar notas.
+O importador procura o cabeçalho nas primeiras 20 linhas e ignora diferenças de caixa, acentos e espaços nos nomes das colunas. Arquivos devem ser XLSX e ter no máximo 25 MB.
 Datas inválidas, identificadores divergentes e coordenadas inválidas impedem a carga.
 O conjunto normalizado tem limite de 19 MB na interface / 20 MB no banco.
 

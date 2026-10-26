@@ -21,6 +21,9 @@ assert.equal(P.date('31/01/2026'),'2026-01-31');assert.throws(()=>P.date('31/02/
 assert.throws(()=>P.dedupe([{id:'1',v:1},{id:'1',v:2}],'id'));
 assert.equal(P.dedupe([{id:'1'},{id:'1'}],'id').length,1);
 assert.equal(P.kind(['Ordem','Data da nota','TAG Planta','Parada','Início da avaria','Início da avaria (hora)','Fim da avaria','Fim da avaria (hora)']),'stoppageNotes');
+assert.equal(P.kind(['ORDEM ','Data da nota','TAG PLANTA','PARADA']),'stoppageNotes');
+assert.equal(P.canonicalHeader('INICIO DA AVARIA (HORA)'),'Início da avaria (hora)');
+assert.equal(P.kind(['Ordem','Data da nota','TAG Planta','Parada','Início da avaria']), 'stoppageNotes');
 assert.equal(P.time('2:53:20'),'02:53:20');
 assert.equal(P.time(0.5),'12:00:00');
 assert.equal(P.time(0.9999999999),'23:59:59');
