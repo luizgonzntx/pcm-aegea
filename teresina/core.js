@@ -224,7 +224,7 @@ function icmMatrix(data,orders){
 }
 function engineeringMetrics(data,rows,asOf){
  let preventive=0,predictive=0,correctiveEmerg=0,correctivePlan=0,service=0,engineering=0,reactive=0;
- let prioEmerg=0,prioUrg=0,leadSum=0,leadCount=0,emergLeadSum=0,emergLeadCount=0,agedOpen30d=0;
+ let prioEmerg=0,prioUrg=0,agedOpen30d=0;
  const doneIds=new Set,correctiveDoneIds=new Set;
  for(const o of rows){
   const cls=orderClass(o),s=status(o),p=upper(o.priority);
@@ -240,11 +240,6 @@ function engineeringMetrics(data,rows,asOf){
   if(s==='done'){
    doneIds.add(o.id);
    if(cls==='corrective_emergency'||cls==='corrective_planned'||cls==='service')correctiveDoneIds.add(o.id);
-   const lt=daysBetween(o.created,o.start);
-   if(lt!=null&&lt>=0&&lt<=365){
-    leadSum+=lt;leadCount++;
-    if(cls==='corrective_emergency'){emergLeadSum+=lt;emergLeadCount++;}
-   }
   }else if(s==='open'&&asOf){
    const refDate=o.created||o.date;
    const age=daysBetween(refDate,asOf);
@@ -283,8 +278,6 @@ function engineeringMetrics(data,rows,asOf){
  return {
   total,preventive,predictive,engineering,correctiveEmerg,correctivePlan,service,reactive,proactive,reactiveTotal,
   proactiveRate,predictiveRate,emergencyRate,prioEmerg,prioUrg,
-  avgLeadDays:leadCount?leadSum/leadCount:null,
-  avgEmergLeadDays:emergLeadCount?emergLeadSum/emergLeadCount:null,
   agedOpen30d,
   icmCoverageRate,corrWithIcm,correctiveDoneTotal:correctiveDoneIds.size,
   palliativeCount:palliativeOrders.size,palliativeRate,
