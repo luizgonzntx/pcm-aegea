@@ -433,9 +433,7 @@
                 <span class="eyebrow">CONFIABILIDADE POR PLANTA</span>
                 <h2>MTBF, MTTR e disponibilidade</h2>
               </div>
-              <button id="exportReliabilityBtn">↓ Exportar confiabilidade (CSV)</button>
             </div>
-            <p class="small-note">MTBF é o intervalo médio entre inícios de avarias distintas (por Ordem). MTTR é a duração média entre início e fim nas avarias fechadas. A disponibilidade estimada é MTBF ÷ (MTBF + MTTR) e só é calculada quando ambos os indicadores podem ser apurados. Avaria sem data de fim é considerada aberta e não entra no MTTR. Período e filtros atuais são aplicados.</p>
             <div id="reliabilitySummary" class="kpis"></div>
             <div id="reliabilityTable" class="table-wrap"></div>
           </article>
@@ -446,9 +444,8 @@
                 <span class="eyebrow">CONFIABILIDADE POR ATIVO</span>
                 <h2>MTBF e MTTR por ativo</h2>
               </div>
-              <button id="exportAssetReliabilityBtn">↓ Exportar MTBF / MTTR por ativo (CSV)</button>
             </div>
-            <p class="small-note">Cálculo separado por TAG do ativo vinculada à Ordem. MTBF é o intervalo médio entre inícios de avarias distintas; MTTR é a duração média das avarias fechadas. Ativos sem TAG e registros com horários incompletos não entram nas médias. Período e filtros atuais são aplicados.</p>
+            <p class="small-note">Cálculo por TAG do ativo vinculada à Ordem, considerando o período e os filtros selecionados.</p>
             <div id="assetReliabilitySummary" class="kpis"></div>
             <div id="assetReliabilityTable" class="table-wrap"></div>
           </article>

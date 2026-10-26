@@ -474,13 +474,12 @@
       kpi('Avarias no período', num(reliabilityEvents), 'Ordens com data de início e Parada = X', '#c43650') +
       kpi('Avarias abertas', num(reliabilityOpen), 'Sem data de fim', '#c2780c');
     $('#reliabilityTable').innerHTML = reliability.length
-      ? '<table><thead><tr><th>Planta</th><th>MTBF médio</th><th>Intervalos</th><th>MTTR médio</th><th>Disponibilidade estimada</th><th>Fechadas</th><th>Abertas</th><th>Fim incompleto</th></tr></thead><tbody>' +
+      ? '<table><thead><tr><th>Planta</th><th>MTBF médio</th><th>Intervalos</th><th>MTTR médio</th><th>Disponibilidade estimada</th><th>Fechadas</th><th>Abertas</th></tr></thead><tbody>' +
         reliability.map(item => {
           return '<tr><td><b>' + esc(item.plant) + '</b><br><span class="small-note">' + esc(item.tag) + '</span></td>' +
             '<td>' + duration(item.mtbfHours) + '</td><td>' + num(item.intervals) + '</td>' +
             '<td>' + duration(item.mttrHours) + '</td><td><b>' + pct(item.availability) + '</b></td><td>' + num(item.closed) + '</td>' +
-            '<td>' + num(item.open) + '</td>' +
-            '<td>' + num(item.incomplete) + '</td></tr>';
+            '<td>' + num(item.open) + '</td></tr>';
         }).join('') + '</tbody></table>'
       : emptyHTML;
 
@@ -491,13 +490,13 @@
       kpi('Avarias abertas', num(assetReliabilityOpen), 'Sem data de fim', '#c2780c') +
       kpi('Avarias analisadas', num(assetReliabilityEvents), 'Ordens distintas com início válido', '#c43650');
     $('#assetReliabilityTable').innerHTML = assetReliability.length
-      ? '<table><thead><tr><th>Ativo</th><th>Equipamento</th><th>Planta</th><th>MTBF médio</th><th>Intervalos</th><th>MTTR médio</th><th>Fechadas</th><th>Abertas</th><th>Fim incompleto</th></tr></thead><tbody>' +
+      ? '<table><thead><tr><th>Ativo</th><th>Equipamento</th><th>Planta</th><th>MTBF médio</th><th>Intervalos</th><th>MTTR médio</th><th>Fechadas</th><th>Abertas</th></tr></thead><tbody>' +
         assetReliability.map(item =>
           '<tr><td><b>' + esc(item.asset) + '</b></td><td>' + esc(item.equipment || 'Não informado') + '</td>' +
           '<td>' + esc(item.plant) + '<br><span class="small-note">' + esc(item.tag) + '</span></td>' +
           '<td>' + duration(item.mtbfHours) + '</td><td>' + num(item.intervals) + '</td>' +
           '<td>' + duration(item.mttrHours) + '</td><td>' + num(item.closed) + '</td>' +
-          '<td>' + num(item.open) + '</td><td>' + num(item.incomplete) + '</td></tr>'
+          '<td>' + num(item.open) + '</td></tr>'
         ).join('') + '</tbody></table>'
       : emptyHTML;
 
@@ -1076,26 +1075,6 @@
     downloadCsvFile('Ordens_com_Flag_de_Parada_Aguas_de_Teresina_' + today() + '.csv', lines);
   }
 
-  function exportReliabilityCSV() {
-    if (!data) return;
-    const metrics = P.reliabilityByPlant(data, f);
-    const lines = [
-      ['TAG Planta', 'Planta', 'Avarias distintas', 'Intervalos entre avarias', 'MTBF (horas)', 'MTTR (horas)', 'Disponibilidade estimada (%)', 'Avarias fechadas', 'Avarias abertas', 'Fim incompleto'].map(safeCsvCell).join(';'),
-      ...metrics.map(item => [item.tag, item.plant, item.events, item.intervals, item.mtbfHours == null ? '' : item.mtbfHours.toFixed(2), item.mttrHours == null ? '' : item.mttrHours.toFixed(2), item.availability == null ? '' : (item.availability * 100).toFixed(2), item.closed, item.open, item.incomplete].map(safeCsvCell).join(';'))
-    ];
-    downloadCsvFile('MTBF_MTTR_Plantas_Aguas_de_Teresina_' + today() + '.csv', lines);
-  }
-
-  function exportAssetReliabilityCSV() {
-    if (!data) return;
-    const metrics = P.reliabilityByAsset(data, f);
-    const lines = [
-      ['TAG Ativo', 'Equipamento', 'TAG Planta', 'Planta', 'Avarias distintas', 'Intervalos entre avarias', 'MTBF (horas)', 'MTTR (horas)', 'Avarias fechadas', 'Avarias abertas', 'Fim incompleto'].map(safeCsvCell).join(';'),
-      ...metrics.map(item => [item.asset, item.equipment, item.tag, item.plant, item.events, item.intervals, item.mtbfHours == null ? '' : item.mtbfHours.toFixed(2), item.mttrHours == null ? '' : item.mttrHours.toFixed(2), item.closed, item.open, item.incomplete].map(safeCsvCell).join(';'))
-    ];
-    downloadCsvFile('MTBF_MTTR_Ativos_Aguas_de_Teresina_' + today() + '.csv', lines);
-  }
-
   function exportDeadlinesCSV() {
     if (!data) return;
     const asOf = today();
@@ -1296,8 +1275,6 @@
     if ($('#exportBadActorsBtn')) $('#exportBadActorsBtn').onclick = exportBadActorsCSV;
     if ($('#exportStopsBtn')) $('#exportStopsBtn').onclick = exportStopsCSV;
     if ($('#exportFlaggedStopsBtn')) $('#exportFlaggedStopsBtn').onclick = exportFlaggedStopsCSV;
-    if ($('#exportReliabilityBtn')) $('#exportReliabilityBtn').onclick = exportReliabilityCSV;
-    if ($('#exportAssetReliabilityBtn')) $('#exportAssetReliabilityBtn').onclick = exportAssetReliabilityCSV;
     if ($('#printStopsBtn')) $('#printStopsBtn').onclick = printStopsReport;
     if ($('#printOverviewBtn')) $('#printOverviewBtn').onclick = printOverviewReport;
 
