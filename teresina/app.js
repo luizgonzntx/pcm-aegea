@@ -455,10 +455,13 @@
       kpi('Ordens com Parada = X', num(flaggedTotal), 'Ordens distintas no período da nota', '#c43650') +
       kpi('Plantas com ocorrências', num(flaggedByPlant.length), 'TAG Planta distinta', '#c2780c');
     $('#flaggedStops').innerHTML = flaggedByPlant.length
-      ? '<table><thead><tr><th>Planta</th><th>TAG Planta</th><th>Ordens distintas com Parada = X</th></tr></thead><tbody>' +
+      ? '<table><thead><tr><th>Planta</th><th>TAG Planta</th><th>Total</th><th>Concluídas</th><th>Em aberto</th><th>Canceladas</th><th>Outras situações</th></tr></thead><tbody>' +
         flaggedByPlant.map(item => {
           const key = rankEvidence.push({ name: item.plant + ' · Ordens com flag de parada', count: item.count, ids: item.ids }) - 1;
-          return '<tr><td><b>' + esc(item.plant) + '</b></td><td>' + esc(item.tag) + '</td><td><button class="link" data-rank="' + key + '">' + num(item.count) + ' OS ↗</button></td></tr>';
+          return '<tr><td><b>' + esc(item.plant) + '</b></td><td>' + esc(item.tag) + '</td>' +
+            '<td><button class="link" data-rank="' + key + '">' + num(item.count) + ' OS ↗</button></td>' +
+            '<td>' + num(item.done) + '</td><td>' + num(item.open) + '</td>' +
+            '<td>' + num(item.cancelled) + '</td><td>' + num(item.other) + '</td></tr>';
         }).join('') + '</tbody></table>'
       : emptyHTML;
 

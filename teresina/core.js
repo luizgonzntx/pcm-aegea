@@ -114,10 +114,21 @@ function flaggedStopOrders(data,f){
   if(upper(note.flag)!=='X'||!text(note.order)||!text(note.tag)||!period(note.date||'',f||{}))continue;
   const order=ordersById.get(note.order);
   if(!matches('tag',note.tag)||!matches('asset',note.asset||order?.asset)||!matches('type',order?.type)||!matches('priority',note.priority||order?.priority))continue;
-  if(!byPlant.has(note.tag))byPlant.set(note.tag,{tag:note.tag,plant:text(note.plant)||note.tag,ids:new Set});
-  byPlant.get(note.tag).ids.add(note.order);
+  if(!byPlant.has(note.tag))byPlant.set(note.tag,{tag:note.tag,plant:text(note.plant)||note.tag,ids:new Set,orders:new Map});
+  const plant=byPlant.get(note.tag);
+  plant.ids.add(note.order);
+  if(!plant.orders.has(note.order))plant.orders.set(note.order,order?status(order):'other');
  }
- return [...byPlant.values()].map(item=>({...item,ids:[...item.ids],count:item.ids.size}))
+ return [...byPlant.values()].map(item=>{
+  const counts={done:0,open:0,cancelled:0,other:0};
+  for(const orderStatus of item.orders.values()){
+   if(orderStatus==='done')counts.done++;
+   else if(orderStatus==='open')counts.open++;
+   else if(orderStatus==='closed')counts.cancelled++;
+   else counts.other++;
+  }
+  return {...item,ids:[...item.ids],count:item.ids.size,...counts};
+ })
   .sort((a,b)=>b.count-a.count||a.plant.localeCompare(b.plant,'pt-BR'));
 }
 function reliabilityByGroup(data,f,byAsset){

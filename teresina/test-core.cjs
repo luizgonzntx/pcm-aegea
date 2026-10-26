@@ -34,9 +34,9 @@ const normalized=P.normalize({
  orders:[
   {Ordem:'1','TAG Planta':'T1',Centro:'PITE','Data de referência':'10/01/2026','Dta.início real':'','Data de entrada':'05/01/2026','Status do sistema':'ENTE','Plano de manutenção':'P1','Tipo de ordem':'ZTPF','Texto prioridade':'Necessário','TAG Ativo':'A1'},
   {Ordem:'2','TAG Planta':'T1',Centro:'PITE','Data de referência':'10/01/2026','Dta.início real':'','Data de entrada':'05/01/2026','Status do sistema':'ABER','Plano de manutenção':'P1','Tipo de ordem':'ZTPF','Texto prioridade':'Necessário','TAG Ativo':'A1'},
-  {Ordem:'3','TAG Planta':'T1',Centro:'PITE','Data de referência':'10/01/2026','Dta.início real':'','Data de entrada':'05/01/2026','Status do sistema':'ABER','Plano de manutenção':'P1','Tipo de ordem':'ZTPF','Texto prioridade':'Necessário','TAG Ativo':'A1'},
-  {Ordem:'4','TAG Planta':'T1',Centro:'PITE','Data de referência':'10/01/2026','Dta.início real':'','Data de entrada':'05/01/2026','Status do sistema':'ABER','Plano de manutenção':'P1','Tipo de ordem':'ZTPF','Texto prioridade':'Necessário','TAG Ativo':'A1'},
-  {Ordem:'5','TAG Planta':'T1',Centro:'PITE','Data de referência':'10/01/2026','Dta.início real':'','Data de entrada':'05/01/2026','Status do sistema':'ABER','Plano de manutenção':'P1','Tipo de ordem':'ZTPF','Texto prioridade':'Necessário','TAG Ativo':'A1'}
+  {Ordem:'3','TAG Planta':'T1',Centro:'PITE','Data de referência':'10/01/2026','Dta.início real':'','Data de entrada':'05/01/2026','Status do sistema':'ENTE','Plano de manutenção':'P1','Tipo de ordem':'ZTPF','Texto prioridade':'Necessário','TAG Ativo':'A1'},
+  {Ordem:'4','TAG Planta':'T1',Centro:'PITE','Data de referência':'10/01/2026','Dta.início real':'','Data de entrada':'05/01/2026','Status do sistema':'LIB','Plano de manutenção':'P1','Tipo de ordem':'ZTPF','Texto prioridade':'Necessário','TAG Ativo':'A1'},
+  {Ordem:'5','TAG Planta':'T1',Centro:'PITE','Data de referência':'10/01/2026','Dta.início real':'','Data de entrada':'05/01/2026','Status do sistema':'ENCE','Plano de manutenção':'P1','Tipo de ordem':'ZTPF','Texto prioridade':'Necessário','TAG Ativo':'A1'}
  ],
  items:[{Ordem:'1'}],
  actions:[{Ordem:'1'}],
@@ -59,6 +59,10 @@ assert.equal(normalized.meta.missingStoppageNoteDate,1);
 assert.equal(P.flaggedStopOrders(normalized,{from:'2026-01-01',to:'2026-01-31'}).length,1);
 assert.equal(P.flaggedStopOrders(normalized,{from:'2026-02-01',to:'2026-02-28'}).length,0);
 assert.equal(P.flaggedStopOrders(normalized,{from:'2026-01-01',to:'2026-01-31'})[0].count,5);
+assert.deepEqual(
+ (({count,done,open,cancelled,other})=>({count,done,open,cancelled,other}))(P.flaggedStopOrders(normalized,{from:'2026-01-01',to:'2026-01-31'})[0]),
+ {count:5,done:2,open:2,cancelled:1,other:0}
+);
 assert.equal(P.flaggedStopOrders(normalized,{from:'2026-01-01',to:'2026-01-31',asset:['A1'],type:['ZTPF'],priority:['Necessário']})[0].count,5);
 assert.equal(P.flaggedStopOrders(normalized,{from:'2026-01-01',to:'2026-01-31',priority:['Emergência']}).length,0);
 const reliability=P.reliabilityByPlant(normalized,{from:'2026-01-01',to:'2026-01-31'});
