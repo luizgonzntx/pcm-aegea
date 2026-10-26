@@ -378,8 +378,19 @@ const optionalSchemas={
 };
 function headerKey(value){return text(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();}
 const canonicalHeaders=new Map(Object.values(schemas).flat().concat(Object.values(optionalSchemas).flat()).map(h=>[headerKey(h),h]));
-function canonicalHeader(value){return canonicalHeaders.get(headerKey(value))||text(value);}
-function kind(headers){const keys=new Set(headers.map(headerKey));return Object.keys(schemas).find(k=>schemas[k].every(h=>keys.has(headerKey(h))));}
+const headerAliases=new Map([
+ ['numero da ordem','Ordem'],['numero ordem','Ordem'],['n ordem','Ordem'],['no ordem','Ordem'],
+ ['flag parada','Parada'],['indicador parada','Parada'],['parada?','Parada'],
+ ['data nota','Data da nota'],['data da ocorrencia','Data da nota']
+].map(([alias,canonical])=>[headerKey(alias),canonical]));
+function canonicalHeader(value){const key=headerKey(value);return canonicalHeaders.get(key)||headerAliases.get(key)||text(value);}
+function kind(headers){
+ const keys=new Set(headers.map(value=>headerKey(canonicalHeader(value))));
+ return Object.keys(schemas).find(k=>{
+  const required=k==='stoppageNotes'?['Ordem','Parada']:schemas[k];
+  return required.every(h=>keys.has(headerKey(h)));
+ });
+}
 function normalize(tables,files){
  for(const k of Object.keys(schemas))if(!Array.isArray(tables[k])||(k!=='stoppageNotes'&&!tables[k].length))throw Error('Planilha ausente ou vazia: '+k);
  const coord=(v,min,max)=>{let n=Number(text(v).replace(',','.'));if(!text(v)||!Number.isFinite(n)||n<min||n>max)throw Error('Latitude ou longitude inválida: '+text(v));return n;};
