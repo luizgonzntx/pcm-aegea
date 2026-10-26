@@ -149,7 +149,7 @@
       <section id="empty" class="empty" hidden>
         <span class="empty-icon">↥</span>
         <h2>Sua operação começa pelos dados.</h2>
-        <p>Importe os arquivos de sistemas, ordens, itens e medidas. Os indicadores, diagnósticos de confiabilidade e o mapa serão calculados a partir das suas planilhas.</p>
+        <p>Importe os arquivos de sistemas, ordens, itens, medidas e notas de parada. Os indicadores, diagnósticos de confiabilidade e o mapa serão calculados a partir das suas planilhas.</p>
         <button id="emptyImport" class="primary" hidden>Importar primeiro conjunto</button>
       </section>
 
@@ -410,6 +410,32 @@
 
           <div id="stopKpis" class="kpis"></div>
 
+          <article class="card" style="margin-bottom:20px">
+            <div class="card-top">
+              <div>
+                <span class="eyebrow">FONTE: PLANILHA DE NOTAS</span>
+                <h2>Ordens com flag de parada</h2>
+              </div>
+              <button id="exportFlaggedStopsBtn">↓ Exportar ordens com flag (CSV)</button>
+            </div>
+            <p class="small-note">Conta ordens distintas com <b>Parada = X</b>, agrupadas pela TAG Planta e pela Data da nota, respeitando os filtros do painel. É um indicador histórico de ocorrências; não informa se a planta está parada neste momento.</p>
+            <div id="flaggedStopSummary" class="kpis"></div>
+            <div id="flaggedStops" class="table-wrap"></div>
+          </article>
+
+          <article class="card" style="margin-bottom:20px">
+            <div class="card-top">
+              <div>
+                <span class="eyebrow">CONFIABILIDADE POR PLANTA</span>
+                <h2>MTBF e MTTR estimados</h2>
+              </div>
+              <button id="exportReliabilityBtn">↓ Exportar MTBF / MTTR (CSV)</button>
+            </div>
+            <p class="small-note">MTBF é o intervalo médio entre inícios de avarias distintas (por Ordem). MTTR é a duração média entre início e fim nas avarias fechadas. Avaria sem data de fim é considerada aberta e não entra no MTTR. Período e filtros atuais são aplicados.</p>
+            <div id="reliabilitySummary" class="kpis"></div>
+            <div id="reliabilityTable" class="table-wrap"></div>
+          </article>
+
           <div class="overview-bottom">
             <article class="card">
               <div class="card-top">
@@ -527,9 +553,9 @@
       <button id="closeImport" aria-label="Fechar">✕</button>
     </div>
     <h2>Uma base atualizada. Uma visão compartilhada.</h2>
-    <p>Selecione ou arraste os quatro arquivos Excel: <strong>sistemas</strong>, <strong>ordens</strong>, <strong>itens</strong> e <strong>medidas</strong>. O conjunto será validado antes de substituir a base.</p>
+    <p>Selecione ou arraste os cinco arquivos Excel: <strong>sistemas</strong>, <strong>ordens</strong>, <strong>itens</strong>, <strong>medidas</strong> e <strong>notas de parada</strong>. O conjunto será validado antes de substituir a base.</p>
     <label class="file-zone" id="dropZone">
-      <span class="file-zone-title">↑ Arraste as 4 planilhas (.xlsx) aqui ou clique para selecionar</span>
+      <span class="file-zone-title">↑ Arraste as 5 planilhas (.xlsx) aqui ou clique para selecionar</span>
       <input id="files" type="file" accept=".xlsx" multiple>
     </label>
     <div id="fileChecklist" class="file-checklist"></div>
@@ -545,4 +571,3 @@
   <div id="toast" role="status" hidden></div>
 </body>
 </html>
-

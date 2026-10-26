@@ -60,13 +60,13 @@
           <div><span class="eyebrow blue">ÁREA RESTRITA</span><h2>Publicar atualização da base</h2><p class="small-note" id="sessionLabel"></p></div>
           <button id="logoutBtn" type="button">Sair</button>
         </div>
-        <p class="admin-subtitle">Selecione os quatro arquivos XLSX. A validação acontece no navegador; a gravação só ocorre depois de sua revisão e confirmação.</p>
+        <p class="admin-subtitle">Selecione os cinco arquivos XLSX: sistemas, ordens, itens, medidas e notas de parada. A validação acontece no navegador; a gravação só ocorre depois de sua revisão e confirmação.</p>
         <input id="files" type="file" accept=".xlsx" multiple>
         <div id="fileList" class="admin-files"></div>
         <div id="review" hidden></div>
         <div class="admin-actions"><button id="validateBtn" class="primary" type="button">Validar arquivos</button><button id="saveBtn" type="button" hidden>Publicar no Supabase</button></div>
         <p id="adminStatus" class="admin-status" role="status"></p>
-        <div class="admin-note">A base atual será substituída integralmente. A publicação usa controle de revisão: se alguém atualizar antes de você, o sistema bloqueia a gravação para evitar sobrescrever dados novos.</div>
+        <div class="admin-note">A publicação substitui as cinco bases. As ordens com `Parada = X` são contadas uma única vez por ordem e planta, usando a data da nota; isso representa histórico de ocorrências, não uma indicação de que a planta está parada agora. Se alguém atualizar antes de você, o controle de revisão bloqueia a gravação para evitar sobrescrever dados novos.</div>
       </div>
     </section>
   </main>
@@ -92,7 +92,7 @@
       }
       async function validate() {
         const list = files();
-        if (list.length !== 4) return msg('Selecione exatamente quatro arquivos XLSX: sistemas, ordens, itens e medidas.', 'error');
+        if (list.length !== 5) return msg('Selecione exatamente cinco arquivos XLSX: sistemas, ordens, itens, medidas e notas de parada.', 'error');
         if (list.some(f => !/\.xlsx$/i.test(f.name) || f.size > 25 * 1024 * 1024)) return msg('Cada arquivo deve ser XLSX e ter no máximo 25 MB.', 'error');
         $('#validateBtn').disabled = true; $('#saveBtn').hidden = true; msg('Lendo e validando as planilhas…');
         try {
@@ -104,9 +104,10 @@
             worker.onerror = () => { clearTimeout(timeout); worker.terminate(); worker=null; reject(Error('Falha ao ler os arquivos.')); };
             worker.postMessage(buffers, buffers.map(x => x.buffer));
           });
+          if (new Blob([JSON.stringify(result)]).size > 19 * 1024 * 1024) throw Error('O conjunto processado excede o limite de 19 MB. Reduza o tamanho das planilhas.');
           pending = result;
           $('#review').hidden = false;
-          $('#review').innerHTML = '<div class="admin-meta"><div><small>Instalações</small><b>' + result.systems.length.toLocaleString('pt-BR') + '</b></div><div><small>Ordens válidas</small><b>' + result.orders.length.toLocaleString('pt-BR') + '</b></div><div><small>Itens / medidas</small><b>' + result.items.length.toLocaleString('pt-BR') + ' / ' + result.actions.length.toLocaleString('pt-BR') + '</b></div></div><p class="small-note">' + result.meta.excluded.toLocaleString('pt-BR') + ' ordens fora do escopo. A publicação substitui a base atual.</p>';
+          $('#review').innerHTML = '<div class="admin-meta"><div><small>Instalações</small><b>' + result.systems.length.toLocaleString('pt-BR') + '</b></div><div><small>Ordens válidas</small><b>' + result.orders.length.toLocaleString('pt-BR') + '</b></div><div><small>Itens / medidas</small><b>' + result.items.length.toLocaleString('pt-BR') + ' / ' + result.actions.length.toLocaleString('pt-BR') + '</b></div><div><small>Ordens com Parada = X</small><b>' + result.meta.stoppageOrders.toLocaleString('pt-BR') + '</b></div></div><p class="small-note">' + result.meta.excluded.toLocaleString('pt-BR') + ' ordens fora do escopo; ' + result.meta.excludedStoppageNotes.toLocaleString('pt-BR') + ' notas sem Ordem válida ou fora das instalações; ' + result.meta.missingStoppageNoteDate.toLocaleString('pt-BR') + ' sem Data da nota (não entram na contagem histórica por Data da nota, mas podem ter início de avaria válido). A publicação substitui a base atual.</p>';
           $('#saveBtn').hidden = false; msg('Validação concluída. Revise os totais e publique quando estiver pronto.', 'success');
         } catch (e) { msg(e.message || 'Não foi possível validar.', 'error'); }
         finally { $('#validateBtn').disabled = false; }
@@ -132,4 +133,3 @@
   </script>
 </body>
 </html>
-

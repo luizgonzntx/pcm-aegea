@@ -384,6 +384,9 @@
 
   function renderStops() {
     const records = P.stopRecords(data, rows);
+    const flaggedByPlant = P.flaggedStopOrders(data, f);
+    const flaggedTotal = flaggedByPlant.reduce((sum, item) => sum + item.count, 0);
+    const reliability = P.reliabilityByPlant(data, f);
     const reasons = new Map(), years = new Map(), assets = new Map(), groups = new Map(), plants = new Set();
     for (const r of records) {
       const add = (map, key) => {
@@ -416,6 +419,39 @@
       kpi('Paradas confirmadas', num(confirmedCount), records.length ? pct(confirmedCount / records.length) + ' do total' : 'Sem registros', '#0f8a68') +
       kpi('Plantas atingidas', num(plants.size), 'Instalações com ocorrência', '#c2780c') +
       kpi('Ativos envolvidos', num(assets.size), 'Ativos com ocorrência', '#0027bd');
+
+    $('#flaggedStopSummary').innerHTML =
+      kpi('Ordens com Parada = X', num(flaggedTotal), 'Ordens distintas no período da nota', '#c43650') +
+      kpi('Plantas com ocorrências', num(flaggedByPlant.length), 'TAG Planta distinta', '#c2780c');
+    $('#flaggedStops').innerHTML = flaggedByPlant.length
+      ? '<table><thead><tr><th>Planta</th><th>TAG Planta</th><th>Ordens distintas com Parada = X</th></tr></thead><tbody>' +
+        flaggedByPlant.map(item => {
+          const key = rankEvidence.push({ name: item.plant + ' · Ordens com flag de parada', count: item.count, ids: item.ids }) - 1;
+          return '<tr><td><b>' + esc(item.plant) + '</b></td><td>' + esc(item.tag) + '</td><td><button class="link" data-rank="' + key + '">' + num(item.count) + ' OS ↗</button></td></tr>';
+        }).join('') + '</tbody></table>'
+      : emptyHTML;
+
+    const reliabilityEvents = reliability.reduce((sum, item) => sum + item.events, 0);
+    const reliabilityOpen = reliability.reduce((sum, item) => sum + item.open, 0);
+    const duration = hours => {
+      if (hours == null) return '—';
+      return hours >= 24
+        ? (hours / 24).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' dias (' + hours.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' h)'
+        : hours.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' h';
+    };
+    $('#reliabilitySummary').innerHTML =
+      kpi('Avarias no período', num(reliabilityEvents), 'Ordens com data de início e Parada = X', '#c43650') +
+      kpi('Avarias abertas', num(reliabilityOpen), 'Sem data de fim', '#c2780c');
+    $('#reliabilityTable').innerHTML = reliability.length
+      ? '<table><thead><tr><th>Planta</th><th>MTBF médio</th><th>Intervalos</th><th>MTTR médio</th><th>Fechadas</th><th>Abertas</th><th>Fim incompleto</th></tr></thead><tbody>' +
+        reliability.map(item => {
+          return '<tr><td><b>' + esc(item.plant) + '</b><br><span class="small-note">' + esc(item.tag) + '</span></td>' +
+            '<td>' + duration(item.mtbfHours) + '</td><td>' + num(item.intervals) + '</td>' +
+            '<td>' + duration(item.mttrHours) + '</td><td>' + num(item.closed) + '</td>' +
+            '<td>' + num(item.open) + '</td>' +
+            '<td>' + num(item.incomplete) + '</td></tr>';
+        }).join('') + '</tbody></table>'
+      : emptyHTML;
 
     const maxReason = reasonList[0]?.[1].total || 1;
     $('#stopReasons').innerHTML = reasonList.length
@@ -606,10 +642,17 @@
     const r = rankEvidence[index];
     if (!r) return;
     const ids = new Set(r.ids), list = data.orders.filter(o => ids.has(o.id));
+    const stopNotes = r.name.endsWith('Ordens com flag de parada')
+      ? (data.stoppageNotes || []).filter(note => ids.has(note.order))
+      : [];
     modalMode = 'evidence';
     openDetail(
-      '<div class="detail-heading"><h2>' + esc(r.name) + '</h2><p>' + num(list.length) + ' ordens distintas nos filtros selecionados.</p></div>' +
-      '<div class="table-wrap">' + table(list) + '</div>',
+      '<div class="detail-heading"><h2>' + esc(r.name) + '</h2><p>' + num(r.count) + ' ordens distintas nos filtros selecionados.</p></div>' +
+      (stopNotes.length
+        ? '<div class="table-wrap"><table><thead><tr><th>Ordem</th><th>Data da nota</th><th>Nota</th><th>Descrição</th></tr></thead><tbody>' +
+          stopNotes.map(note => '<tr><td>' + esc(note.order) + '</td><td>' + esc(fmt(note.date)) + '</td><td>' + esc(note.note) + '</td><td>' + esc(note.description) + '</td></tr>').join('') +
+          '</tbody></table></div>'
+        : '<div class="table-wrap">' + table(list) + '</div>'),
       'ICM & ENGENHARIA · ORDENS RELACIONADAS'
     );
   }
@@ -755,7 +798,7 @@
     pending = null;
     $('#saveImport').hidden = true;
     const files = selectedFiles.length ? selectedFiles : [...$('#files').files];
-    if (files.length !== 4) return importMessage('Selecione exatamente quatro arquivos: sistemas, ordens, itens e medidas.', true);
+    if (files.length !== 5) return importMessage('Selecione exatamente cinco arquivos: sistemas, ordens, itens, medidas e notas de parada.', true);
     if (files.some(f => !/\.xlsx$/i.test(f.name) || f.size > 25 * 1024 * 1024)) return importMessage('Use arquivos .xlsx de até 25 MB cada.', true);
     $('#validateImport').disabled = true;
     $('#files').disabled = true;
@@ -789,8 +832,8 @@
       if (new Blob([JSON.stringify(result)]).size > 19 * 1024 * 1024) throw Error('O conjunto processado excede o limite de 19 MB. Reduza o intervalo da exportação.');
       pending = result;
       $('#importReview').innerHTML =
-        '<div class="detail-kpis"><div><small>Instalações</small><b>' + num(result.systems.length) + '</b></div><div><small>Ordens válidas</small><b>' + num(result.orders.length) + '</b></div><div><small>Itens / medidas</small><b>' + num(result.items.length) + ' / ' + num(result.actions.length) + '</b></div></div>' +
-        '<p class="small-note">' + num(result.meta.excluded) + ' ordens fora do escopo; ' + num(result.meta.missingReference) + ' sem data de referência. A base atual será substituída integralmente após salvar.</p>';
+        '<div class="detail-kpis"><div><small>Instalações</small><b>' + num(result.systems.length) + '</b></div><div><small>Ordens válidas</small><b>' + num(result.orders.length) + '</b></div><div><small>Itens / medidas</small><b>' + num(result.items.length) + ' / ' + num(result.actions.length) + '</b></div><div><small>Ordens com Parada = X</small><b>' + num(result.meta.stoppageOrders) + '</b></div></div>' +
+        '<p class="small-note">' + num(result.meta.excluded) + ' ordens fora do escopo; ' + num(result.meta.missingReference) + ' sem data de referência; ' + num(result.meta.excludedStoppageNotes) + ' notas sem Ordem válida ou fora das instalações; ' + num(result.meta.missingStoppageNoteDate) + ' sem Data da nota. A base atual será substituída integralmente após salvar.</p>';
       importMessage('Validação concluída. Confira os totais e salve a atualização.');
       $('#saveImport').hidden = false;
     } catch (e) {
@@ -975,6 +1018,26 @@
     downloadCsvFile('Paradas_Aguas_de_Teresina_' + today() + '.csv', lines);
   }
 
+  function exportFlaggedStopsCSV() {
+    if (!data) return;
+    const grouped = P.flaggedStopOrders(data, f);
+    const lines = [
+      ['TAG Planta', 'Planta', 'Ordens distintas com Parada = X'].map(safeCsvCell).join(';'),
+      ...grouped.map(item => [item.tag, item.plant, item.count].map(safeCsvCell).join(';'))
+    ];
+    downloadCsvFile('Ordens_com_Flag_de_Parada_Aguas_de_Teresina_' + today() + '.csv', lines);
+  }
+
+  function exportReliabilityCSV() {
+    if (!data) return;
+    const metrics = P.reliabilityByPlant(data, f);
+    const lines = [
+      ['TAG Planta', 'Planta', 'Avarias distintas', 'Intervalos entre avarias', 'MTBF (horas)', 'MTTR (horas)', 'Avarias fechadas', 'Avarias abertas', 'Fim incompleto'].map(safeCsvCell).join(';'),
+      ...metrics.map(item => [item.tag, item.plant, item.events, item.intervals, item.mtbfHours == null ? '' : item.mtbfHours.toFixed(2), item.mttrHours == null ? '' : item.mttrHours.toFixed(2), item.closed, item.open, item.incomplete].map(safeCsvCell).join(';'))
+    ];
+    downloadCsvFile('MTBF_MTTR_Plantas_Aguas_de_Teresina_' + today() + '.csv', lines);
+  }
+
   function exportDeadlinesCSV() {
     if (!data) return;
     const asOf = today();
@@ -1151,6 +1214,8 @@
     if ($('#exportDeadlinesBtn')) $('#exportDeadlinesBtn').onclick = exportDeadlinesCSV;
     if ($('#exportBadActorsBtn')) $('#exportBadActorsBtn').onclick = exportBadActorsCSV;
     if ($('#exportStopsBtn')) $('#exportStopsBtn').onclick = exportStopsCSV;
+    if ($('#exportFlaggedStopsBtn')) $('#exportFlaggedStopsBtn').onclick = exportFlaggedStopsCSV;
+    if ($('#exportReliabilityBtn')) $('#exportReliabilityBtn').onclick = exportReliabilityCSV;
     if ($('#printStopsBtn')) $('#printStopsBtn').onclick = printStopsReport;
     if ($('#printOverviewBtn')) $('#printOverviewBtn').onclick = printOverviewReport;
 
@@ -1234,4 +1299,3 @@
 
   boot();
 })();
-

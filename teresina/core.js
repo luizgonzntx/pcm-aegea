@@ -33,6 +33,7 @@ function orderClass(o){
 function validDate(s){if(!/^\d{4}-\d{2}-\d{2}$/.test(s))return false;const d=new Date(s+'T00:00:00Z');return Number.isFinite(+d)&&d.toISOString().slice(0,10)===s;}
 function daysBetween(a,b){if(!validDate(a||'')||!validDate(b||''))return null;return Math.round((new Date(b+'T00:00:00Z')-new Date(a+'T00:00:00Z'))/86400000);}
 function date(v){if(!text(v))return '';if(typeof v==='number'){if(v<1||v>150000)throw Error('Data numérica inválida');return new Date(Date.UTC(1899,11,30)+Math.floor(v)*86400000).toISOString().slice(0,10);}let s=text(v).slice(0,10),m=s.match(/^(\d{2})[/.](\d{2})[/.](\d{4})$/);if(m)s=m[3]+'-'+m[2]+'-'+m[1];if(!validDate(s))throw Error('Data inválida: '+text(v));return s;}
+function time(v){if(v==null||text(v)==='')return '';let seconds;if(typeof v==='number'){if(v<0||v>=1)throw Error('Hora numérica inválida');seconds=Math.min(86399,Math.round(v*86400));}else{const m=text(v).match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);if(!m)throw Error('Hora inválida: '+text(v));const h=Number(m[1]),min=Number(m[2]),sec=Number(m[3]||0);if(h>23||min>59||sec>59)throw Error('Hora inválida: '+text(v));seconds=h*3600+min*60+sec;}const h=String(Math.floor(seconds/3600)).padStart(2,'0'),min=String(Math.floor(seconds%3600/60)).padStart(2,'0'),sec=String(seconds%60).padStart(2,'0');return h+':'+min+':'+sec;}
 function period(v,f){return validDate(v||'')&&(!f.from||v>=f.from)&&(!f.to||v<=f.to);}
 function filter(data,f,cohort){const tags=new Set(data.systems.map(s=>s.tag));const matches=(value,selected)=>{const list=Array.isArray(selected)?selected:(selected?[selected]:[]);return !list.length||list.includes(value);};return data.orders.filter(o=>o.center==='PITE'&&tags.has(o.tag)&&matches(o.tag,f.tag)&&matches(o.asset,f.asset)&&matches(o.type,f.type)&&matches(o.priority,f.priority)&&period(o[cohort?'date':(f.dateField||'date')],f));}
 function stats(rows){const s={total:rows.length,done:0,open:0,notdone:0,closed:0,other:0};rows.forEach(o=>s[status(o)]++);return s;}
@@ -103,6 +104,59 @@ function stopRecords(data,rows){
    text:o.text||''
   };
  }).filter(Boolean);
+}
+function flaggedStopOrders(data,f){
+ const selected=key=>Array.isArray(f?.[key])?f[key]:(f?.[key]?[f[key]]:[]);
+ const matches=(key,value)=>{const values=selected(key);return !values.length||values.includes(value);};
+ const ordersById=new Map((data.orders||[]).map(order=>[order.id,order]));
+ const byPlant=new Map;
+ for(const note of (data.stoppageNotes||[])){
+  if(upper(note.flag)!=='X'||!text(note.order)||!text(note.tag)||!period(note.date||'',f||{}))continue;
+  const order=ordersById.get(note.order);
+  if(!matches('tag',note.tag)||!matches('asset',note.asset||order?.asset)||!matches('type',order?.type)||!matches('priority',note.priority||order?.priority))continue;
+  if(!byPlant.has(note.tag))byPlant.set(note.tag,{tag:note.tag,plant:text(note.plant)||note.tag,ids:new Set});
+  byPlant.get(note.tag).ids.add(note.order);
+ }
+ return [...byPlant.values()].map(item=>({...item,ids:[...item.ids],count:item.ids.size}))
+  .sort((a,b)=>b.count-a.count||a.plant.localeCompare(b.plant,'pt-BR'));
+}
+function reliabilityByPlant(data,f){
+ const ordersById=new Map((data.orders||[]).map(order=>[order.id,order]));
+ const eventsByPlant=new Map;
+ const matches=(key,value)=>{const selected=Array.isArray(f?.[key])?f[key]:(f?.[key]?[f[key]]:[]);return !selected.length||selected.includes(value);};
+ for(const note of (data.stoppageNotes||[])){
+  if(upper(note.flag)!=='X'||!text(note.order)||!validDate(note.startDate||'')||!period(note.startDate,f||{}))continue;
+  const order=ordersById.get(note.order),tag=order?.tag||note.tag;
+  if(!tag||tag!==note.tag||!matches('tag',tag)||!matches('asset',note.asset||order?.asset)||!matches('type',order?.type)||!matches('priority',note.priority||order?.priority))continue;
+  const start=note.startTime?Date.parse(note.startDate+'T'+note.startTime+'Z'):NaN;
+  if(!eventsByPlant.has(tag))eventsByPlant.set(tag,{tag,plant:text(note.plant)||tag,events:new Map});
+  const plant=eventsByPlant.get(tag);
+  if(!plant.events.has(note.order))plant.events.set(note.order,{order:note.order,start:NaN,end:NaN,endDatePresent:false});
+  const event=plant.events.get(note.order);
+  if(Number.isFinite(start)&&(!Number.isFinite(event.start)||start<event.start))event.start=start;
+  if(validDate(note.endDate||'')){
+   event.endDatePresent=true;
+  }
+  if(validDate(note.endDate||'')&&note.endTime){
+   const end=Date.parse(note.endDate+'T'+note.endTime+'Z');
+   if(Number.isFinite(end)&&(!Number.isFinite(event.end)||end>event.end))event.end=end;
+  }
+ }
+ return [...eventsByPlant.values()].map(plant=>{
+  const events=[...plant.events.values()];
+  const validStarts=events.filter(event=>Number.isFinite(event.start)).sort((a,b)=>a.start-b.start);
+  let intervalSum=0,intervalCount=0,repairSum=0,closed=0,open=0,incomplete=0;
+  for(let i=1;i<validStarts.length;i++){const diff=validStarts[i].start-validStarts[i-1].start;if(diff>0){intervalSum+=diff;intervalCount++;}}
+  for(const event of events){
+   if(!event.endDatePresent){open++;continue;}
+   if(!Number.isFinite(event.start)||!Number.isFinite(event.end)||event.end<event.start){incomplete++;continue;}
+   repairSum+=event.end-event.start;closed++;
+  }
+  return {tag:plant.tag,plant:plant.plant,events:events.length,intervals:intervalCount,closed,open,incomplete,
+   mtbfHours:intervalCount?intervalSum/intervalCount/3600000:null,
+   mttrHours:closed?repairSum/closed/3600000:null,
+   ids:events.map(event=>event.order)};
+ }).sort((a,b)=>b.events-a.events||a.plant.localeCompare(b.plant,'pt-BR'));
 }
 function badActors(rows){
  const byAsset=new Map;
@@ -316,20 +370,37 @@ const schemas={
  systems:['COD_INFORMACAO','NOME','COD_LATITUDE','COD_LONGITUDE'],
  orders:['Ordem','TAG Planta','Centro','Data de referência','Dta.início real','Data de entrada','Status do sistema','Plano de manutenção','Tipo de ordem'],
  items:['Ordem','Texto code causa','Texto code parte objeto','Texto de code para problema'],
- actions:['Ordem','Texto do código da medida']
+ actions:['Ordem','Texto do código da medida'],
+ stoppageNotes:['Ordem','Data da nota','TAG Planta','Parada','Início da avaria','Início da avaria (hora)','Fim da avaria','Fim da avaria (hora)']
 };
 function kind(headers){return Object.keys(schemas).find(k=>schemas[k].every(h=>headers.includes(h)));}
 function normalize(tables,files){
- for(const k of Object.keys(schemas))if(!Array.isArray(tables[k])||!tables[k].length)throw Error('Planilha ausente ou vazia: '+k);
+ for(const k of Object.keys(schemas))if(!Array.isArray(tables[k])||(k!=='stoppageNotes'&&!tables[k].length))throw Error('Planilha ausente ou vazia: '+k);
  const coord=(v,min,max)=>{let n=Number(text(v).replace(',','.'));if(!text(v)||!Number.isFinite(n)||n<min||n>max)throw Error('Latitude ou longitude inválida: '+text(v));return n;};
  const systems=dedupe(tables.systems.map(r=>({tag:text(r.COD_INFORMACAO),name:text(r.NOME),type:text(r.COD_ELEMENTO),lat:coord(r.COD_LATITUDE,-90,90),lng:coord(r.COD_LONGITUDE,-180,180),status:text(r.SITUACAO_OPERACIONAL),critical:text(r.CRITICIDADE),address:text(r.ENDERECO_LOGRADOURO),district:text(r.ENDERECO_BAIRRO),photo:text(r.FOTO_FACHADA)})),'tag');
  const optionalDate=v=>text(v)?date(v):'';const tags=new Set(systems.map(s=>s.tag)),all=dedupe(tables.orders.map(r=>({id:text(r.Ordem),note:text(r.Nota),tag:text(r['TAG Planta']),center:upper(r.Centro),date:date(r['Data de referência']),start:date(r['Dta.início real']),created:date(r['Data de entrada']),due:date(r['Prazo programado']),finished:date(r['Conclusão real']),type:text(r['Tipo de ordem']),text:text(r['Texto breve']),status:text(r['Status do sistema']),equipment:text(r['Denominação do objeto técnico']),asset:text(r['TAG Ativo']),plan:text(r['Plano de manutenção']),priority:text(r['Texto prioridade']),activity:text(r['Tipo atividad.manut.']),workCenter:text(r['CenTrabalho princ.']),stopConfirmed:['SIM','S','YES','TRUE','1','CONFIRMADA','CONFIRMADO'].includes(upper(r['Parada confirmada']||r['Parada confirmada?'])),stopStart:optionalDate(r['Início da parada']||r['Inicio da parada']),stopEnd:optionalDate(r['Fim da parada']||r['Final da parada']),stopReason:text(r['Motivo da parada']||r['Motivo parada']),stopImpact:text(r['Impacto operacional']||r['Impacto da parada'])})),'id');
  const orders=all.filter(o=>o.center==='PITE'&&tags.has(o.tag)),ids=new Set(orders.map(o=>o.id));if(!orders.length)throw Error('Nenhuma ordem de Águas de Teresina corresponde às instalações informadas.');
  const items=tables.items.map(r=>({order:text(r.Ordem),note:text(r.Nota),cause:text(r['Texto code causa']),problem:text(r['Texto de code para problema']),component:text(r['Texto code parte objeto']),item:text(r.Item)})).filter(r=>ids.has(r.order));
  const actions=tables.actions.map(r=>({order:text(r.Ordem),note:text(r.Nota),action:text(r['Texto do código da medida']),item:text(r.Medida)})).filter(r=>ids.has(r.order));
- return {systems,orders,items,actions,meta:{loadedAt:new Date().toISOString(),files,sourceOrders:all.length,excluded:all.length-orders.length,missingReference:orders.filter(o=>!o.date).length}};
+ const systemsByTag=new Map(systems.map(s=>[s.tag,s])),ordersById=new Map(orders.map(o=>[o.id,o]));
+ let excludedStoppageNotes=0,missingStoppageNoteDate=0;
+ const stoppageNotes=[];
+ for(const r of tables.stoppageNotes){
+  if(upper(r.Parada)!=='X')continue;
+  const order=text(r.Ordem),linkedOrder=ordersById.get(order),providedTag=text(r['TAG Planta']),tag=linkedOrder?.tag||'';
+  const noteDate=optionalDate(r['Data da nota']);
+  if(!order||!linkedOrder||!tag||!systemsByTag.has(tag)||(providedTag&&providedTag!==tag)){excludedStoppageNotes++;continue;}
+  if(!noteDate)missingStoppageNoteDate++;
+  stoppageNotes.push({
+   order,date:noteDate,note:text(r.Nota),description:text(r['Descrição']),
+   asset:text(r['TAG Ativo']),priority:text(r['Texto prioridade']),
+   tag,plant:text(r['DSC Planta'])||systemsByTag.get(tag).name,flag:'X',
+   startDate:optionalDate(r['Início da avaria']),startTime:time(r['Início da avaria (hora)']),
+   endDate:optionalDate(r['Fim da avaria']),endTime:time(r['Fim da avaria (hora)'])
+  });
+ }
+ return {systems,orders,items,actions,stoppageNotes,meta:{loadedAt:new Date().toISOString(),files,sourceOrders:all.length,excluded:all.length-orders.length,missingReference:orders.filter(o=>!o.date).length,stoppageOrders:new Set(stoppageNotes.map(n=>n.order)).size,excludedStoppageNotes,missingStoppageNoteDate}};
 }
-const api={text,upper,status,labels,typeLabels,typeLabel,typeGroup,orderClass,validDate,daysBetween,date,period,filter,stats,adherence,rank,timing,byType,topAssets,badActors,icmMatrix,engineeringMetrics,decisionInsights,stopRecords,systemHealth,dedupe,schemas,kind,normalize};
+const api={text,upper,status,labels,typeLabels,typeLabel,typeGroup,orderClass,validDate,daysBetween,date,time,period,filter,stats,adherence,rank,timing,byType,topAssets,badActors,icmMatrix,engineeringMetrics,decisionInsights,stopRecords,flaggedStopOrders,reliabilityByPlant,systemHealth,dedupe,schemas,kind,normalize};
 if(typeof module!=='undefined')module.exports=api;root.PCM=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
-

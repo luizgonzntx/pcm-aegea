@@ -10,7 +10,7 @@ Painel estático com identidade Aegea, mapa por coordenadas, aderência ao plano
 ## Acesso e primeira carga
 A interface exige uma conta já existente no Supabase Auth e autorizada em public.pcm_teresina_members.
 A conta do proprietário foi autorizada como admin. Não há cadastro público ou envio automático de convites.
-O painel começa sem dados operacionais. Entre e importe os quatro arquivos XLSX (sistemas, ordens, itens e medidas) para realizar a primeira carga.
+O painel começa sem dados operacionais. Entre na área administrativa e importe os cinco arquivos XLSX (sistemas, ordens, itens, medidas e notas de parada) para realizar a primeira carga.
 As próximas importações substituem o conjunto completo, após validação e confirmação no painel.
 O conjunto é compartilhado entre os membros autorizados e fica no Supabase; não é incluído no repositório público.
 Se outra sessão atualizar a base entre a leitura e a gravação, a revisão impede sobrescrever essa alteração.
@@ -31,6 +31,7 @@ Os campos opcionais Prazo programado e Conclusão real habilitam a avaliação d
 O arquivo de sistemas deve ter COD_INFORMACAO, NOME, COD_LATITUDE e COD_LONGITUDE.
 Itens: Ordem, Texto code causa, Texto code parte objeto, Texto de code para problema.
 Medidas: Ordem, Texto do código da medida.
+Notas de parada: Ordem, Data da nota, TAG Planta, Parada, Início da avaria, Início da avaria (hora), Fim da avaria e Fim da avaria (hora). A coluna `Parada` usa `X` para marcar ocorrências; Nota e Descrição são opcionais e mantidas para rastreabilidade.
 A primeira linha é usada como cabeçalho. Arquivos devem ser XLSX e ter no máximo 25 MB.
 Datas inválidas, identificadores divergentes e coordenadas inválidas impedem a carga.
 O conjunto normalizado tem limite de 19 MB na interface / 20 MB no banco.
@@ -46,13 +47,16 @@ O conjunto normalizado tem limite de 19 MB na interface / 20 MB no banco.
   - Top Ativos Críticos com maior volume de intervenções executadas.
   - Matriz Cruzada Item (Componente) × Problema × Causa × Medida para diagnóstico de falhas recorrentes.
 - Atalhos rápidos de período (Mês, 90 dias, Ano, Tudo), filtro por Prioridade e busca rápida de instalações.
-- Importação com suporte a arrastar e soltar (Drag-and-Drop) e checklist de validação dos 4 arquivos `.xlsx`.
+- Importação com suporte a arrastar e soltar (Drag-and-Drop) e checklist de validação dos 5 arquivos `.xlsx`.
 - Exportação CSV nas abas de Ordens, ICM (Matriz Cruzada) e Planos/Prazos (Aderência por Instalação).
 - Data de entrada é criação; referência define competência; início real define começo do serviço.
 - No prazo exige conclusão real <= prazo programado. Sem as datas, não avaliável.
 - ICM conta ordens executadas distintas por item, causa ou medida. Não faz produto cartesiano entre tabelas.
 - Causa registrada não equivale automaticamente a causa raiz.
 - Suspensão ainda não tem mapeamento validado.
+- A seção de paradas separa a contagem histórica da quinta planilha (`Parada = X`, ordens distintas por TAG Planta, filtradas pela Data da nota) das ocorrências identificadas pelo texto de ordens/itens. A flag não representa situação atual da planta.
+- MTBF estimado por planta: média dos intervalos entre inícios de avarias distintas (Ordens) marcadas com `X`, por data/hora de início e dentro do período/filtros selecionados. É uma estimativa de intervalo entre falhas, não horas efetivas de operação.
+- MTTR estimado por planta: média entre início e fim da avaria nas ordens com data de fim preenchida. Hora `00:00:00` é válida se a data de fim existir; data de fim vazia significa avaria aberta e é excluída do MTTR. Registros com horário incompleto são contabilizados à parte e excluídos das médias.
 
 ## Publicação e verificação
 Arquivos estáticos, sem build. O GitHub Pages existente publica a raiz; o painel está na subpasta teresina.
@@ -68,4 +72,3 @@ A chave no config.js é pública e só autoriza o que as políticas RLS permitem
 database/schema.sql registra o esquema aplicado pela migração pcm_teresina_private_dataset.
 Apenas a coluna payload é editável por administradores autenticados. Revisão, autor e data da alteração são definidos no banco.
 A mesma instância atende outros aplicativos; esta implantação usa somente tabelas pcm_teresina_*.
-
