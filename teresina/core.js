@@ -303,7 +303,6 @@ function decisionInsights(data,rows,f){
    category:'MIX DE MANUTENÇÃO (NBR 5462 / SMRP)',
    title:pctVal>=75?'Matriz Proativa Saudável ('+pctVal+'%)':'Excesso de Demanda Reativa ('+(100-pctVal)+'% Corretiva/Serviços)',
    body:'Das '+m.total.toLocaleString('pt-BR')+' ordens no recorte, '+m.proactive.toLocaleString('pt-BR')+' ('+pctVal+'%) são preventivas/preditivas/engenharia e '+m.reactiveTotal.toLocaleString('pt-BR')+' são corretivas, reativas ou serviços. O benchmark de classe mundial (SMRP) recomenda ≥ 80% de atuação proativa.',
-   action:'Converter os modos de falha recorrentes das corretivas emergenciais em listas de tarefas preventivas e inspeções preditivas.'
   });
  }
  if(m.palliativeCount>0){
@@ -313,7 +312,6 @@ function decisionInsights(data,rows,f){
    category:'CONFIABILIDADE ELÉTRICA & AUTOMAÇÃO',
    title:'Alerta de "Efeito Reset": '+m.palliativeCount.toLocaleString('pt-BR')+' intervenções paliativas ('+pPct+'% das medidas)',
    body:'Foram identificadas '+m.palliativeCount.toLocaleString('pt-BR')+' ordens encerradas com medidas paliativas (Reset / Rearme / Ajuste de parâmetros) e '+m.electricalCount.toLocaleString('pt-BR')+' ocorrências por distúrbios elétricos/automação (assimetria, subtensão, sobretensão, erro de configuração).',
-   action:'Realizar termografia nos quadros de comando, aferir proteção de falta/assimetria de fase e investigar qualidade de energia junto à concessionária.',
    ids:m.palliativeIds
   });
  }
@@ -323,7 +321,6 @@ function decisionInsights(data,rows,f){
    category:'INTEGRIDADE HIDRÁULICA E MECÂNICA',
    title:m.cavitationCount.toLocaleString('pt-BR')+' ordens com Cavitação, Detritos ou Perda Hidráulica',
    body:'Os apontamentos indicam desgaste prematuro de rotores, eixos e selos mecânicos associados a cavitação e entrada de detritos nas elevatórias/poços.',
-   action:'Conferir pressão de sucção / NPSH disponível, revisar limpeza de grades e crivos e validar se o conjunto opera próximo ao BEP (ponto de melhor eficiência).',
    ids:m.cavitationIds
   });
  }
@@ -334,7 +331,6 @@ function decisionInsights(data,rows,f){
    category:'GESTÃO DE ATIVOS CRÍTICOS (BAD ACTORS)',
    title:actors.filter(a=>a.rework30d>0).length+' ativos com reincidência em menos de 30 dias ('+m.totalRework30d+' retrabalhos)',
    body:'Os ativos mais críticos no período são: '+top+'. A repetição de falhas em intervalo inferior a 30 dias caracteriza falha prematura ou atuação apenas no sintoma.',
-   action:'Abrir Análise de Causa Raiz (RCA / 5 Porquês) para os Top 5 Bad Actors e bloquear encerramento sem laudo técnico.',
    ids:actors[0].ids
   });
  }
@@ -345,7 +341,6 @@ function decisionInsights(data,rows,f){
    category:'GOVERNANÇA DE DADOS PCM (SAP)',
    title:'Cobertura de Apontamento ICM nas Corretivas: '+covPct+'%',
    body:'De '+m.correctiveDoneTotal.toLocaleString('pt-BR')+' ordens corretivas/serviços executadas, '+m.corrWithIcm.toLocaleString('pt-BR')+' possuem Item, Causa e Medida completos nas planilhas de catálogo.',
-   action:'Tornar obrigatório o preenchimento dos catálogos de parte, causa e medida antes do encerramento técnico das ordens corretivas.'
   });
  }
  if(adh.rate!=null){
@@ -355,7 +350,6 @@ function decisionInsights(data,rows,f){
    category:'DISCIPLINA DE EXECUÇÃO DO PLANO',
    title:'Aderência à Preventiva/Preditiva em '+adhPct+'% ('+m.agedOpen30d+' OS abertas > 30 dias)',
    body:'Foram cumpridas '+adh.done.toLocaleString('pt-BR')+' de '+adh.total.toLocaleString('pt-BR')+' ordens planejadas no período, restando '+m.agedOpen30d.toLocaleString('pt-BR')+' ordens abertas com mais de 30 dias de carteira.',
-   action:'Priorizar na programação semanal dos centros ELT-001 e MEC-001 o nivelamento das instalações com aderência inferior a 85%.'
   });
  }
  return insights;

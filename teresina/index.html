@@ -255,13 +255,13 @@
 
         </section>
 
-        <!-- 2. ENGENHARIA & DECISÃO (BOAS PRÁTICAS DE MANUTENÇÃO NBR 5462 / SMRP) -->
+        <!-- 2. ENGENHARIA -->
         <section data-view="intelligence" hidden>
           <div class="section-intro">
             <div>
-              <span class="eyebrow blue">ENGENHARIA DE MANUTENÇÃO · BENCHMARKS SMRP &amp; NBR 5462</span>
-              <h2>Inteligência para tomada de decisão.</h2>
-              <p>Avaliação automática da maturidade da manutenção, equilíbrio proativo vs. reativo, retrabalho, efeito reset e ativos críticos (Bad Actors).</p>
+              <span class="eyebrow blue">ANÁLISE DA MANUTENÇÃO</span>
+              <h2>Indicadores e recorrências.</h2>
+              <p>Distribuição das ordens, ativos com mais corretivas e registros repetidos no período.</p>
             </div>
             <div class="section-actions">
               <button id="exportBadActorsBtn">↓ Exportar Bad Actors &amp; MTBF (CSV)</button>
@@ -283,9 +283,9 @@
 
           <div class="section-intro" style="margin-top:26px;padding-bottom:14px">
             <div>
-              <span class="eyebrow blue">DIAGNÓSTICO AUTOMÁTICO E PLANO DE AÇÃO</span>
-              <h2>Recomendações prioritárias para gestão</h2>
-              <p>Geradas em tempo real a partir dos padrões de falha, causas e medidas apontados no período selecionado.</p>
+              <span class="eyebrow blue">PONTOS DE ATENÇÃO</span>
+              <h2>Ocorrências para avaliar</h2>
+              <p>Ocorrências identificadas nos registros do período. Avalie-as com a equipe de manutenção.</p>
             </div>
           </div>
           <div id="decisionCards" class="decision-grid"></div>
@@ -293,10 +293,10 @@
           <article class="card" style="margin-top:22px">
             <div class="card-top">
               <div>
-                <span class="eyebrow">ANÁLISE DE REINCIDÊNCIA CRÔNICA (PARETO DE FALHAS)</span>
-                <h2>Bad Actors · Ativos Críticos, Retrabalho (&lt; 30 dias) e MTBF Estimado</h2>
+                <span class="eyebrow">RECORRÊNCIA DE FALHAS</span>
+                <h2>Ativos com mais intervenções corretivas</h2>
               </div>
-              <span class="small-note">Ativos ordenados pelo volume de intervenções corretivas e falhas prematuras</span>
+              <span class="small-note">Ordenados pelo volume de ordens corretivas no período.</span>
             </div>
             <div id="badActorsTable" class="table-wrap"></div>
           </article>

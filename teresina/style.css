@@ -2415,6 +2415,43 @@ tr:hover td {
   border-radius: 6px;
 }
 
+section[data-view]:not([hidden]) {
+  animation: view-enter .18s ease-out both;
+}
+
+.card,
+.decision-card,
+.system-row {
+  transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+
+.card:hover,
+.decision-card:hover {
+  border-color: #d5dbe3;
+  box-shadow: var(--shadow);
+}
+
+.system-row:hover {
+  transform: translateY(-1px);
+}
+
+@keyframes view-enter {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  section[data-view]:not([hidden]) {
+    animation: none;
+  }
+
+  .card,
+  .decision-card,
+  .system-row {
+    transition: none;
+  }
+}
+
 @media (max-width: 1200px) {
   main {
     padding-right: 24px;

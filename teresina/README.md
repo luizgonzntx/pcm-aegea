@@ -8,15 +8,21 @@ Painel estático com identidade Aegea, mapa por coordenadas, aderência ao plano
 - Este diretório é independente do SICAB na raiz do repositório.
 
 ## Acesso e primeira carga
-A interface exige uma conta já existente no Supabase Auth e autorizada em public.pcm_teresina_members.
-A conta do proprietário foi autorizada como admin. Não há cadastro público ou envio automático de convites.
+A interface exige uma conta no Supabase Auth autorizada em public.pcm_teresina_members.
+Administradores podem criar contas com e-mail, senha inicial e perfil na área administrativa. O cadastro usa uma Edge Function protegida; nunca coloque a chave `service_role` no navegador.
+Para ativar o cadastro, configure o segredo da função e publique-a no projeto Supabase:
+```sh
+supabase secrets set SUPABASE_SERVICE_ROLE_KEY='VALOR_DA_SERVICE_ROLE' --project-ref xlbdhfjzxgfmsjstlzsd
+supabase functions deploy admin-create-user --project-ref xlbdhfjzxgfmsjstlzsd
+```
+O administrador deve compartilhar a senha inicial com o novo usuário por um canal seguro.
 O painel começa sem dados operacionais. Entre na área administrativa e importe os cinco arquivos XLSX (sistemas, ordens, itens, medidas e notas de parada) para realizar a primeira carga.
 As próximas importações substituem o conjunto completo, após validação e confirmação no painel.
 O conjunto é compartilhado entre os membros autorizados e fica no Supabase; não é incluído no repositório público.
 Se outra sessão atualizar a base entre a leitura e a gravação, a revisão impede sobrescrever essa alteração.
 
 ## Autorizar consulta
-No SQL Editor do Supabase, após criar a conta no Authentication:
+Se necessário, autorize uma conta existente pelo SQL Editor do Supabase:
 ```sql
 insert into public.pcm_teresina_members(user_id, role)
 select id, 'viewer' from auth.users where lower(email) = lower('EMAIL_DO_DIRETOR')

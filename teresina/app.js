@@ -270,9 +270,9 @@
     const sysNameByTag = new Map((data?.systems || []).map(s => [s.tag, s.name]));
 
     kpiEl.innerHTML =
-      kpi('Índice de Manutenção Proativa', pct(m.proactiveRate), num(m.proactive) + ' preventivas/preditivas · Meta SMRP ≥ 80%', m.proactiveRate >= 0.75 ? '#0f8a68' : m.proactiveRate >= 0.60 ? '#c2780c' : '#c43650') +
-      kpi('Taxa de Emergência Operacional', pct(m.emergencyRate), num(m.prioEmerg) + ' emergenciais · Meta SMRP ≤ 10%', m.emergencyRate <= 0.10 ? '#0f8a68' : m.emergencyRate <= 0.20 ? '#c2780c' : '#c43650') +
-      kpi('Índice de Paliativos (Efeito Reset)', pct(m.palliativeRate), num(m.palliativeCount) + ' ordens com Reset/Rearme/Parâmetros', m.palliativeRate <= 0.12 ? '#0f8a68' : '#c43650') +
+      kpi('Ordens preventivas, preditivas e de engenharia', pct(m.proactiveRate), num(m.proactive) + ' ordens; referência SMRP ≥ 80%', m.proactiveRate >= 0.75 ? '#0f8a68' : m.proactiveRate >= 0.60 ? '#c2780c' : '#c43650') +
+      kpi('Ordens com prioridade emergencial', pct(m.emergencyRate), num(m.prioEmerg) + ' ordens marcadas como emergência', m.emergencyRate <= 0.10 ? '#0f8a68' : m.emergencyRate <= 0.20 ? '#c2780c' : '#c43650') +
+      kpi('Ordens com reset ou rearme', pct(m.palliativeRate), num(m.palliativeCount) + ' ordens com reset, rearme ou ajuste', m.palliativeRate <= 0.12 ? '#0f8a68' : '#c43650') +
       kpi('Cobertura ICM nas Corretivas', pct(m.icmCoverageRate), num(m.corrWithIcm) + ' de ' + num(m.correctiveDoneTotal) + ' corretivas com catálogo completo', '#0027bd');
 
     const mixEl = $('#maintenanceMixBar');
@@ -315,7 +315,7 @@
             }
             return '<article class="decision-card ' + ins.severity + '">' +
               '<div><span class="eyebrow blue">' + esc(ins.category) + '</span><h3>' + esc(ins.title) + '</h3><p>' + esc(ins.body) + '</p></div>' +
-              '<div class="decision-action"><div><b>Plano de ação recomendado:</b> ' + esc(ins.action) + '</div>' + btn + '</div>' +
+              (btn ? '<div class="decision-action">' + btn + '</div>' : '') +
               '</article>';
           }).join('')
         : emptyHTML;

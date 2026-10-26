@@ -21,6 +21,11 @@
     .admin-form { display:grid; gap:12px; max-width:420px; }
     .admin-form label { display:grid; gap:6px; font-weight:700; color:var(--ink); }
     .admin-form button { margin-top:4px; }
+    .admin-user-form { display:grid; gap:12px; max-width:480px; }
+    .admin-user-form label { display:grid; gap:6px; font-weight:700; color:var(--ink); }
+    .admin-user-form select, .admin-user-form input { width:100%; }
+    .admin-section { margin-top:32px; padding-top:26px; border-top:1px solid var(--line); }
+    .admin-section h3 { margin-bottom:8px; }
     .admin-status { min-height:22px; color:var(--muted); }
     .admin-status.error { color:var(--red); }
     .admin-status.success { color:var(--green); }
@@ -67,6 +72,28 @@
         <div class="admin-actions"><button id="validateBtn" class="primary" type="button">Validar arquivos</button><button id="saveBtn" type="button" hidden>Publicar no Supabase</button></div>
         <p id="adminStatus" class="admin-status" role="status"></p>
         <div class="admin-note">A publicação substitui as cinco bases. As ordens com `Parada = X` são contadas uma única vez por ordem e planta, usando a data da nota; isso representa histórico de ocorrências, não uma indicação de que a planta está parada agora. Se alguém atualizar antes de você, o controle de revisão bloqueia a gravação para evitar sobrescrever dados novos.</div>
+
+        <section class="admin-section" aria-labelledby="userManagementTitle">
+          <span class="eyebrow blue">ACESSO AO PAINEL</span>
+          <h3 id="userManagementTitle">Cadastrar usuário</h3>
+          <p class="small-note">Crie a conta e compartilhe a senha com o usuário por um canal seguro.</p>
+          <form id="createUserForm" class="admin-user-form">
+            <label>E-mail
+              <input id="newUserEmail" type="email" autocomplete="off" required>
+            </label>
+            <label>Senha inicial
+              <input id="newUserPassword" type="password" autocomplete="new-password" minlength="8" maxlength="72" required>
+            </label>
+            <label>Perfil
+              <select id="newUserRole" required>
+                <option value="viewer">Consulta</option>
+                <option value="admin">Administrador</option>
+              </select>
+            </label>
+            <button id="createUserBtn" class="primary" type="submit">Criar conta</button>
+            <p id="userStatus" class="admin-status" role="status" aria-live="polite"></p>
+          </form>
+        </section>
       </div>
     </section>
   </main>
@@ -78,6 +105,7 @@
       const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
       const msg = (text, kind = '') => { const el = $('#adminStatus'); el.textContent = text; el.className = 'admin-status ' + kind; };
       const loginMsg = (text, kind = '') => { const el = $('#loginStatus'); el.textContent = text; el.className = 'admin-status ' + kind; };
+      const userMsg = (text, kind = '') => { const el = $('#userStatus'); el.textContent = text; el.className = 'admin-status ' + kind; };
       function showLogin() { $('#loginPanel').hidden = false; $('#adminPanel').hidden = true; }
       function files() { return [...($('#files').files || [])]; }
       function renderFiles(list) { $('#fileList').innerHTML = list.map(f => '<div class="admin-file"><span>' + esc(f.name) + '</span><b>' + (f.size / 1048576).toLocaleString('pt-BR', {maximumFractionDigits:2}) + ' MB</b></div>').join(''); }
@@ -121,11 +149,47 @@
         else { revision=data.revision; pending=null; $('#saveBtn').hidden=true; msg('Base publicada com sucesso. Revisão ' + data.revision + '.', 'success'); }
         $('#saveBtn').disabled = false;
       }
+      async function createUser(event) {
+        event.preventDefault();
+        const email = $('#newUserEmail').value.trim().toLowerCase();
+        const password = $('#newUserPassword').value;
+        const role = $('#newUserRole').value;
+        if (!user || !email || password.length < 8 || !['viewer', 'admin'].includes(role)) {
+          userMsg('Informe um e-mail válido, senha entre 8 e 72 caracteres e perfil.', 'error');
+          return;
+        }
+        const button = $('#createUserBtn');
+        button.disabled = true;
+        userMsg('Criando conta…');
+        try {
+          const { data: { session }, error: sessionError } = await db.auth.getSession();
+          if (sessionError) throw sessionError;
+          if (!session?.access_token) throw Error('Sessão administrativa expirada. Entre novamente.');
+          const { data, error } = await db.functions.invoke('admin-create-user', {
+            body: { email, password, role },
+            headers: { Authorization: 'Bearer ' + session.access_token }
+          });
+          if (error) {
+            let detail = null;
+            if (error.context instanceof Response) {
+              try { detail = await error.context.json(); } catch { detail = null; }
+            }
+            throw Error(detail?.error || error.message || 'Não foi possível criar a conta.');
+          }
+          $('#createUserForm').reset();
+          userMsg('Conta criada para ' + (data?.email || email) + ' com perfil ' + (role === 'admin' ? 'Administrador' : 'Consulta') + '.', 'success');
+        } catch (e) {
+          userMsg(e.message || 'Não foi possível criar a conta.', 'error');
+        } finally {
+          button.disabled = false;
+        }
+      }
       window.addEventListener('DOMContentLoaded', async () => {
         if (!window.supabase || !window.PCM_CONFIG) return loginMsg('Configuração indisponível.', 'error');
         db = window.supabase.createClient(window.PCM_CONFIG.url, window.PCM_CONFIG.key);
         $('#loginForm').addEventListener('submit', async e => { e.preventDefault(); loginMsg('Entrando…'); const {error}=await db.auth.signInWithPassword({email:$('#email').value,password:$('#password').value}); if(error) loginMsg(error.message,'error'); });
         $('#logoutBtn').onclick = () => db.auth.signOut(); $('#files').onchange = () => renderFiles(files()); $('#validateBtn').onclick=validate; $('#saveBtn').onclick=save;
+        $('#createUserForm').addEventListener('submit', createUser);
         db.auth.onAuthStateChange((_event, session) => { setTimeout(() => enter(session), 0); });
         const {data:{session}}=await db.auth.getSession(); await enter(session);
       });
