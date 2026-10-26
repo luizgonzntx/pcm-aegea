@@ -11,10 +11,10 @@
   const emptyHTML = '<div class="no-data">Sem registros para os filtros selecionados.</div>';
 
   const filterLabels = {
-    tag: { options: '#systemOptions', summary: '#systemSummary', all: 'Todos os sistemas' },
-    asset: { options: '#assetOptions', summary: '#assetSummary', all: 'Todos os ativos' },
-    type: { options: '#typeOptions', summary: '#typeSummary', all: 'Todos os tipos' },
-    priority: { options: '#priorityOptions', summary: '#prioritySummary', all: 'Todas as prioridades' }
+    tag: { options: '#systemOptions', summary: '#systemSummary', all: 'Todos os sistemas', title: 'Instalação' },
+    asset: { options: '#assetOptions', summary: '#assetSummary', all: 'Todos os ativos', title: 'Ativo' },
+    type: { options: '#typeOptions', summary: '#typeSummary', all: 'Todos os tipos', title: 'Tipo' },
+    priority: { options: '#priorityOptions', summary: '#prioritySummary', all: 'Todas as prioridades', title: 'Prioridade' }
   };
 
   function selectedValues(key) {
@@ -57,6 +57,31 @@
     if (selected.has(value)) selected.delete(value); else selected.add(value);
     f[key] = [...selected];
     refreshFilterSummary(key);
+  }
+
+  function updateActiveFilters() {
+    const year = today().slice(0, 4);
+    const active = [];
+    if (f.from !== year + '-01-01' || f.to !== year + '-12-31') {
+      active.push({ key: 'period', label: 'Período: ' + fmt(f.from) + ' – ' + fmt(f.to) });
+    }
+    for (const key of ['tag', 'asset', 'type', 'priority']) {
+      const cfg = filterLabels[key];
+      for (const value of selectedValues(key)) {
+        const option = [...document.querySelectorAll(cfg.options + ' input')].find(input => input.value === value);
+        const label = option?.dataset.label || (key === 'type' ? P.typeLabel(value) : value);
+        active.push({ key, value, label: cfg.title + ': ' + label });
+      }
+    }
+
+    $('#activeFilterCount').textContent = active.length ? active.length + (active.length === 1 ? ' filtro ativo' : ' filtros ativos') : 'Nenhum filtro adicional';
+    $('#clearFilters').disabled = active.length === 0;
+    $('#activeFilters').hidden = active.length === 0;
+    $('#activeFilterChips').innerHTML = active.map(item =>
+      '<button type="button" class="active-filter-chip" data-remove-filter="' + item.key + '"' +
+      (item.value != null ? ' data-filter-value="' + esc(item.value) + '"' : '') +
+      '>' + esc(item.label) + '<span aria-hidden="true">×</span></button>'
+    ).join('');
   }
 
   function notify(message) {
@@ -180,6 +205,7 @@
       kpi('Não executadas', num(s.notdone), 'Mantidas na base do plano', '#c43650');
 
     $('#scope').textContent = (f.tag.length ? num(f.tag.length) + ' instalação(ões)' : num(data.systems.length) + ' instalações') + ' · Entrada: ' + fmt(f.from) + ' a ' + fmt(f.to);
+    updateActiveFilters();
     renderSystemsList();
     $('#planSummary').innerHTML =
       '<strong class="plan-number">' + pct(a.rate) + '</strong>' +
@@ -1172,6 +1198,29 @@
         assets();
       }
       refreshFilterSummary(key);
+      if (data) render();
+    });
+
+    $('#activeFilterChips').addEventListener('click', event => {
+      const chip = event.target.closest('[data-remove-filter]');
+      if (!chip) return;
+      const key = chip.dataset.removeFilter;
+      if (key === 'period') {
+        f.from = today().slice(0, 4) + '-01-01';
+        f.to = today().slice(0, 4) + '-12-31';
+        $('#from').value = f.from;
+        $('#to').value = f.to;
+        $$('.preset-btn').forEach(button => button.classList.toggle('active', button.dataset.preset === 'year'));
+      } else if (filterLabels[key]) {
+        f[key] = selectedValues(key).filter(value => value !== chip.dataset.filterValue);
+        const input = [...document.querySelectorAll(filterLabels[key].options + ' input')].find(item => item.value === chip.dataset.filterValue);
+        if (input) input.checked = false;
+        if (key === 'tag') {
+          f.asset = [];
+          assets();
+        }
+        refreshFilterSummary(key);
+      }
       if (data) render();
     });
 

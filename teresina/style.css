@@ -2452,6 +2452,155 @@ section[data-view]:not([hidden]) {
   }
 }
 
+.filters {
+  align-items: end;
+  gap: 12px;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.filters-heading {
+  display: flex;
+  flex: 1 0 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 2px;
+}
+
+.filters-heading strong,
+.filters-heading span {
+  display: block;
+}
+
+.filters-heading strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.filters-heading div > span,
+.active-filter-count {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: none;
+}
+
+.filters > label,
+.filter-picker {
+  flex: 1 1 150px;
+  min-width: 130px;
+  gap: 7px;
+  font-size: 11px;
+  text-transform: none;
+}
+
+.filters input,
+.filter-picker summary {
+  min-height: 40px;
+  padding: 10px 11px;
+  border-color: #d9e0e8;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.filter-picker summary {
+  padding-right: 30px;
+}
+
+.filter-picker details[open] summary,
+.filters input:focus {
+  border-color: #8da9df;
+  box-shadow: 0 0 0 3px rgba(0, 57, 166, .09);
+}
+
+.filter-options {
+  border-radius: 6px;
+  box-shadow: 0 8px 22px rgba(16, 24, 40, .12);
+}
+
+.clear-filters {
+  min-height: 40px;
+  padding: 9px 13px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.clear-filters:disabled {
+  opacity: .48;
+  cursor: default;
+  background: #fff;
+}
+
+.active-filters {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 2px 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.active-filters[hidden] {
+  display: none;
+}
+
+#activeFilterChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.active-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 27px;
+  padding: 4px 8px;
+  border: 1px solid #dce4ef;
+  border-radius: 5px;
+  background: #fff;
+  color: #344054;
+  font-size: 11px;
+}
+
+.active-filter-chip:hover {
+  border-color: #aebed5;
+  background: #f7f9fc;
+}
+
+.active-filter-chip span {
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+}
+
+@media (max-width: 640px) {
+  .filters {
+    align-items: stretch;
+    gap: 10px;
+    padding: 13px;
+  }
+
+  .filters > label,
+  .filter-picker {
+    flex: 1 1 calc(50% - 10px);
+    min-width: 0;
+  }
+
+  .clear-filters {
+    flex: 1 1 100%;
+  }
+
+  .active-filters {
+    flex-direction: column;
+    gap: 6px;
+  }
+}
+
 @media (max-width: 1200px) {
   main {
     padding-right: 24px;

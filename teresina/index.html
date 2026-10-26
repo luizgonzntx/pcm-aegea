@@ -101,7 +101,11 @@
       </header>
 
       <section class="filters" aria-label="Filtros por data de entrada e carteira">
-        <label>Entrada de
+        <div class="filters-heading">
+          <div><strong>Filtros</strong><span>Refine os indicadores e as ordens exibidas</span></div>
+          <span id="activeFilterCount" class="active-filter-count" aria-live="polite"></span>
+        </div>
+        <label>Entrada a partir de
           <input type="date" id="from">
         </label>
         <label>Entrada até
@@ -135,8 +139,12 @@
             <div id="priorityOptions" class="filter-options" role="group" aria-label="Prioridades"></div>
           </details>
         </div>
-        <button id="clearFilters" title="Limpar filtros">Limpar</button>
+        <button id="clearFilters" class="clear-filters" title="Limpar filtros">Limpar filtros</button>
       </section>
+      <div id="activeFilters" class="active-filters" hidden>
+        <span>Aplicados</span>
+        <div id="activeFilterChips"></div>
+      </div>
 
       <div class="statusline">
         <span id="loadStatus">Carregando informações…</span>
@@ -415,7 +423,6 @@
               </div>
               <button id="exportFlaggedStopsBtn">↓ Exportar ordens com flag (CSV)</button>
             </div>
-            <p class="small-note">Conta ordens distintas com <b>Parada = X</b>, agrupadas pela TAG Planta e pela Data da nota, respeitando os filtros do painel. É um indicador histórico de ocorrências; não informa se a planta está parada neste momento.</p>
             <div id="flaggedStopSummary" class="kpis"></div>
             <div id="flaggedStops" class="table-wrap"></div>
           </article>
