@@ -94,9 +94,11 @@ assert.equal(assetReliability.length,2);
 assert.equal(assetReliability[0].asset,'A1');
 assert.equal(assetReliability[0].mtbfHours,24);
 assert.equal(assetReliability[0].mttrHours,3);
+assert.equal(assetReliability[0].availability,24/(24+3));
 assert.equal(assetReliability[1].asset,'A2');
 assert.equal(assetReliability[1].mtbfHours,48);
 assert.equal(assetReliability[1].mttrHours,2);
+assert.equal(assetReliability[1].availability,48/(48+2));
 assert.deepEqual(P.reliabilityByAsset({
  orders:[o('a1',{asset:'A1'}),o('a2',{asset:'A2'})],
  stoppageNotes:[
