@@ -137,7 +137,9 @@ function reliabilityByGroup(data,f,byAsset){
  const matches=(key,value)=>{const selected=Array.isArray(f?.[key])?f[key]:(f?.[key]?[f[key]]:[]);return !selected.length||selected.includes(value);};
  for(const note of (data.stoppageNotes||[])){
   if(upper(note.flag)!=='X'||!text(note.order)||!validDate(note.startDate||'')||!period(note.startDate,f||{}))continue;
-  const order=ordersById.get(note.order),tag=order?.tag||note.tag;
+  const order=ordersById.get(note.order);
+  if(!order||!['ZNTP','ZNTE'].includes(upper(order.type)))continue;
+  const tag=order.tag||note.tag;
   if(!tag||tag!==note.tag||!matches('tag',tag)||!matches('asset',note.asset||order?.asset)||!matches('type',order?.type)||!matches('priority',note.priority||order?.priority))continue;
   const asset=text(order?.asset)||text(note.asset);
   if(byAsset&&!asset)continue;
@@ -145,12 +147,9 @@ function reliabilityByGroup(data,f,byAsset){
   const start=note.startTime?Date.parse(note.startDate+'T'+note.startTime+'Z'):NaN;
   if(!groups.has(groupKey))groups.set(groupKey,{tag,plant:text(note.plant)||tag,asset,equipment:text(order?.equipment),events:new Map});
   const group=groups.get(groupKey);
-  if(!group.events.has(note.order))group.events.set(note.order,{order:note.order,start:NaN,end:NaN,endDatePresent:false});
+  if(!group.events.has(note.order))group.events.set(note.order,{order:note.order,orderStatus:status(order||{}),start:NaN,end:NaN});
   const event=group.events.get(note.order);
   if(Number.isFinite(start)&&(!Number.isFinite(event.start)||start<event.start))event.start=start;
-  if(validDate(note.endDate||'')){
-   event.endDatePresent=true;
-  }
   if(validDate(note.endDate||'')&&note.endTime){
    const end=Date.parse(note.endDate+'T'+note.endTime+'Z');
    if(Number.isFinite(end)&&(!Number.isFinite(event.end)||end>event.end))event.end=end;
@@ -162,7 +161,8 @@ function reliabilityByGroup(data,f,byAsset){
   let intervalSum=0,intervalCount=0,repairSum=0,closed=0,open=0,incomplete=0;
   for(let i=1;i<validStarts.length;i++){const diff=validStarts[i].start-validStarts[i-1].start;if(diff>0){intervalSum+=diff;intervalCount++;}}
   for(const event of events){
-   if(!event.endDatePresent){open++;continue;}
+   if(event.orderStatus==='open'){open++;continue;}
+   if(event.orderStatus!=='done')continue;
    if(!Number.isFinite(event.start)||!Number.isFinite(event.end)||event.end<event.start){incomplete++;continue;}
    repairSum+=event.end-event.start;closed++;
   }

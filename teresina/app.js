@@ -483,8 +483,8 @@
         : hours.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' h';
     };
     $('#reliabilitySummary').innerHTML =
-      kpi('Avarias no período', num(reliabilityEvents), 'Ordens com data de início e Parada = X', '#c43650') +
-      kpi('Avarias abertas', num(reliabilityOpen), 'Sem data de fim', '#c2780c');
+      kpi('Avarias no período', num(reliabilityEvents), 'Ordens ZNTP/ZNTE com início e Parada = X', '#c43650') +
+      kpi('Avarias abertas', num(reliabilityOpen), 'Ordens com situação em aberto', '#c2780c');
     $('#reliabilityTable').innerHTML = reliability.length
       ? '<table><thead><tr><th>Planta</th><th>MTBF médio</th><th>Intervalos</th><th>MTTR médio</th><th>Disponibilidade estimada</th><th>Fechadas</th><th>Abertas</th></tr></thead><tbody>' +
         reliability.map(item => {
@@ -498,9 +498,9 @@
     const assetReliabilityEvents = assetReliability.reduce((sum, item) => sum + item.events, 0);
     const assetReliabilityOpen = assetReliability.reduce((sum, item) => sum + item.open, 0);
     $('#assetReliabilitySummary').innerHTML =
-      kpi('Ativos com avaria registrada', num(assetReliability.length), 'Identificados pela TAG do ativo', '#0027bd') +
-      kpi('Avarias abertas', num(assetReliabilityOpen), 'Sem data de fim', '#c2780c') +
-      kpi('Avarias analisadas', num(assetReliabilityEvents), 'Ordens distintas com início válido', '#c43650');
+      kpi('Ativos com avaria registrada', num(assetReliability.length), 'Ordens ZNTP/ZNTE agrupadas pela TAG do ativo', '#0027bd') +
+      kpi('Avarias abertas', num(assetReliabilityOpen), 'Ordens com situação em aberto', '#c2780c') +
+      kpi('Avarias analisadas', num(assetReliabilityEvents), 'Ordens ZNTP/ZNTE distintas com início válido', '#c43650');
     $('#assetReliabilityTable').innerHTML = assetReliability.length
       ? '<table><thead><tr><th>Ativo</th><th>Equipamento</th><th>Planta</th><th>MTBF médio</th><th>Intervalos</th><th>MTTR médio</th><th>Disponibilidade</th><th>Fechadas</th><th>Abertas</th></tr></thead><tbody>' +
         assetReliability.map(item =>
