@@ -125,6 +125,13 @@
     return '<article class="kpi"' + (accent ? ' style="--accent:' + accent + '"' : '') + '><span>' + esc(title) + '</span><strong>' + esc(value) + '</strong><small>' + esc(note) + '</small></article>';
   }
 
+  function formatHours(hours) {
+    if (hours == null) return '—';
+    return hours >= 24
+      ? (hours / 24).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' dias'
+      : hours.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' h';
+  }
+
   function renderSystemsList() {
     if (!data) return;
     const q = ($('#systemSearch')?.value || '').trim().toLocaleLowerCase('pt-BR');
@@ -141,11 +148,13 @@
       const a = P.adherence(data, sysFilter);
       const n = P.stats(selected);
       const t = P.timing(P.filter(data, sysFilter, true), asOf);
+      const reliability = P.reliabilityByPlant(data, sysFilter).find(item => item.tag === s.tag);
       const health = P.systemHealth(a.rate, t.overdue);
       const badgeLabel = a.rate == null ? 'Sem plano' : pct(a.rate);
       return '<button class="system-row" data-system="' + esc(s.tag) + '">' +
         '<div class="system-row-top"><b>' + esc(s.name) + '</b><span class="badge ' + health + '">' + esc(badgeLabel) + '</span></div>' +
         '<span class="system-meta"><span>' + num(n.done) + ' executadas de ' + num(n.total) + '</span><span>' + (t.overdue ? num(t.overdue) + ' vencida(s)' : esc(s.district || s.tag)) + '</span></span>' +
+        '<span class="system-reliability"><span>MTBF <b>' + formatHours(reliability?.mtbfHours) + '</b></span><span>MTTR <b>' + formatHours(reliability?.mttrHours) + '</b></span><span>Disponibilidade <b>' + pct(reliability?.availability) + '</b></span></span>' +
         '<span class="mini-track"><i class="' + health + '" style="width:' + (a.rate == null ? 0 : a.rate * 100) + '%"></i></span>' +
         '</button>';
     }).join('');

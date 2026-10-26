@@ -1015,6 +1015,21 @@ header p {
   margin-top: 6px;
 }
 
+.system-row .system-reliability {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.system-row .system-reliability b {
+  display: inline;
+  color: var(--ink);
+  font-size: inherit;
+}
+
 .mini-track {
   height: 4px;
   background: #edf1fa;
