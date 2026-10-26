@@ -59,6 +59,7 @@ O conjunto normalizado tem limite de 19 MB na interface / 20 MB no banco.
 - MTBF estimado por planta: média dos intervalos entre inícios de avarias distintas (Ordens) marcadas com `X`, por data/hora de início e dentro do período/filtros selecionados. É uma estimativa de intervalo entre falhas, não horas efetivas de operação.
 - MTTR estimado por planta: média entre início e fim da avaria nas ordens com data de fim preenchida. Hora `00:00:00` é válida se a data de fim existir; data de fim vazia significa avaria aberta e é excluída do MTTR. Registros com horário incompleto são contabilizados à parte e excluídos das médias.
 - Disponibilidade estimada por planta: `MTBF ÷ (MTBF + MTTR)`, apresentada como percentual quando ambos os indicadores podem ser calculados com os dados e filtros do período. A estimativa depende do histórico de avarias registrado e não substitui medição direta do tempo operacional.
+- MTBF e MTTR por ativo: análise separada, agrupada pela TAG Ativo da ordem (com a TAG da nota como alternativa quando a ordem não informar ativo), além da planta. Ocorrências sem TAG de ativo não são agrupadas. As mesmas regras de período, horários incompletos e encerramento aplicadas à confiabilidade por planta são mantidas.
 
 ## Publicação e verificação
 Arquivos estáticos, sem build. O GitHub Pages existente publica a raiz; o painel está na subpasta teresina.

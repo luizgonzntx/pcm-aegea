@@ -120,19 +120,22 @@ function flaggedStopOrders(data,f){
  return [...byPlant.values()].map(item=>({...item,ids:[...item.ids],count:item.ids.size}))
   .sort((a,b)=>b.count-a.count||a.plant.localeCompare(b.plant,'pt-BR'));
 }
-function reliabilityByPlant(data,f){
+function reliabilityByGroup(data,f,byAsset){
  const ordersById=new Map((data.orders||[]).map(order=>[order.id,order]));
- const eventsByPlant=new Map;
+ const groups=new Map;
  const matches=(key,value)=>{const selected=Array.isArray(f?.[key])?f[key]:(f?.[key]?[f[key]]:[]);return !selected.length||selected.includes(value);};
  for(const note of (data.stoppageNotes||[])){
   if(upper(note.flag)!=='X'||!text(note.order)||!validDate(note.startDate||'')||!period(note.startDate,f||{}))continue;
   const order=ordersById.get(note.order),tag=order?.tag||note.tag;
   if(!tag||tag!==note.tag||!matches('tag',tag)||!matches('asset',note.asset||order?.asset)||!matches('type',order?.type)||!matches('priority',note.priority||order?.priority))continue;
+  const asset=text(order?.asset)||text(note.asset);
+  if(byAsset&&!asset)continue;
+  const groupKey=byAsset?tag+'\u0000'+asset:tag;
   const start=note.startTime?Date.parse(note.startDate+'T'+note.startTime+'Z'):NaN;
-  if(!eventsByPlant.has(tag))eventsByPlant.set(tag,{tag,plant:text(note.plant)||tag,events:new Map});
-  const plant=eventsByPlant.get(tag);
-  if(!plant.events.has(note.order))plant.events.set(note.order,{order:note.order,start:NaN,end:NaN,endDatePresent:false});
-  const event=plant.events.get(note.order);
+  if(!groups.has(groupKey))groups.set(groupKey,{tag,plant:text(note.plant)||tag,asset,equipment:text(order?.equipment),events:new Map});
+  const group=groups.get(groupKey);
+  if(!group.events.has(note.order))group.events.set(note.order,{order:note.order,start:NaN,end:NaN,endDatePresent:false});
+  const event=group.events.get(note.order);
   if(Number.isFinite(start)&&(!Number.isFinite(event.start)||start<event.start))event.start=start;
   if(validDate(note.endDate||'')){
    event.endDatePresent=true;
@@ -142,8 +145,8 @@ function reliabilityByPlant(data,f){
    if(Number.isFinite(end)&&(!Number.isFinite(event.end)||end>event.end))event.end=end;
   }
  }
- return [...eventsByPlant.values()].map(plant=>{
-  const events=[...plant.events.values()];
+ return [...groups.values()].map(group=>{
+  const events=[...group.events.values()];
   const validStarts=events.filter(event=>Number.isFinite(event.start)).sort((a,b)=>a.start-b.start);
   let intervalSum=0,intervalCount=0,repairSum=0,closed=0,open=0,incomplete=0;
   for(let i=1;i<validStarts.length;i++){const diff=validStarts[i].start-validStarts[i-1].start;if(diff>0){intervalSum+=diff;intervalCount++;}}
@@ -155,12 +158,14 @@ function reliabilityByPlant(data,f){
   const mtbfHours=intervalCount?intervalSum/intervalCount/3600000:null;
   const mttrHours=closed?repairSum/closed/3600000:null;
   const availabilityDenominator=mtbfHours+mttrHours;
-  return {tag:plant.tag,plant:plant.plant,events:events.length,intervals:intervalCount,closed,open,incomplete,
+  return {tag:group.tag,plant:group.plant,asset:group.asset,equipment:group.equipment,events:events.length,intervals:intervalCount,closed,open,incomplete,
    mtbfHours,mttrHours,
    availability:mtbfHours!=null&&mttrHours!=null&&availabilityDenominator>0?mtbfHours/availabilityDenominator:null,
    ids:events.map(event=>event.order)};
- }).sort((a,b)=>b.events-a.events||a.plant.localeCompare(b.plant,'pt-BR'));
+ }).sort((a,b)=>b.events-a.events||a.plant.localeCompare(b.plant,'pt-BR')||(byAsset?a.asset.localeCompare(b.asset,'pt-BR'):0));
 }
+function reliabilityByPlant(data,f){return reliabilityByGroup(data,f,false);}
+function reliabilityByAsset(data,f){return reliabilityByGroup(data,f,true);}
 function badActors(rows){
  const byAsset=new Map;
  for(const o of rows){
@@ -414,6 +419,6 @@ function normalize(tables,files){
  }
  return {systems,orders,items,actions,stoppageNotes,meta:{loadedAt:new Date().toISOString(),files,sourceOrders:all.length,excluded:all.length-orders.length,missingReference:orders.filter(o=>!o.date).length,stoppageOrders:new Set(stoppageNotes.map(n=>n.order)).size,excludedStoppageNotes,missingStoppageNoteDate}};
 }
-const api={text,upper,status,labels,typeLabels,typeLabel,typeGroup,orderClass,validDate,daysBetween,date,time,period,filter,stats,adherence,rank,timing,byType,topAssets,badActors,icmMatrix,engineeringMetrics,decisionInsights,stopRecords,flaggedStopOrders,reliabilityByPlant,systemHealth,dedupe,schemas,optionalSchemas,headerKey,canonicalHeader,kind,normalize};
+const api={text,upper,status,labels,typeLabels,typeLabel,typeGroup,orderClass,validDate,daysBetween,date,time,period,filter,stats,adherence,rank,timing,byType,topAssets,badActors,icmMatrix,engineeringMetrics,decisionInsights,stopRecords,flaggedStopOrders,reliabilityByPlant,reliabilityByAsset,systemHealth,dedupe,schemas,optionalSchemas,headerKey,canonicalHeader,kind,normalize};
 if(typeof module!=='undefined')module.exports=api;root.PCM=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

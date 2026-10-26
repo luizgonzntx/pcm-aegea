@@ -70,6 +70,36 @@ assert.equal(reliability[0].availability,39/(39+1.75));
 assert.equal(reliability[0].open,1);
 assert.equal(reliability[0].closed,2);
 assert.equal(reliability[0].incomplete,2);
+const assetReliability=P.reliabilityByAsset({
+ orders:[
+  o('a1',{asset:'A1',equipment:'Bomba A'}),
+  o('a2',{asset:'A1',equipment:'Bomba A'}),
+  o('b1',{asset:'A2',equipment:'Bomba B'}),
+  o('b2',{asset:'A2',equipment:'Bomba B'}),
+  o('unknown',{asset:''})
+ ],
+ stoppageNotes:[
+  {order:'a1',flag:'X',tag:'T1',startDate:'2026-01-01',startTime:'00:00:00',endDate:'2026-01-01',endTime:'02:00:00'},
+  {order:'a2',flag:'X',tag:'T1',startDate:'2026-01-02',startTime:'00:00:00',endDate:'2026-01-02',endTime:'04:00:00'},
+  {order:'b1',flag:'X',tag:'T1',startDate:'2026-01-01',startTime:'00:00:00',endDate:'2026-01-01',endTime:'01:00:00'},
+  {order:'b2',flag:'X',tag:'T1',startDate:'2026-01-03',startTime:'00:00:00',endDate:'2026-01-03',endTime:'03:00:00'},
+  {order:'unknown',flag:'X',tag:'T1',startDate:'2026-01-04',startTime:'00:00:00',endDate:'2026-01-04',endTime:'01:00:00'}
+ ]
+},{from:'2026-01-01',to:'2026-01-31'});
+assert.equal(assetReliability.length,2);
+assert.equal(assetReliability[0].asset,'A1');
+assert.equal(assetReliability[0].mtbfHours,24);
+assert.equal(assetReliability[0].mttrHours,3);
+assert.equal(assetReliability[1].asset,'A2');
+assert.equal(assetReliability[1].mtbfHours,48);
+assert.equal(assetReliability[1].mttrHours,2);
+assert.deepEqual(P.reliabilityByAsset({
+ orders:[o('a1',{asset:'A1'}),o('a2',{asset:'A2'})],
+ stoppageNotes:[
+  {order:'a1',flag:'X',tag:'T1',asset:'A1',startDate:'2026-01-01',startTime:'00:00:00',endDate:'2026-01-01',endTime:'01:00:00'},
+  {order:'a2',flag:'X',tag:'T1',asset:'A2',startDate:'2026-01-01',startTime:'00:00:00',endDate:'2026-01-01',endTime:'01:00:00'}
+ ]
+},{from:'2026-01-01',to:'2026-01-31',asset:['A2']}).map(item=>item.asset),['A2']);
 const availabilityWithoutMtbf=P.reliabilityByPlant({
  orders:[o('single')],
  stoppageNotes:[{order:'single',flag:'X',startDate:'2026-01-01',startTime:'00:00:00',endDate:'2026-01-01',endTime:'01:00:00',tag:'T1'}]

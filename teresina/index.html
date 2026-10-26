@@ -433,6 +433,19 @@
             <div id="reliabilityTable" class="table-wrap"></div>
           </article>
 
+          <article class="card" style="margin-bottom:20px">
+            <div class="card-top">
+              <div>
+                <span class="eyebrow">CONFIABILIDADE POR ATIVO</span>
+                <h2>MTBF e MTTR por ativo</h2>
+              </div>
+              <button id="exportAssetReliabilityBtn">↓ Exportar MTBF / MTTR por ativo (CSV)</button>
+            </div>
+            <p class="small-note">Cálculo separado por TAG do ativo vinculada à Ordem. MTBF é o intervalo médio entre inícios de avarias distintas; MTTR é a duração média das avarias fechadas. Ativos sem TAG e registros com horários incompletos não entram nas médias. Período e filtros atuais são aplicados.</p>
+            <div id="assetReliabilitySummary" class="kpis"></div>
+            <div id="assetReliabilityTable" class="table-wrap"></div>
+          </article>
+
           <div class="overview-bottom">
             <article class="card">
               <div class="card-top">
