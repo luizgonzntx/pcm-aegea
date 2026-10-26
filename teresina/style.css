@@ -1572,6 +1572,36 @@ td.description {
 .adherence-bar i.warn { background: var(--amber); }
 .adherence-bar i.critical { background: var(--red); }
 
+.availability-cell {
+  display: grid;
+  gap: 6px;
+  min-width: 110px;
+}
+
+.availability-cell > b {
+  font-variant-numeric: tabular-nums;
+}
+
+.availability-bar {
+  display: block;
+  width: 100%;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #edf1fa;
+}
+
+.availability-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  transition: width .35s ease;
+}
+
+.availability-bar i.good { background: var(--green); }
+.availability-bar i.warn { background: var(--amber); }
+.availability-bar i.critical { background: var(--red); }
+
 .badge {
   font-size: 10px;
   font-weight: 700;

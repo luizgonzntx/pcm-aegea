@@ -482,6 +482,11 @@
         ? (hours / 24).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' dias (' + hours.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' h)'
         : hours.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' h';
     };
+    const availabilityCell = value => {
+      const rate = value == null ? null : Math.max(0, Math.min(1, value));
+      const level = rate == null ? 'unavailable' : rate >= 0.85 ? 'good' : rate >= 0.6 ? 'warn' : 'critical';
+      return '<div class="availability-cell"><b>' + pct(value) + '</b><span class="availability-bar" aria-hidden="true"><i class="' + level + '" style="width:' + (rate == null ? 0 : rate * 100) + '%"></i></span></div>';
+    };
     $('#reliabilitySummary').innerHTML =
       kpi('Avarias encerradas tecnicamente', num(reliabilityEvents), 'Ordens ZNTP/ZNTE com Parada = X e início válido', '#c43650') +
       kpi('Reparos com duração válida', num(reliabilityClosed), 'Ordens com início e fim da avaria válidos', '#0f8a68');
@@ -490,7 +495,7 @@
         reliability.map(item => {
           return '<tr><td><b>' + esc(item.plant) + '</b><br><span class="small-note">' + esc(item.tag) + '</span></td>' +
             '<td>' + num(item.events) + '</td><td>' + duration(item.mtbfHours) + '</td><td>' + num(item.intervals) + '</td>' +
-            '<td>' + duration(item.mttrHours) + '</td><td>' + num(item.closed) + '</td><td><b>' + pct(item.availability) + '</b></td></tr>';
+            '<td>' + duration(item.mttrHours) + '</td><td>' + num(item.closed) + '</td><td>' + availabilityCell(item.availability) + '</td></tr>';
         }).join('') + '</tbody></table>'
       : emptyHTML;
 
@@ -506,7 +511,7 @@
           '<tr><td><b>' + esc(item.asset) + '</b></td><td>' + esc(item.equipment || 'Não informado') + '</td>' +
           '<td>' + esc(item.plant) + '<br><span class="small-note">' + esc(item.tag) + '</span></td>' +
           '<td>' + num(item.events) + '</td><td>' + duration(item.mtbfHours) + '</td><td>' + num(item.intervals) + '</td>' +
-          '<td>' + duration(item.mttrHours) + '</td><td>' + num(item.closed) + '</td><td><b>' + pct(item.availability) + '</b></td></tr>'
+          '<td>' + duration(item.mttrHours) + '</td><td>' + num(item.closed) + '</td><td>' + availabilityCell(item.availability) + '</td></tr>'
         ).join('') + '</tbody></table>'
       : emptyHTML;
 
