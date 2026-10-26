@@ -30,6 +30,7 @@
   function filterSummary(key, values) {
     const cfg = filterLabels[key], count = values.length;
     if (!count) return cfg.all;
+    if (count === document.querySelectorAll(cfg.options + ' .filter-check').length) return cfg.all;
     if (count === 1) {
       const input = [...document.querySelectorAll(cfg.options + ' input')].find(item => item.value === values[0]);
       return input?.dataset.label || values[0];
@@ -42,7 +43,13 @@
     if (!el) return;
     const selected = selectedValues(key);
     el.innerHTML = list.length
-      ? list.map(([value, label]) => '<label class="filter-option"><input type="checkbox" class="filter-check" data-filter-key="' + key + '" value="' + esc(value) + '" data-label="' + esc(label) + '"' + (selected.includes(value) ? ' checked' : '') + '><span>' + esc(label) + '</span></label>').join('')
+      ? '<div class="filter-options-tools">' +
+        '<input type="search" class="filter-search" data-filter-search="' + key + '" placeholder="Buscar ' + cfg.title.toLocaleLowerCase('pt-BR') + '…" aria-label="Buscar ' + cfg.title.toLocaleLowerCase('pt-BR') + '">' +
+        '<div><button type="button" data-filter-action="all" data-filter-key="' + key + '">Marcar todos</button>' +
+        '<button type="button" data-filter-action="clear" data-filter-key="' + key + '">Limpar</button></div>' +
+        '</div><div class="filter-options-list">' +
+        list.map(([value, label]) => '<label class="filter-option" data-filter-label="' + esc(label.toLocaleLowerCase('pt-BR')) + '"><input type="checkbox" class="filter-check" data-filter-key="' + key + '" value="' + esc(value) + '" data-label="' + esc(label) + '"' + (selected.includes(value) ? ' checked' : '') + '><span>' + esc(label) + '</span></label>').join('') +
+        '</div>'
       : '<span class="filter-empty">Nenhuma opção disponível</span>';
     $(cfg.summary).textContent = filterSummary(key, selected);
   }
@@ -67,7 +74,9 @@
     }
     for (const key of ['tag', 'asset', 'type', 'priority']) {
       const cfg = filterLabels[key];
-      for (const value of selectedValues(key)) {
+      const values = selectedValues(key);
+      if (values.length && values.length === document.querySelectorAll(cfg.options + ' .filter-check').length) continue;
+      for (const value of values) {
         const option = [...document.querySelectorAll(cfg.options + ' input')].find(input => input.value === value);
         const label = option?.dataset.label || (key === 'type' ? P.typeLabel(value) : value);
         active.push({ key, value, label: cfg.title + ': ' + label });
@@ -1175,6 +1184,35 @@
       const selected = selectedValues(key).filter(value => value !== input.value);
       if (input.checked) selected.push(input.value);
       f[key] = [...new Set(selected)];
+      if (key === 'tag') {
+        f.asset = [];
+        assets();
+      }
+      refreshFilterSummary(key);
+      if (data) render();
+    });
+
+    document.addEventListener('input', event => {
+      const search = event.target.closest('[data-filter-search]');
+      if (!search) return;
+      const query = search.value.trim().toLocaleLowerCase('pt-BR');
+      const options = $(filterLabels[search.dataset.filterSearch].options);
+      options.querySelectorAll('.filter-option').forEach(option => {
+        option.hidden = !option.dataset.filterLabel.includes(query);
+      });
+    });
+
+    document.addEventListener('click', event => {
+      const action = event.target.closest('[data-filter-action]');
+      if (!action) return;
+      const { key } = action.dataset;
+      const options = $(filterLabels[key].options);
+      f[key] = action.dataset.filterAction === 'all'
+        ? [...options.querySelectorAll('.filter-check')].map(input => input.value)
+        : [];
+      options.querySelectorAll('.filter-check').forEach(input => {
+        input.checked = f[key].includes(input.value);
+      });
       if (key === 'tag') {
         f.asset = [];
         assets();

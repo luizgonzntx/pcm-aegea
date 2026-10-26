@@ -2522,6 +2522,53 @@ section[data-view]:not([hidden]) {
   box-shadow: 0 8px 22px rgba(16, 24, 40, .12);
 }
 
+.filter-options-tools {
+  position: sticky;
+  top: -7px;
+  z-index: 1;
+  display: grid;
+  gap: 7px;
+  padding: 3px 0 8px;
+  margin-bottom: 4px;
+  background: #fff;
+  border-bottom: 1px solid #edf0f4;
+}
+
+.filter-options-tools input.filter-search {
+  min-height: 34px;
+  padding: 7px 9px;
+  border-radius: 5px;
+  font-size: 12px;
+}
+
+.filter-options-tools > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.filter-options-tools button {
+  min-height: 27px;
+  padding: 4px 7px;
+  border: 0;
+  background: transparent;
+  color: var(--blue);
+  font-size: 11px;
+}
+
+.filter-options-tools button:hover {
+  background: #f2f5fa;
+}
+
+.filter-options-list {
+  display: grid;
+  gap: 1px;
+}
+
+.filter-option[hidden] {
+  display: none;
+}
+
 .clear-filters {
   min-height: 40px;
   padding: 9px 13px;
@@ -2576,6 +2623,13 @@ section[data-view]:not([hidden]) {
   color: var(--muted);
   font-size: 15px;
   line-height: 1;
+}
+
+.filter-date-help {
+  margin: 7px 2px 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 @media (max-width: 640px) {
