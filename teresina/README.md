@@ -66,6 +66,7 @@ O conjunto normalizado tem limite de 19 MB na interface / 20 MB no banco.
 - MTTR estimado por planta: média do tempo entre início e fim da avaria registrados na nota, usando o mesmo conjunto de ordens tecnicamente encerradas (`ENTE`), com `Parada = X` e tipo `ZNTP`/`ZNTE`. São necessárias data e hora válidas de início e fim; hora `00:00:00` é válida. Ordens sem fim válido ou com fim anterior ao início não entram no MTTR.
 - Disponibilidade estimada por planta: `MTBF ÷ (MTBF + MTTR)`, apresentada como percentual quando ambos os indicadores podem ser calculados com os dados e filtros do período. A estimativa depende do histórico de avarias registrado e não substitui medição direta do tempo operacional.
 - Nas tabelas de confiabilidade, a barra de disponibilidade usa verde para valores ≥ 85%, âmbar para 60% a < 85% e vermelho para valores < 60%; sem dados suficientes, o percentual aparece como indisponível.
+- O ranking de confiabilidade por planta é ordenado da maior para a menor disponibilidade; plantas sem disponibilidade calculável aparecem ao final. Em telas móveis, a tabela é substituída por cartões compactos com posição, disponibilidade, MTBF e MTTR.
 - MTBF e MTTR por ativo: mesmas regras de ordem tecnicamente encerrada, flag de parada, tipos `ZNTP`/`ZNTE`, período e horários válidos da confiabilidade por planta, agrupadas pela TAG Ativo da ordem (com a TAG da nota como alternativa quando a ordem não informar ativo), além da planta. Ocorrências sem TAG de ativo não são agrupadas.
 
 ## Publicação e verificação

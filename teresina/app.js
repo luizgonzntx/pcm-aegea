@@ -487,16 +487,28 @@
       const level = rate == null ? 'unavailable' : rate >= 0.85 ? 'good' : rate >= 0.6 ? 'warn' : 'critical';
       return '<div class="availability-cell"><b>' + pct(value) + '</b><span class="availability-bar" aria-hidden="true"><i class="' + level + '" style="width:' + (rate == null ? 0 : rate * 100) + '%"></i></span></div>';
     };
+    const plantReliabilityRanking = [...reliability].sort((a, b) =>
+      (b.availability ?? -1) - (a.availability ?? -1) || a.plant.localeCompare(b.plant, 'pt-BR')
+    );
     $('#reliabilitySummary').innerHTML =
       kpi('Avarias encerradas tecnicamente', num(reliabilityEvents), 'Ordens ZNTP/ZNTE com Parada = X e início válido', '#c43650') +
       kpi('Reparos com duração válida', num(reliabilityClosed), 'Ordens com início e fim da avaria válidos', '#0f8a68');
-    $('#reliabilityTable').innerHTML = reliability.length
-      ? '<table><thead><tr><th>Planta</th><th>Avarias consideradas</th><th>MTBF médio</th><th>Intervalos</th><th>MTTR médio</th><th>Reparos válidos</th><th>Disponibilidade estimada</th></tr></thead><tbody>' +
-        reliability.map(item => {
-          return '<tr><td><b>' + esc(item.plant) + '</b><br><span class="small-note">' + esc(item.tag) + '</span></td>' +
-            '<td>' + num(item.events) + '</td><td>' + duration(item.mtbfHours) + '</td><td>' + num(item.intervals) + '</td>' +
-            '<td>' + duration(item.mttrHours) + '</td><td>' + num(item.closed) + '</td><td>' + availabilityCell(item.availability) + '</td></tr>';
-        }).join('') + '</tbody></table>'
+    $('#reliabilityTable').innerHTML = plantReliabilityRanking.length
+      ? '<div class="reliability-ranking"><table class="reliability-ranking-table"><thead><tr><th>Rank</th><th>Planta</th><th>Avarias consideradas</th><th>MTBF médio</th><th>Intervalos</th><th>MTTR médio</th><th>Reparos válidos</th><th>Disponibilidade</th></tr></thead><tbody>' +
+        plantReliabilityRanking.map((item, index) =>
+          '<tr><td><span class="reliability-rank">' + (index + 1) + '</span></td>' +
+          '<td><b>' + esc(item.plant) + '</b><br><span class="small-note">' + esc(item.tag) + '</span></td>' +
+          '<td>' + num(item.events) + '</td><td>' + duration(item.mtbfHours) + '</td><td>' + num(item.intervals) + '</td>' +
+          '<td>' + duration(item.mttrHours) + '</td><td>' + num(item.closed) + '</td><td>' + availabilityCell(item.availability) + '</td></tr>'
+        ).join('') + '</tbody></table><div class="reliability-ranking-cards">' +
+        plantReliabilityRanking.map((item, index) =>
+          '<article class="reliability-rank-card"><div class="reliability-rank-heading"><span class="reliability-rank">' + (index + 1) + '</span>' +
+          '<div class="reliability-rank-plant"><b>' + esc(item.plant) + '</b><small>' + esc(item.tag) + '</small></div>' +
+          '<strong class="reliability-rank-value">' + pct(item.availability) + '</strong></div>' +
+          '<div class="reliability-rank-bar">' + availabilityCell(item.availability) + '</div>' +
+          '<div class="reliability-rank-metrics"><span>MTBF <b>' + duration(item.mtbfHours) + '</b></span><span>MTTR <b>' + duration(item.mttrHours) + '</b></span></div>' +
+          '</article>'
+        ).join('') + '</div></div>'
       : emptyHTML;
 
     const assetReliabilityEvents = assetReliability.reduce((sum, item) => sum + item.events, 0);
