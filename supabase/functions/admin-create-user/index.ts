@@ -4,6 +4,10 @@ const allowedOrigins = new Set([
   "https://luizgonzntx.github.io",
   "http://localhost:5173",
   "http://127.0.0.1:5173",
+  ...(Deno.env.get("ADMIN_CREATE_USER_ALLOWED_ORIGINS") ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
 ]);
 
 function response(body: Record<string, unknown>, status: number, origin: string | null) {
