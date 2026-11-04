@@ -36,12 +36,25 @@
       section('Recalque', 1050, [['Cj Motobomba','1+2',3,1,1,1],['Inversor','2',2,2,1,0],['Soft','1',1,1,1,0],['Trafo','1',1,1,0,0]])
     ] }
   ];
-  const key = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const key = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/^\d+\s+/, '');
   function find(name) {
     const normalized = key(name);
     if (!normalized) return null;
     const matches = units.filter(unit => [unit.name, ...(unit.aliases || [])].some(alias => key(alias) === normalized));
-    return matches.length === 1 ? matches[0] : null;
+    if (matches.length === 1) return matches[0];
+    // Nomes completos de subseções identificam somente os equipamentos daquele ponto.
+    // Nunca usar aproximação por substring: “Dirceu” ou “Captação” isolados são ambíguos.
+    const sections = [];
+    for (const unit of units) {
+      for (const section of unit.sections) {
+        if (section.name === 'Unidade') continue;
+        const names = [unit.name, ...(unit.aliases || [])];
+        if (names.some(name => [name + ' ' + section.name, section.name + ' ' + name].some(alias => key(alias) === normalized))) {
+          sections.push({ ...unit, sections: [section] });
+        }
+      }
+    }
+    return sections.length === 1 ? sections[0] : null;
   }
   const api = { units, find };
   if (typeof module !== 'undefined') module.exports = api;

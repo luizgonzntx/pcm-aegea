@@ -2881,13 +2881,6 @@ section[data-view]:not([hidden]) {
   font-weight: 700;
 }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
-.inventory-overview { margin-bottom: 20px; }
-.inventory-overview > summary { cursor: pointer; padding: 18px 20px; font-size: 15px; font-weight: 700; color: var(--navy); }
-.inventory-overview > summary .badge { margin-left: 8px; vertical-align: middle; }
-.inventory-overview > summary:focus-visible { outline: 3px solid var(--turquoise); outline-offset: -3px; }
-.inventory-browser { padding: 0 20px 20px; }
-.inventory-browser > label { display: block; font-weight: 700; margin: 14px 0 6px; }
-.inventory-browser > select { width: min(100%, 420px); min-height: 44px; }
 .inventory-source { margin: 16px 0; border-left: 3px solid var(--blue); padding: 10px 14px; background: #f1f5fb; font-size: 12px; color: var(--muted); }
 .inventory-section { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin: 14px 0; }
 .inventory-section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; padding: 13px 16px; background: #f4f7fc; }
@@ -2905,9 +2898,6 @@ section[data-view]:not([hidden]) {
 .inventory-value.in-maintenance { background: #fff0d1; color: #815009; font-weight: 700; }
 .plant-inventory > .small-note { margin: 12px 0; }
 @media (max-width: 640px) {
-  .inventory-overview > summary { padding: 16px; }
-  .inventory-overview > summary .badge { display: block; width: fit-content; margin: 8px 0 0; }
-  .inventory-browser { padding: 0 14px 16px; }
   .inventory-table { min-width: 0; }
   .inventory-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .inventory-table tbody { display: block; }

@@ -671,12 +671,7 @@
     const unit = window.PCM_INVENTORY?.find(system.name);
     return '<section class="plant-inventory"><h3 class="detail-section">Configuração e equipamentos da planta</h3>' + (unit
       ? inventoryHTML(unit)
-      : '<p class="small-note">Não há correspondência exata para este nome no levantamento. Consulte as unidades disponíveis sem atribuir dados de outra planta.</p><button type="button" data-open-inventory>Consultar levantamento de equipamentos</button>') + '</section>';
-  }
-
-  function inventoryPicker(selected = '') {
-    return '<label for="detailInventoryUnit">Unidade do levantamento</label><select id="detailInventoryUnit"><option value="">Selecione uma planta</option>' +
-      window.PCM_INVENTORY.units.map(unit => '<option value="' + unit.id + '"' + (unit.id === selected ? ' selected' : '') + '>' + esc(unit.name) + '</option>').join('') + '</select><div id="detailInventoryBody"></div>';
+      : '<p class="small-note">Levantamento de equipamentos ainda não cadastrado para esta planta.</p>') + '</section>';
   }
 
   function showSystem(tag) {
@@ -692,8 +687,8 @@
     const photo = /^https:\/\//i.test(s.photo) ? '<p><a href="' + esc(s.photo) + '" target="_blank" rel="noopener noreferrer">Abrir imagem cadastrada ↗</a></p>' : '';
     openDetail(
       '<div class="detail-heading"><h2>' + esc(s.name) + '</h2><p>' + esc(s.tag) + ' · ' + esc(s.address || s.district || 'Endereço não informado') + '</p></div>' +
-      '<div class="detail-kpis plant-summary"><div><small>Ordens executadas</small><b>' + num(n.done) + '</b></div><div><small>Aderência ao plano</small><b>' + pct(a.rate) + '</b></div><div><small>Ordens no período</small><b>' + num(n.total) + '</b></div></div>' +
-      plantInventory(s) + '<details class="plant-location"><summary>Cadastro e localização</summary><dl class="order-info">' +
+      plantInventory(s) + '<div class="detail-kpis plant-summary"><div><small>Ordens executadas</small><b>' + num(n.done) + '</b></div><div><small>Aderência ao plano</small><b>' + pct(a.rate) + '</b></div><div><small>Ordens no período</small><b>' + num(n.total) + '</b></div></div>' +
+      '<details class="plant-location"><summary>Cadastro e localização</summary><dl class="order-info">' +
       field('Situação operacional', s.status) +
       field('Criticidade', s.critical) +
       field('Tipo de manutenção', P.typeLabel(s.type)) +
@@ -1201,23 +1196,6 @@
   function bind() {
     $('#from').value = f.from;
     $('#to').value = f.to;
-    if (window.PCM_INVENTORY) {
-      $('#inventoryUnit').innerHTML += window.PCM_INVENTORY.units.map(unit => '<option value="' + unit.id + '">' + esc(unit.name) + '</option>').join('');
-      $('#inventoryUnit').onchange = event => {
-        const unit = window.PCM_INVENTORY.units.find(unit => unit.id === event.target.value);
-        $('#inventoryBody').innerHTML = unit ? inventoryHTML(unit) : '';
-      };
-      document.addEventListener('click', event => {
-        if (!event.target.closest('[data-open-inventory]')) return;
-        openDetail('<div class="detail-heading"><h2>Equipamentos das plantas</h2></div><div class="inventory-browser">' + inventoryPicker() + '</div>', 'LEVANTAMENTO PRELIMINAR · TERESINA');
-        $('#detailInventoryUnit').focus();
-      });
-      document.addEventListener('change', event => {
-        if (event.target.id !== 'detailInventoryUnit') return;
-        const unit = window.PCM_INVENTORY.units.find(unit => unit.id === event.target.value);
-        $('#detailInventoryBody').innerHTML = unit ? inventoryHTML(unit) : '';
-      });
-    }
     $$('[data-page]').forEach(b => b.onclick = () => setPage(b.dataset.page));
     $$('[data-go]').forEach(b => b.onclick = () => setPage(b.dataset.go));
     $$('.preset-btn').forEach(b => b.onclick = () => applyPeriodPreset(b.dataset.preset));

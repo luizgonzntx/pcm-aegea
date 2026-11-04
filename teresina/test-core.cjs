@@ -172,3 +172,10 @@ for(const unit of inventory.units)for(const section of unit.sections)for(const i
  for(const key of ['installed','operating','hotReserve','maintenance'])assert.ok(Number.isInteger(item[key])&&item[key]>=0,`${unit.name}: ${key}`);
 }
 console.log('Levantamento: associação por nome, seções e quantidades verificadas.');
+assert.equal(inventory.find('1 - ETA SUL').id,'eta-sul');
+assert.equal(inventory.find('10 — ETA NORTE').id,'eta-norte');
+assert.equal(inventory.find('ETA Sul - Captação').sections.length,1);
+assert.equal(inventory.find('ETA Sul - Captação').sections[0].powerCv,1750);
+assert.equal(inventory.find('Recalque - ETA Norte').sections[0].powerCv,1050);
+assert.equal(inventory.find('Captação'),null);
+assert.equal(inventory.find('Booster Dirceu Norte'),null);

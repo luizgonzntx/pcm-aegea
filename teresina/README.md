@@ -94,9 +94,9 @@ O CI executa os testes de regras, a checagem de sintaxe e a validação dos recu
 
 ## Levantamento de equipamentos das plantas
 
-A seção **Equipamentos das plantas**, na visão Sistemas, permite consultar todas as unidades do levantamento fornecido por imagem.
+Ao clicar em um ponto do mapa ou em uma instalação da lista, os equipamentos correspondentes aparecem diretamente no início dos detalhes, sem consulta manual ou seletor de unidades.
 Nos detalhes de uma instalação, o levantamento aparece automaticamente quando seu nome corresponde exatamente a um nome ou alias de `inventory.js`, ignorando acentos, caixa e pontuação.
-Nomes parciais não geram vínculo: por exemplo, “Dirceu” não identifica com segurança Booster Dirceu ou Elevatória Dirceu. Nesse caso, o painel oferece a consulta manual das unidades, sem salvar uma associação.
+A numeração inicial é ignorada (ex.: “1 - ETA Sul”). Nomes completos de subseções, como “ETA Sul - Captação”, exibem apenas os equipamentos da subseção. Nomes parciais não geram vínculo: “Dirceu” não identifica com segurança Booster Dirceu ou Elevatória Dirceu. Plantas sem vínculo mostram que o levantamento ainda não está cadastrado, sem oferecer dados de outra unidade.
 
 `inventory.js` contém a transcrição e os aliases explícitos. A fonte é preliminar, sem data de referência, e não acompanha os filtros de ordens ou o período.
 “Mat.” foi confirmado como **Em manutenção**. A potência (CV) pertence à seção, não a cada linha de equipamento.
