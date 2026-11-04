@@ -21,7 +21,7 @@
     ] },
     { id: 'booster-petronio-portela', name: 'Booster Petronio Portela', sections: [section('Unidade', 2800, [['Cj Motobomba','4+2',6,4,2,2],['Inversor','4',4,4,2,0],['Trafo','3',3,1,2,0]])] },
     { id: 'risoleta-neves', name: 'Risoleta Neves', sections: [section('Unidade', 40, [['Cj Motobomba','1+1',2,2,0,0],['Inversor','2',2,2,0,0],['Trafo','1',1,1,0,0]])] },
-    { id: 'sist-r7', name: 'Sist. R7', aliases: ['Sistema R7'], sections: [
+    { id: 'sist-r7', name: 'Sist. R7', aliases: ['Sistema R7'], identifiers: ['RN7', 'RN-7'], sections: [
       section('CJ p/ unidade', null, [['Trafo','1',1,1,0,0]]),
       section('Elevado', 300, [['Cj Motobomba','1+1',1,1,0,0],['Inversor',null,1,1,0,0]]),
       section('Planalto Uruguai', 600, [['Cj Motobomba','2+1',3,2,0,1],['Inversor','1',1,1,0,0],['Soft','1',1,1,0,0]]),
@@ -37,11 +37,15 @@
     ] }
   ];
   const key = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/^\d+\s+/, '');
+  const containsIdentifier = (name, identifier) => (' ' + name + ' ').includes(' ' + key(identifier) + ' ');
   function find(name) {
     const normalized = key(name);
     if (!normalized) return null;
     const matches = units.filter(unit => [unit.name, ...(unit.aliases || [])].some(alias => key(alias) === normalized));
     if (matches.length === 1) return matches[0];
+    const identifiers = units.filter(unit => (unit.identifiers || []).some(identifier => containsIdentifier(normalized, identifier)));
+    if (identifiers.length === 1) return identifiers[0];
+    if (identifiers.length > 1) return null;
     // Nomes completos de subseções identificam somente os equipamentos daquele ponto.
     // Nunca usar aproximação por substring: “Dirceu” ou “Captação” isolados são ambíguos.
     const sections = [];
