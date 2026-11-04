@@ -12,13 +12,15 @@
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
   <script defer src="config.js"></script>
   <script defer src="core.js"></script>
+  <script defer src="inventory.js"></script>
+  <script defer src="ui.js"></script>
   <script defer src="app.js"></script>
 </head>
 <body>
   <div id="access" class="access">
     <div class="access-art">
       <div class="access-brand-top">
-        <img src="../aegea-assets/aguas-de-teresina-branco.png" alt="Águas de Teresina" class="access-logo">
+        <img src="assets/aguas-de-teresina-branco.png" alt="Águas de Teresina" class="access-logo">
         <span class="access-pill">PCM · TERESINA</span>
       </div>
       <div class="access-hero">
@@ -27,13 +29,12 @@
         <p>Acompanhe ordens, planos, ativos e ocorrências das unidades de Teresina.</p>
       </div>
       <div class="access-brand-bottom">
-        <img src="../aegea-assets/regional-geral-branco.png" alt="Águas do Piauí · Águas de Teresina · Águas de Timon" class="access-regional-logo">
         <small>Águas de Teresina · Grupo Aegea</small>
       </div>
     </div>
     <div class="access-form">
       <form id="loginForm">
-        <img src="../aegea-assets/aguas-de-teresina-azul.png" alt="Águas de Teresina" class="form-brand-logo">
+        <img src="assets/aguas-de-teresina-azul.png" alt="Águas de Teresina" class="form-brand-logo">
         <span class="eyebrow blue">ÁGUAS DE TERESINA</span>
         <h2>Acesse sua conta</h2>
         <p>Entre com suas credenciais autorizadas.</p>
@@ -41,7 +42,7 @@
           <input id="email" type="email" required autocomplete="username" placeholder="nome.sobrenome@aegea.com.br">
         </label>
         <label>Senha de acesso
-          <input id="password" type="password" required autocomplete="current-password" minlength="6" placeholder="••••••••">
+          <span class="password-field"><input id="password" type="password" required autocomplete="current-password" minlength="6" placeholder="••••••••"><button type="button" class="password-toggle" data-password-target="password" aria-controls="password" aria-pressed="false" aria-label="Mostrar senha">Mostrar</button></span>
         </label>
         <button class="primary" id="loginBtn">Entrar no painel executivo <span>↗</span></button>
         <p id="loginMessage" class="message" role="status"></p>
@@ -52,19 +53,19 @@
 
   <div id="shell" hidden>
     <aside class="sidebar">
-      <img src="../aegea-assets/aegea-celula-branca.png" alt="" aria-hidden="true" class="sidebar-orb">
+      <img src="assets/aegea-celula-branca.png" alt="" aria-hidden="true" class="sidebar-orb">
       <div class="sidebar-brand">
-        <img src="../aegea-assets/aguas-de-teresina-branco.png" alt="Águas de Teresina" class="logo">
+        <img src="assets/aguas-de-teresina-branco.png" alt="Águas de Teresina" class="logo">
         <span class="sidebar-sub">INTELIGÊNCIA DE MANUTENÇÃO</span>
       </div>
       <div class="rail-title">MENU</div>
       <nav aria-label="Navegação principal">
-        <button data-page="overview" class="active"><span>◉</span> Sistemas</button>
-        <button data-page="intelligence"><span>↗</span> Engenharia</button>
-        <button data-page="icm"><span>▥</span> ICM</button>
-        <button data-page="deadlines"><span>◷</span> Planos</button>
-        <button data-page="orders"><span>≡</span> Ordens</button>
-        <button data-page="stops"><span>Ⅱ</span> Paradas</button>
+        <button title="Sistemas" aria-label="Sistemas" aria-current="page" data-page="overview" class="active"><span>◉</span> Sistemas</button>
+        <button title="Engenharia" aria-label="Engenharia" data-page="intelligence"><span>↗</span> Engenharia</button>
+        <button title="ICM" aria-label="ICM" data-page="icm"><span>▥</span> ICM</button>
+        <button title="Planos" aria-label="Planos" data-page="deadlines"><span>◷</span> Planos</button>
+        <button title="Ordens" aria-label="Ordens" data-page="orders"><span>≡</span> Ordens</button>
+        <button title="Paradas" aria-label="Paradas" data-page="stops"><span>Ⅱ</span> Paradas</button>
       </nav>
       <div class="rail-bottom">
         <div id="userChip" class="user-chip" hidden>
@@ -73,14 +74,13 @@
         </div>
         <button id="rulesBtn">Critérios e metodologia ↗</button>
         <button id="logoutBtn">Sair da conta</button>
-        <img src="../aegea-assets/regional-geral-branco.png" alt="Regional Aegea" class="sidebar-regional">
       </div>
     </aside>
 
     <main>
       <header>
         <div class="header-title-wrap">
-          <img src="../aegea-assets/aegea-celula-azul.png" alt="" aria-hidden="true" class="header-cell-mark">
+          <img src="assets/aegea-celula-azul.png" alt="" aria-hidden="true" class="header-cell-mark">
           <div>
             <span class="eyebrow blue">PCM · ÁGUAS DE TERESINA</span>
             <h1 id="pageTitle">Visão dos sistemas</h1>
@@ -148,9 +148,19 @@
       </div>
 
       <div class="statusline">
-        <span id="loadStatus">Carregando informações…</span>
+        <span id="loadStatus" role="status">Carregando informações…</span>
         <span id="scope"></span>
       </div>
+
+      <details class="card inventory-overview" data-view="overview">
+        <summary>Equipamentos das plantas <span class="badge">Levantamento preliminar</span></summary>
+        <div class="inventory-browser">
+          <p class="small-note">Consulte a configuração das unidades. Este levantamento é independente dos filtros de ordens e do período.</p>
+          <label for="inventoryUnit">Unidade operacional</label>
+          <select id="inventoryUnit"><option value="">Selecione uma planta</option></select>
+          <div id="inventoryBody" aria-live="polite"></div>
+        </div>
+      </details>
 
       <section id="empty" class="empty" hidden>
         <span class="empty-icon">↥</span>
@@ -227,7 +237,7 @@
             </article>
 
             <article class="card plan-card">
-              <img src="../aegea-assets/aegea-celula-branca.png" alt="" aria-hidden="true" class="plan-card-orb">
+              <img src="assets/aegea-celula-branca.png" alt="" aria-hidden="true" class="plan-card-orb">
               <span class="eyebrow">DISCIPLINA DO PLANO PREVENTIVO &amp; PREDITIVO</span>
               <div id="planSummary"></div>
               <p>Ordens do plano com referência no período. A execução dentro do período considera a data de início real.</p>
@@ -545,7 +555,7 @@
 
       <footer>
         <div class="footer-brand">
-          <img src="../aegea-assets/aguas-de-teresina-azul.png" alt="Águas de Teresina" class="footer-logo">
+          <img src="assets/aguas-de-teresina-azul.png" alt="Águas de Teresina" class="footer-logo">
           <span>Planejamento, Controle e Engenharia da Manutenção</span>
         </div>
         <span id="footerDate"></span>

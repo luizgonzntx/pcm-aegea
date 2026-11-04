@@ -4,16 +4,16 @@ Painel estático com identidade Aegea, mapa por coordenadas, aderência ao plano
 
 ## Endereços
 - Interface: https://luizgonzntx.github.io/pcm-aegea/teresina/
-- Projeto Supabase: xlbdhfjzxgfmsjstlzsd
-- Este diretório é independente do SICAB na raiz do repositório.
+- Projeto Supabase: conforme `config.js` (atualmente `zvbkbjtajmdfrxonrhen`)
+- O repositório contém exclusivamente o painel de Teresina e seus recursos de publicação e administração.
 
 ## Acesso e primeira carga
 A interface exige uma conta no Supabase Auth autorizada em public.pcm_teresina_members.
 Administradores podem criar contas com e-mail, senha inicial e perfil na área administrativa. O cadastro usa uma Edge Function protegida; nunca coloque a chave `service_role` no navegador.
 Para ativar o cadastro, configure o segredo da função e publique-a no projeto Supabase:
 ```sh
-supabase secrets set SUPABASE_SERVICE_ROLE_KEY='VALOR_DA_SERVICE_ROLE' --project-ref xlbdhfjzxgfmsjstlzsd
-supabase functions deploy admin-create-user --project-ref xlbdhfjzxgfmsjstlzsd
+supabase secrets set SUPABASE_SERVICE_ROLE_KEY='VALOR_DA_SERVICE_ROLE' --project-ref zvbkbjtajmdfrxonrhen
+supabase functions deploy admin-create-user --project-ref zvbkbjtajmdfrxonrhen
 ```
 O administrador deve compartilhar a senha inicial com o novo usuário por um canal seguro.
 O painel começa sem dados operacionais. Entre na área administrativa e importe os cinco arquivos XLSX (sistemas, ordens, itens, medidas e notas de parada) para realizar a primeira carga.
@@ -72,7 +72,7 @@ O conjunto normalizado tem limite de 19 MB na interface / 20 MB no banco.
 ## Publicação e verificação
 Arquivos estáticos, sem build. O GitHub Pages existente publica a raiz; o painel está na subpasta teresina.
 Dependências fixadas: Leaflet 1.9.4, supabase-js 2.49.4, SheetJS 0.20.3.
-Fontes e grafismos Aegea são reutilizados de ../aegea-assets/.
+Fontes e grafismos necessários ao painel ficam em `assets/`, junto à aplicação.
 O mapa usa tiles OpenStreetMap e requer internet; se falhar, a lista de instalações continua utilizável.
 Testes: node teresina/test-core.cjs
 Sintaxe: node --check teresina/app.js
@@ -83,3 +83,22 @@ A chave no config.js é pública e só autoriza o que as políticas RLS permitem
 database/schema.sql registra o esquema aplicado pela migração pcm_teresina_private_dataset.
 Apenas a coluna payload é editável por administradores autenticados. Revisão, autor e data da alteração são definidos no banco.
 A mesma instância atende outros aplicativos; esta implantação usa somente tabelas pcm_teresina_*.
+
+## Desenvolvimento local
+
+Na raiz do repositório, use `python3 -m http.server 8000 --bind 127.0.0.1`.
+O arquivo inicial redireciona para `teresina/`. Não há instalação de pacotes nem build obrigatório.
+Para gerar a versão do Cloudflare Pages, execute `bash scripts/build-cloudflare-pages.sh` e configure `dist` como diretório de saída.
+Valide os recursos de ambas as versões com `node scripts/check-static.cjs` após gerar `dist`.
+O CI executa os testes de regras, a checagem de sintaxe e a validação dos recursos publicados.
+
+## Levantamento de equipamentos das plantas
+
+A seção **Equipamentos das plantas**, na visão Sistemas, permite consultar todas as unidades do levantamento fornecido por imagem.
+Nos detalhes de uma instalação, o levantamento aparece automaticamente quando seu nome corresponde exatamente a um nome ou alias de `inventory.js`, ignorando acentos, caixa e pontuação.
+Nomes parciais não geram vínculo: por exemplo, “Dirceu” não identifica com segurança Booster Dirceu ou Elevatória Dirceu. Nesse caso, o painel oferece a consulta manual das unidades, sem salvar uma associação.
+
+`inventory.js` contém a transcrição e os aliases explícitos. A fonte é preliminar, sem data de referência, e não acompanha os filtros de ordens ou o período.
+“Mat.” foi confirmado como **Em manutenção**. A potência (CV) pertence à seção, não a cada linha de equipamento.
+A notação de projeto (ex.: `3+2`), as divergências de quantidades e os campos ausentes foram preservados. Não são calculados totais ou disponibilidade a partir dessas quantidades.
+A numeração repetida da imagem não é usada como identificador. Atualizações deste levantamento devem ser feitas no arquivo; a importação das cinco planilhas operacionais continua separada.

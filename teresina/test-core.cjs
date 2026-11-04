@@ -153,3 +153,22 @@ const actors=P.badActors(filtered);
 assert.equal(actors.length,1);
 assert.equal(actors[0].corrective,1);
 console.log('PCM: regras de execução, aderência, datas, deduplicação, tipos, top ativos, matriz ICM, saúde e engenharia de manutenção verificadas.');
+
+// O levantamento deve vincular apenas nomes completos conhecidos, sem misturar plantas.
+const inventory=require('./inventory.js');
+assert.equal(inventory.find('  ETA SUL  ').id,'eta-sul');
+assert.equal(inventory.find('ELEVATÓRIA DIRCEU').id,'elevatoria-dirceu');
+assert.equal(inventory.find('Booster Dirceu').id,'booster-dirceu');
+assert.equal(inventory.find('Dirceu'),null);
+assert.equal(inventory.find('ETA Sul - outra planta'),null);
+assert.equal(inventory.find(''),null);
+assert.equal(inventory.find('Sistema R7').sections.length,4);
+assert.equal(inventory.find('ETA Sul').sections[0].powerCv,1750);
+assert.equal(inventory.find('ETA Norte').sections[0].equipment[0].maintenance,2);
+assert.equal(inventory.find('ETA Norte').sections[1].equipment[0].project,'1+2');
+assert.equal(inventory.find('Sist. R7').sections[0].powerCv,null);
+assert.equal(new Set(inventory.units.map(unit=>unit.id)).size,inventory.units.length);
+for(const unit of inventory.units)for(const section of unit.sections)for(const item of section.equipment){
+ for(const key of ['installed','operating','hotReserve','maintenance'])assert.ok(Number.isInteger(item[key])&&item[key]>=0,`${unit.name}: ${key}`);
+}
+console.log('Levantamento: associação por nome, seções e quantidades verificadas.');

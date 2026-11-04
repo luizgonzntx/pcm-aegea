@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="style.css">
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
   <script defer src="config.js"></script>
+  <script defer src="ui.js"></script>
   <style>
     .admin-page { min-height: 100vh; display: grid; place-items: center; padding: 28px; background: var(--bg); }
     .admin-shell { width: min(960px, 100%); }
@@ -45,7 +46,7 @@
 <body class="admin-page">
   <main class="admin-shell">
     <div class="admin-brand">
-      <img src="../aegea-assets/aguas-de-teresina-azul.png" alt="Águas de Teresina">
+      <img src="assets/aguas-de-teresina-azul.png" alt="Águas de Teresina">
       <strong>Administração da base PCM</strong>
     </div>
     <section class="admin-card">
@@ -54,7 +55,7 @@
         <p class="admin-subtitle">Esta área não aparece no painel operacional. Somente um membro com perfil ADMIN pode publicar uma nova base no Supabase.</p>
         <form id="loginForm" class="admin-form">
           <label>E-mail<input id="email" type="email" autocomplete="username" required></label>
-          <label>Senha<input id="password" type="password" autocomplete="current-password" required></label>
+          <label>Senha<span class="password-field"><input id="password" type="password" autocomplete="current-password" required><button type="button" class="password-toggle" data-password-target="password" aria-controls="password" aria-pressed="false" aria-label="Mostrar senha">Mostrar</button></span></label>
           <button class="primary" type="submit">Entrar como administrador</button>
           <p id="loginStatus" class="admin-status" role="status"></p>
         </form>

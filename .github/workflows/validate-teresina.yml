@@ -4,10 +4,14 @@ on:
   push:
     paths:
       - "teresina/**"
+      - "scripts/**"
+      - "index.html"
       - ".github/workflows/validate-teresina.yml"
   pull_request:
     paths:
       - "teresina/**"
+      - "scripts/**"
+      - "index.html"
       - ".github/workflows/validate-teresina.yml"
 
 permissions:
@@ -27,6 +31,14 @@ jobs:
         with:
           node-version: 22
       - name: Check JavaScript syntax
-        run: node --check app.js
+        run: |
+          node --check app.js
+          node --check inventory.js
+          node --check ui.js
       - name: Run core tests
         run: node test-core.cjs
+      - name: Validate publication assets
+        working-directory: .
+        run: |
+          bash scripts/build-cloudflare-pages.sh
+          node scripts/check-static.cjs

@@ -121,7 +121,11 @@
       stops: 'Paradas'
     };
     $('#pageTitle').textContent = titles[next] || 'Visão dos sistemas';
-    $$('[data-page]').forEach(b => b.classList.toggle('active', b.dataset.page === next));
+    $$('[data-page]').forEach(b => {
+      b.classList.toggle('active', b.dataset.page === next);
+      if (b.dataset.page === next) b.setAttribute('aria-current', 'page');
+      else b.removeAttribute('aria-current');
+    });
     $$('[data-view]').forEach(v => v.hidden = v.dataset.view !== next);
     if (next === 'overview' && map) setTimeout(() => map.invalidateSize(), 60);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -168,8 +172,8 @@
 
   function renderSystemsList() {
     if (!data) return;
-    const q = ($('#systemSearch')?.value || '').trim().toLocaleLowerCase('pt-BR');
-    const filteredSystems = data.systems.filter(s => !q || [s.name, s.tag, s.district, s.address].join(' ').toLocaleLowerCase('pt-BR').includes(q));
+    const q = P.headerKey($('#systemSearch')?.value || '');
+    const filteredSystems = data.systems.filter(s => !q || P.headerKey([s.name, s.tag, s.district, s.address].join(' ')).includes(q));
     $('#systemCount').textContent = num(filteredSystems.length);
     if (!filteredSystems.length) {
       $('#systemsList').innerHTML = emptyHTML;
@@ -650,6 +654,31 @@
     if (!$('#detail').open) $('#detail').showModal();
   }
 
+  function inventoryHTML(unit) {
+    return '<div class="inventory-content"><p class="inventory-source">Levantamento preliminar transcrito da imagem fornecida. Data de referência não informada; não representa situação em tempo real.</p>' +
+      unit.sections.map(section => '<section class="inventory-section"><div class="inventory-section-head"><h4>' + esc(section.name) + '</h4><span>Potência instalada: <b>' + (section.powerCv == null ? 'Não informada' : num(section.powerCv) + ' CV') + '</b></span></div>' +
+        '<div class="inventory-table-wrap"><table class="inventory-table"><caption class="sr-only">Equipamentos — ' + esc(unit.name) + ' — ' + esc(section.name) + '</caption><thead><tr><th scope="col">Equipamento</th><th scope="col">Projeto</th><th scope="col">Instalados</th><th scope="col">Em operação</th><th scope="col">Reserva quente</th><th scope="col">Em manutenção</th></tr></thead><tbody>' +
+        section.equipment.map(item => '<tr>' + [
+          ['Equipamento', esc(item.name)], ['Projeto', item.project == null ? '—' : esc(item.project)],
+          ['Instalados', num(item.installed)], ['Em operação', num(item.operating)],
+          ['Reserva quente', '<span class="inventory-value ' + (item.hotReserve ? 'has-reserve' : '') + '">' + num(item.hotReserve) + '</span>'],
+          ['Em manutenção', '<span class="inventory-value ' + (item.maintenance ? 'in-maintenance' : '') + '">' + num(item.maintenance) + '</span>']
+        ].map(([label, value]) => '<td data-label="' + label + '">' + value + '</td>').join('') + '</tr>').join('') + '</tbody></table></div></section>').join('') +
+      '<p class="small-note">Projeto mantém a notação original (ex.: 3+2). Potência informada por seção, sem somar categorias de equipamentos. Campos ausentes aparecem como —; quantidades e divergências da fonte foram preservadas.</p></div>';
+  }
+
+  function plantInventory(system) {
+    const unit = window.PCM_INVENTORY?.find(system.name);
+    return '<section class="plant-inventory"><h3 class="detail-section">Configuração e equipamentos da planta</h3>' + (unit
+      ? inventoryHTML(unit)
+      : '<p class="small-note">Não há correspondência exata para este nome no levantamento. Consulte as unidades disponíveis sem atribuir dados de outra planta.</p><button type="button" data-open-inventory>Consultar levantamento de equipamentos</button>') + '</section>';
+  }
+
+  function inventoryPicker(selected = '') {
+    return '<label for="detailInventoryUnit">Unidade do levantamento</label><select id="detailInventoryUnit"><option value="">Selecione uma planta</option>' +
+      window.PCM_INVENTORY.units.map(unit => '<option value="' + unit.id + '"' + (unit.id === selected ? ' selected' : '') + '>' + esc(unit.name) + '</option>').join('') + '</select><div id="detailInventoryBody"></div>';
+  }
+
   function showSystem(tag) {
     const s = data.systems.find(s => s.tag === tag);
     if (!s) return;
@@ -663,15 +692,15 @@
     const photo = /^https:\/\//i.test(s.photo) ? '<p><a href="' + esc(s.photo) + '" target="_blank" rel="noopener noreferrer">Abrir imagem cadastrada ↗</a></p>' : '';
     openDetail(
       '<div class="detail-heading"><h2>' + esc(s.name) + '</h2><p>' + esc(s.tag) + ' · ' + esc(s.address || s.district || 'Endereço não informado') + '</p></div>' +
-      '<div class="detail-kpis"><div><small>Ordens executadas</small><b>' + num(n.done) + '</b></div><div><small>Aderência ao plano</small><b>' + pct(a.rate) + '</b></div><div><small>Ordens no período</small><b>' + num(n.total) + '</b></div></div>' +
-      '<dl class="order-info">' +
+      '<div class="detail-kpis plant-summary"><div><small>Ordens executadas</small><b>' + num(n.done) + '</b></div><div><small>Aderência ao plano</small><b>' + pct(a.rate) + '</b></div><div><small>Ordens no período</small><b>' + num(n.total) + '</b></div></div>' +
+      plantInventory(s) + '<details class="plant-location"><summary>Cadastro e localização</summary><dl class="order-info">' +
       field('Situação operacional', s.status) +
       field('Criticidade', s.critical) +
       field('Tipo de manutenção', P.typeLabel(s.type)) +
       field('Latitude', s.lat) +
       field('Longitude', s.lng) +
       field('Bairro', s.district) +
-      '</dl>' + photo +
+      '</dl>' + photo + '</details>' +
       '<h3 class="detail-section">Itens, Causas e Medidas</h3><div class="detail-grid">' + blocks + '</div>' +
       '<h3 class="detail-section">Ordens mais recentes no período</h3><div class="table-wrap">' + table([...source].sort((a, b) => (b.created || '').localeCompare(a.created || '')).slice(0, 50)) + '</div>',
       'INSTALAÇÃO · ÁGUAS DE TERESINA'
@@ -1019,7 +1048,7 @@
     ).join('');
     const report = '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Visão dos Sistemas · Águas de Teresina</title><style>' +
       '@page{size:A4 landscape;margin:12mm}*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#10234f;font-size:9px;line-height:1.35;margin:0}header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #0027bd;padding-bottom:9px;margin-bottom:12px}h1{font-size:21px;margin:0 0 3px;color:#0027bd}h2{font-size:13px;margin:14px 0 6px;color:#0027bd}.eyebrow{font-size:8px;letter-spacing:1.1px;text-transform:uppercase;color:#087f99;font-weight:700}.muted{color:#657594;font-size:8px}.logo{max-height:25px;max-width:155px}.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin:10px 0 13px}.kpi{border:1px solid #d7e1f2;border-radius:6px;padding:7px;background:#f7f9fd}.kpi span{display:block;color:#536585;font-size:8px;text-transform:uppercase}.kpi strong{display:block;font-size:17px;color:#0027bd;margin-top:3px}.columns{display:grid;grid-template-columns:1.25fr 1fr;gap:12px}.box{border:1px solid #d7e1f2;border-radius:6px;padding:9px}.box h2{margin-top:0}table{width:100%;border-collapse:collapse;margin-top:5px;font-size:8px}th{background:#eef3ff;color:#536585;text-align:left;text-transform:uppercase;font-size:7px;padding:5px}td{border-bottom:1px solid #e5eaf2;padding:5px;vertical-align:top}footer{border-top:1px solid #d7e1f2;margin-top:14px;padding-top:7px;color:#536585;font-size:8px}@media print{thead{display:table-header-group}tr{break-inside:avoid}.box{break-inside:avoid}}' +
-      '</style></head><body><header><div><div class="eyebrow">PCM · VISÃO EXECUTIVA</div><h1>Visão dos sistemas</h1><div class="muted">Águas de Teresina · Entrada: ' + esc(period) + '</div><div class="muted">Gerado em ' + esc(generated) + '</div></div><img class="logo" src="../aegea-assets/aguas-de-teresina-azul.png" alt="Águas de Teresina"></header>' +
+      '</style></head><body><header><div><div class="eyebrow">PCM · VISÃO EXECUTIVA</div><h1>Visão dos sistemas</h1><div class="muted">Águas de Teresina · Entrada: ' + esc(period) + '</div><div class="muted">Gerado em ' + esc(generated) + '</div></div><img class="logo" src="assets/aguas-de-teresina-azul.png" alt="Águas de Teresina"></header>' +
       '<div class="kpis"><div class="kpi"><span>Ordens no período</span><strong>' + num(stats.total) + '</strong></div><div class="kpi"><span>Executadas</span><strong>' + num(stats.done) + '</strong></div><div class="kpi"><span>Em aberto</span><strong>' + num(stats.open) + '</strong></div><div class="kpi"><span>Não executadas</span><strong>' + num(stats.notdone) + '</strong></div><div class="kpi"><span>Aderência ao plano</span><strong>' + pct(adherence.rate) + '</strong></div></div>' +
       '<section class="box"><h2>Desempenho por instalação</h2><table><thead><tr><th>Instalação</th><th>Ordens</th><th>Executadas</th><th>Em aberto</th><th>Aderência</th><th>Vencidas</th></tr></thead><tbody>' + (systemRows || '<tr><td colspan="6">Sem instalações no recorte.</td></tr>') + '</tbody></table></section>' +
       '<div class="columns"><section class="box"><h2>Evolução mensal</h2><table><thead><tr><th>Mês</th><th>Ordens</th><th>Executadas</th><th>Execução</th></tr></thead><tbody>' + (monthRows || '<tr><td colspan="4">Sem registros.</td></tr>') + '</tbody></table></section><section class="box"><h2>Distribuição por tipo de manutenção</h2><table><thead><tr><th>Tipo</th><th>Ordens</th><th>Executadas</th><th>Execução</th></tr></thead><tbody>' + (typeRows || '<tr><td colspan="4">Sem registros.</td></tr>') + '</tbody></table></section></div>' +
@@ -1063,7 +1092,7 @@
     const assetHtml = assetList.map(([asset, count]) => '<li><span>' + esc(asset) + '</span><b>' + num(count) + '</b></li>').join('');
     const report = '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Relatório de Paradas · Águas de Teresina</title><style>' +
       '@page{size:A4;margin:14mm}*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#10234f;font-size:10px;line-height:1.35;margin:0}header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #0027bd;padding-bottom:10px;margin-bottom:14px}h1{font-size:22px;margin:0 0 3px;color:#0027bd}h2{font-size:14px;margin:18px 0 8px;color:#0027bd}.eyebrow{font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:#087f99;font-weight:700}.meta{color:#536585;font-size:9px}.logo{max-height:26px;max-width:160px}.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin:12px 0 16px}.kpi{border:1px solid #d7e1f2;border-radius:6px;padding:8px;background:#f7f9fd}.kpi span{display:block;color:#536585;font-size:8px;text-transform:uppercase}.kpi strong{display:block;font-size:18px;color:#0027bd;margin-top:3px}.columns{display:grid;grid-template-columns:1fr 1fr;gap:14px}.box{border:1px solid #d7e1f2;border-radius:6px;padding:10px}.box h2{margin-top:0}.list{padding:0;margin:0;list-style:none}.list li{display:flex;justify-content:space-between;border-bottom:1px solid #edf1f7;padding:5px 0}.list li:last-child{border-bottom:0}table{width:100%;border-collapse:collapse;margin-top:6px;font-size:9px}th{background:#eef3ff;color:#536585;text-align:left;text-transform:uppercase;font-size:8px;padding:6px}td{border-bottom:1px solid #e5eaf2;padding:6px;vertical-align:top}footer{border-top:1px solid #d7e1f2;margin-top:18px;padding-top:8px;color:#536585;font-size:8px}@media print{thead{display:table-header-group}tr{break-inside:avoid}.box{break-inside:avoid}}' +
-      '</style></head><body><header><div><div class="eyebrow">PCM · CONFIABILIDADE OPERACIONAL</div><h1>Relatório de Paradas</h1><div class="meta">Águas de Teresina · Período de entrada: ' + esc(period) + '</div><div class="meta">Gerado em ' + esc(generated) + '</div></div><img class="logo" src="../aegea-assets/aguas-de-teresina-azul.png" alt="Águas de Teresina"></header>' +
+      '</style></head><body><header><div><div class="eyebrow">PCM · CONFIABILIDADE OPERACIONAL</div><h1>Relatório de Paradas</h1><div class="meta">Águas de Teresina · Período de entrada: ' + esc(period) + '</div><div class="meta">Gerado em ' + esc(generated) + '</div></div><img class="logo" src="assets/aguas-de-teresina-azul.png" alt="Águas de Teresina"></header>' +
       '<div class="kpis"><div class="kpi"><span>Paradas identificadas</span><strong>' + num(records.length) + '</strong></div><div class="kpi"><span>Paradas confirmadas</span><strong>' + num(confirmed) + '</strong></div><div class="kpi"><span>Plantas atingidas</span><strong>' + num(new Set(records.map(record => record.tag)).size) + '</strong></div><div class="kpi"><span>Ativos envolvidos</span><strong>' + num(new Set(records.map(record => record.asset)).size) + '</strong></div></div>' +
       '<div class="columns"><section class="box"><h2>Pareto de motivos</h2><ul class="list">' + (reasonHtml || '<li>Sem registros</li>') + '</ul></section><section class="box"><h2>Pareto de ativos</h2><ul class="list">' + (assetHtml || '<li>Sem registros</li>') + '</ul></section></div>' +
       '<h2>Detalhamento por ano, planta, ativo e motivo</h2><table><thead><tr><th>Ano</th><th>Planta</th><th>Ativo</th><th>Motivo</th><th>Paradas</th><th>Confirmadas</th></tr></thead><tbody>' + (rowsHtml || '<tr><td colspan="6">Sem registros para os filtros selecionados.</td></tr>') + '</tbody></table>' +
@@ -1172,6 +1201,23 @@
   function bind() {
     $('#from').value = f.from;
     $('#to').value = f.to;
+    if (window.PCM_INVENTORY) {
+      $('#inventoryUnit').innerHTML += window.PCM_INVENTORY.units.map(unit => '<option value="' + unit.id + '">' + esc(unit.name) + '</option>').join('');
+      $('#inventoryUnit').onchange = event => {
+        const unit = window.PCM_INVENTORY.units.find(unit => unit.id === event.target.value);
+        $('#inventoryBody').innerHTML = unit ? inventoryHTML(unit) : '';
+      };
+      document.addEventListener('click', event => {
+        if (!event.target.closest('[data-open-inventory]')) return;
+        openDetail('<div class="detail-heading"><h2>Equipamentos das plantas</h2></div><div class="inventory-browser">' + inventoryPicker() + '</div>', 'LEVANTAMENTO PRELIMINAR · TERESINA');
+        $('#detailInventoryUnit').focus();
+      });
+      document.addEventListener('change', event => {
+        if (event.target.id !== 'detailInventoryUnit') return;
+        const unit = window.PCM_INVENTORY.units.find(unit => unit.id === event.target.value);
+        $('#detailInventoryBody').innerHTML = unit ? inventoryHTML(unit) : '';
+      });
+    }
     $$('[data-page]').forEach(b => b.onclick = () => setPage(b.dataset.page));
     $$('[data-go]').forEach(b => b.onclick = () => setPage(b.dataset.go));
     $$('.preset-btn').forEach(b => b.onclick = () => applyPeriodPreset(b.dataset.preset));
@@ -1210,17 +1256,17 @@
     document.addEventListener('input', event => {
       const search = event.target.closest('[data-filter-search]');
       if (!search) return;
-      const query = search.value.trim().toLocaleLowerCase('pt-BR');
+      const query = P.headerKey(search.value);
       const options = $(filterLabels[search.dataset.filterSearch].options);
       options.querySelectorAll('.filter-option').forEach(option => {
-        option.hidden = !option.dataset.filterLabel.includes(query);
+        option.hidden = !P.headerKey(option.dataset.filterLabel).includes(query);
       });
     });
 
     document.addEventListener('click', event => {
       const action = event.target.closest('[data-filter-action]');
       if (!action) return;
-      const { key } = action.dataset;
+      const key = action.dataset.filterKey;
       const options = $(filterLabels[key].options);
       f[key] = action.dataset.filterAction === 'all'
         ? [...options.querySelectorAll('.filter-check')].map(input => input.value)

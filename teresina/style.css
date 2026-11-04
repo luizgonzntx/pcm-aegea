@@ -1,12 +1,12 @@
 @font-face {
   font-family: Aegea;
-  src: url('../aegea-assets/AEGEASans-Regular.otf') format('opentype');
+  src: url('assets/AEGEASans-Regular.otf') format('opentype');
   font-weight: 400;
   font-display: swap;
 }
 @font-face {
   font-family: Aegea;
-  src: url('../aegea-assets/AEGEASans-Bold.otf') format('opentype');
+  src: url('assets/AEGEASans-Bold.otf') format('opentype');
   font-weight: 700;
   font-display: swap;
 }
@@ -151,7 +151,7 @@ small, .small-note {
 }
 
 .access-art {
-  background: var(--blue) url('../aegea-assets/aegea-fundo-azul.png') center/cover;
+  background: var(--blue) url('assets/aegea-fundo-azul.png') center/cover;
   color: white;
   min-height: 100vh;
   padding: 52px 64px;
@@ -246,13 +246,6 @@ small, .small-note {
   border-top: 1px solid rgba(255, 255, 255, 0.16);
 }
 
-.access-regional-logo {
-  height: 26px;
-  width: auto;
-  object-fit: contain;
-  align-self: flex-start;
-  opacity: 0.92;
-}
 
 .access-art small {
   color: #d6e4ff;
@@ -479,16 +472,6 @@ small, .small-note {
   box-shadow: none;
 }
 
-.sidebar-regional {
-  width: 100%;
-  max-width: 195px;
-  height: auto;
-  object-fit: contain;
-  opacity: 0.72;
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.14);
-}
 
 .live-dot {
   display: inline-block;
@@ -2870,4 +2853,77 @@ section[data-view]:not([hidden]) {
   .section-intro h2 {
     font-size: 20px;
   }
+}
+
+/* Controles de acesso e levantamento das plantas. */
+.password-field {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  overflow: hidden;
+}
+.password-field:focus-within { outline: 2px solid #0039a655; outline-offset: 2px; }
+.password-field input { flex: 1; width: 0; min-width: 0; border: 0; margin: 0; outline: none; }
+.password-field .password-toggle {
+  width: auto;
+  margin: 0;
+  padding: 10px 12px;
+  border: 0;
+  border-left: 1px solid var(--line);
+  border-radius: 0;
+  color: var(--blue);
+  font-size: 12px;
+  align-items: center;
+  font-weight: 700;
+}
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.inventory-overview { margin-bottom: 20px; }
+.inventory-overview > summary { cursor: pointer; padding: 18px 20px; font-size: 15px; font-weight: 700; color: var(--navy); }
+.inventory-overview > summary .badge { margin-left: 8px; vertical-align: middle; }
+.inventory-overview > summary:focus-visible { outline: 3px solid var(--turquoise); outline-offset: -3px; }
+.inventory-browser { padding: 0 20px 20px; }
+.inventory-browser > label { display: block; font-weight: 700; margin: 14px 0 6px; }
+.inventory-browser > select { width: min(100%, 420px); min-height: 44px; }
+.inventory-source { margin: 16px 0; border-left: 3px solid var(--blue); padding: 10px 14px; background: #f1f5fb; font-size: 12px; color: var(--muted); }
+.inventory-section { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin: 14px 0; }
+.inventory-section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; padding: 13px 16px; background: #f4f7fc; }
+.inventory-section-head h4 { margin: 0; font-size: 14px; color: var(--navy); }
+.inventory-section-head > span { color: var(--muted); font-size: 12px; }
+.inventory-section-head b { color: var(--ink); }
+.inventory-table-wrap { overflow-x: auto; }
+.inventory-table { width: 100%; min-width: 580px; border-collapse: collapse; table-layout: auto; }
+.inventory-table th, .inventory-table td { padding: 11px 14px; text-align: center; width: auto; white-space: normal; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.inventory-table th { background: white; font-size: 11px; color: var(--muted); text-transform: none; }
+.inventory-table th:first-child, .inventory-table td:first-child { text-align: left; }
+.inventory-table tr:last-child td { border-bottom: 0; }
+.inventory-value { display: inline-block; min-width: 30px; padding: 4px 7px; border-radius: 5px; background: #f0f2f5; }
+.inventory-value.has-reserve { background: #e7f6f0; color: #08664c; font-weight: 700; }
+.inventory-value.in-maintenance { background: #fff0d1; color: #815009; font-weight: 700; }
+.plant-inventory > .small-note { margin: 12px 0; }
+@media (max-width: 640px) {
+  .inventory-overview > summary { padding: 16px; }
+  .inventory-overview > summary .badge { display: block; width: fit-content; margin: 8px 0 0; }
+  .inventory-browser { padding: 0 14px 16px; }
+  .inventory-table { min-width: 0; }
+  .inventory-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .inventory-table tbody { display: block; }
+  .inventory-table tr { display: grid; grid-template-columns: 1fr 1fr; padding: 12px; gap: 8px 12px; border-bottom: 1px solid var(--line); }
+  .inventory-table tr:last-child { border: 0; }
+  .inventory-table td { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0; border: 0; text-align: right; font-size: 12px; }
+  .inventory-table td::before { content: attr(data-label); color: var(--muted); text-align: left; font-size: 11px; }
+  .inventory-table td:first-child { grid-column: 1 / -1; font-weight: 700; font-size: 14px; padding-bottom: 5px; }
+  .inventory-table td:first-child::before { display: none; }
+  .inventory-section-head { padding: 12px; }
+}
+.plant-location { margin-top: 20px; border-top: 1px solid var(--line); padding-top: 16px; }
+.plant-location > summary { cursor: pointer; font-weight: 700; color: var(--blue); padding: 6px 0; }
+@media (max-width: 640px) {
+  .detail-kpis.plant-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .plant-summary > div { padding: 12px 9px; }
+  .plant-summary small { font-size: 10px; }
+  .plant-summary b { font-size: 22px; }
 }
