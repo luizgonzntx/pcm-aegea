@@ -34,15 +34,6 @@ jobs:
           node teresina/test-core.cjs
           bash scripts/build-cloudflare-pages.sh
           node scripts/check-static.cjs
-      - name: Identify configured secret names
-        env:
-          CONFIGURED_SECRETS: ${{ toJSON(secrets) }}
-        run: |
-          python3 - <<'PYTHON'
-          import json, os
-          names = sorted(name for name in json.loads(os.environ['CONFIGURED_SECRETS']) if name != 'GITHUB_TOKEN')
-          print('::notice title=Available secret names::' + (', '.join(names) or 'No custom secrets are available to this job.'))
-          PYTHON
       - name: Check Cloudflare secret bindings
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN }}
