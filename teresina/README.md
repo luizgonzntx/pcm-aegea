@@ -102,3 +102,11 @@ A numeração inicial é ignorada (ex.: “1 - ETA Sul”). Nomes completos de s
 “Mat.” foi confirmado como **Em manutenção**. A potência (CV) pertence à seção, não a cada linha de equipamento.
 A notação de projeto (ex.: `3+2`), as divergências de quantidades e os campos ausentes foram preservados. Não são calculados totais ou disponibilidade a partir dessas quantidades.
 A numeração repetida da imagem não é usada como identificador. Atualizações deste levantamento devem ser feitas no arquivo; a importação das cinco planilhas operacionais continua separada.
+
+## Publicação de produção no Cloudflare
+
+O site de produção é https://pcm-aegea-teresina.pages.dev/.
+O workflow `.github/workflows/deploy-cloudflare.yml` publica alterações de `main` e também permite execução manual pelo GitHub Actions.
+Ele valida o painel, gera `dist/`, publica no projeto `pcm-aegea-teresina` e compara os arquivos servidos com o build do commit.
+Usa os secrets de repositório `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID` (também aceita `CF_API_TOKEN` e `CF_ACCOUNT_ID`). Os valores permanecem no GitHub; não devem ser colocados no código.
+O token deve ter permissão de edição do Cloudflare Pages na conta do projeto existente.
