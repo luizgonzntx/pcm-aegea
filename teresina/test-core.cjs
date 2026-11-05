@@ -65,77 +65,79 @@ assert.deepEqual(
 );
 assert.equal(P.flaggedStopOrders(normalized,{from:'2026-01-01',to:'2026-01-31',asset:['A1'],type:['ZTPF'],priority:['Necessário']})[0].count,5);
 assert.equal(P.flaggedStopOrders(normalized,{from:'2026-01-01',to:'2026-01-31',priority:['Emergência']}).length,0);
-const reliability=P.reliabilityByPlant({
- ...normalized,
- orders:normalized.orders.map(order=>({...order,type:'ZNTE'}))
-},{from:'2026-01-01',to:'2026-01-31'});
-assert.equal(reliability.length,1);
-assert.equal(reliability[0].events,2);
-assert.equal(reliability[0].mtbfHours,93);
-assert.equal(reliability[0].mttrHours,1.75);
-assert.equal(reliability[0].availability,93/(93+1.75));
-assert.equal(reliability[0].closed,2);
-assert.equal(reliability[0].incomplete,0);
-const statusValidatedReliability=P.reliabilityByPlant({
+
+assert.equal(P.kind(['Ordem','Operação','ID SAP','Trabalho real']),'workLogs');
+assert.equal(P.canonicalHeader('Criado as'),'Criado às');
+assert.equal(P.canonicalHeader('Ínício da avaria (hora)'),'Início da avaria (hora)');
+const metricsData={
  orders:[
-  o('completed1',{status:'ENTE',type:'ZNTE',start:'2026-02-01'}),
-  o('completed2',{status:'ENTE',type:'ZNTP',start:'2026-02-01'}),
-  o('open',{status:'ABER',type:'ZNTP'}),
-  o('cancelled',{status:'ENCE',type:'ZNTE'}),
-  o('preventive',{status:'ENTE',type:'ZTPF'}),
-  o('notFlagged',{status:'ENTE',type:'ZNTE'})
+  o('100',{asset:'A1',type:'ZNTE',status:'ENTE',start:'2026-01-01',startTime:'10:00:00',date:'2026-01-01',referenceTime:'12:00:00'}),
+  o('101',{asset:'A1',type:'ZNTE',status:'ENTE',start:'2026-01-03',startTime:'09:00:00',date:'2026-01-03',referenceTime:'10:00:00'}),
+  o('102',{asset:'A2',type:'ZNTP',status:'ENTE',start:'2026-01-03',startTime:'11:00:00',date:'2026-01-03',referenceTime:'12:00:00'}),
+  o('103',{asset:'A1',type:'ZNTE',status:'ABER',start:'2026-01-03',startTime:'11:00:00',date:'2026-01-03',referenceTime:'13:00:00'}),
+  o('104',{asset:'A1',type:'ZTPF',status:'ENTE',start:'2026-01-04',startTime:'09:00:00',date:'2026-01-04',referenceTime:'10:00:00'})
  ],
  stoppageNotes:[
-  {order:'completed1',flag:'X',tag:'T1',startDate:'2026-01-01',startTime:'01:00:00',endDate:'2026-01-01',endTime:'03:00:00'},
-  {order:'completed2',flag:'X',tag:'T1',startDate:'2026-01-03',startTime:'01:00:00',endDate:'2026-01-03',endTime:'05:00:00'},
-  {order:'open',flag:'X',tag:'T1',startDate:'2026-01-02',startTime:'01:00:00',endDate:'2026-01-02',endTime:'10:00:00'},
-  {order:'cancelled',flag:'X',tag:'T1',startDate:'2026-01-03',startTime:'01:00:00',endDate:'2026-01-03',endTime:'04:00:00'},
-  {order:'preventive',flag:'X',tag:'T1',startDate:'2026-01-04',startTime:'01:00:00',endDate:'2026-01-04',endTime:'06:00:00'},
-  {order:'notFlagged',flag:'',tag:'T1',startDate:'2026-01-05',startTime:'01:00:00',endDate:'2026-01-05',endTime:'06:00:00'}
- ]
-},{from:'2026-01-01',to:'2026-01-31'});
-assert.equal(statusValidatedReliability[0].events,2);
-assert.equal(statusValidatedReliability[0].mtbfHours,48);
-assert.equal(statusValidatedReliability[0].mttrHours,3);
-assert.equal(statusValidatedReliability[0].closed,2);
-assert.equal(statusValidatedReliability[0].incomplete,0);
-const assetReliability=P.reliabilityByAsset({
- orders:[
-  o('a1',{asset:'A1',equipment:'Bomba A',type:'ZNTE',status:'ENTE'}),
-  o('a2',{asset:'A1',equipment:'Bomba A',type:'ZNTP',status:'ENTE'}),
-  o('b1',{asset:'A2',equipment:'Bomba B',type:'ZNTE',status:'ENTE'}),
-  o('b2',{asset:'A2',equipment:'Bomba B',type:'ZNTP',status:'ENTE'}),
-  o('unknown',{asset:'',type:'ZNTE',status:'ENTE'})
+  {order:'100',tag:'T1',asset:'A1',flag:'X',noteType:'CE',date:'2026-01-01',createdTime:'08:00:00'},
+  {order:'100',tag:'T1',asset:'A1',flag:'X',noteType:'CE',date:'2026-01-01',createdTime:'09:00:00'},
+  {order:'101',tag:'T1',asset:'A1',flag:'X',noteType:'CE',date:'2026-01-03',createdTime:'08:00:00'},
+  {order:'102',tag:'T1',asset:'A2',flag:'X',noteType:'CP',date:'2026-01-03',createdTime:'10:00:00'},
+  {order:'103',tag:'T1',asset:'A1',flag:'X',noteType:'CE',date:'2026-01-03',createdTime:'10:00:00'},
+  {order:'104',tag:'T1',asset:'A1',flag:'X',noteType:'CE',date:'2026-01-04',createdTime:'08:00:00'}
  ],
- stoppageNotes:[
-  {order:'a1',flag:'X',tag:'T1',startDate:'2026-01-01',startTime:'00:00:00',endDate:'2026-01-01',endTime:'02:00:00'},
-  {order:'a2',flag:'X',tag:'T1',startDate:'2026-01-02',startTime:'00:00:00',endDate:'2026-01-02',endTime:'04:00:00'},
-  {order:'b1',flag:'X',tag:'T1',startDate:'2026-01-01',startTime:'00:00:00',endDate:'2026-01-01',endTime:'01:00:00'},
-  {order:'b2',flag:'X',tag:'T1',startDate:'2026-01-03',startTime:'00:00:00',endDate:'2026-01-03',endTime:'03:00:00'},
-  {order:'unknown',flag:'X',tag:'T1',startDate:'2026-01-04',startTime:'00:00:00',endDate:'2026-01-04',endTime:'01:00:00'}
+ workLogs:[
+  {order:'100',operation:'0010',worker:'TECNICO1',hours:1},
+  {order:'100',operation:'0010',worker:'TECNICO2',hours:1},
+  {order:'100',operation:'0020',worker:'TECNICO1',hours:2},
+  {order:'100',operation:'0030',worker:'TECNICO2',hours:2},
+  {order:'101',operation:'0010',worker:'TECNICO1',hours:0.5},
+  {order:'101',operation:'0020',worker:'TECNICO1',hours:1.5},
+  {order:'102',operation:'0020',worker:'TECNICO2',hours:1},
+  {order:'100',operation:'0020',worker:'',hours:100}
  ]
+};
+const evt=P.maintenanceEvents(metricsData,{from:'2026-01-01',to:'2026-01-31'});
+assert.equal(evt.length,3); // Uma ordem não é duplicada por ter duas notas.
+const first=evt.find(v=>v.order.id==='100');
+assert.equal(first.attributionHours,2);
+assert.equal(first.mttrHours,2);
+assert.equal(first.stopHours,4);
+assert.equal(first.travelPeople,2);
+assert.equal(first.executionPeople,2);
+assert.equal(first.travelHours,1);
+assert.equal(first.executionHours,2);
+assert.equal(first.attendanceHours,3);
+const rel=P.reliabilityByPlant(metricsData,{from:'2026-01-01',to:'2026-01-31'});
+assert.equal(rel.length,1);
+assert.equal(rel[0].events,3);
+assert.equal(rel[0].closed,3);
+assert.equal(rel[0].mttrHours,4/3);
+assert.equal(rel[0].attributionHours,4/3);
+assert.equal(rel[0].stopHours,8/3);
+assert.equal(rel[0].travelHours,0.75);
+assert.equal(rel[0].executionHours,1.5);
+assert.equal(rel[0].attendanceHours,2.25);
+assert.equal(rel[0].mtbfHours,44); // Somente CE no mesmo ativo: 01/01 12h → 03/01 08h.
+assert.equal(rel[0].intervals,1);
+const byAsset=P.reliabilityByAsset(metricsData,{from:'2026-01-01',to:'2026-01-31'});
+assert.equal(byAsset.length,2);
+assert.equal(byAsset.find(v=>v.asset==='A1').mtbfHours,44);
+assert.equal(byAsset.find(v=>v.asset==='A2').mtbfHours,null);
+const withoutClock=P.reliabilityByPlant({
+ orders:[o('single',{type:'ZNTE',status:'ENTE',start:'2026-01-01',startTime:'10:00:00',date:'2026-01-01',referenceTime:'12:00:00'})],
+ stoppageNotes:[{order:'single',flag:'X',date:'2026-01-01',tag:'T1',asset:'A1',noteType:'CE'}]
 },{from:'2026-01-01',to:'2026-01-31'});
-assert.equal(assetReliability.length,2);
-assert.equal(assetReliability[0].asset,'A1');
-assert.equal(assetReliability[0].mtbfHours,24);
-assert.equal(assetReliability[0].mttrHours,3);
-assert.equal(assetReliability[0].availability,24/(24+3));
-assert.equal(assetReliability[1].asset,'A2');
-assert.equal(assetReliability[1].mtbfHours,48);
-assert.equal(assetReliability[1].mttrHours,2);
-assert.equal(assetReliability[1].availability,48/(48+2));
-assert.deepEqual(P.reliabilityByAsset({
- orders:[o('a1',{asset:'A1',type:'ZNTE',status:'ENTE'}),o('a2',{asset:'A2',type:'ZNTP',status:'ENTE'})],
- stoppageNotes:[
-  {order:'a1',flag:'X',tag:'T1',asset:'A1',startDate:'2026-01-01',startTime:'00:00:00',endDate:'2026-01-01',endTime:'01:00:00'},
-  {order:'a2',flag:'X',tag:'T1',asset:'A2',startDate:'2026-01-01',startTime:'00:00:00',endDate:'2026-01-01',endTime:'01:00:00'}
- ]
-},{from:'2026-01-01',to:'2026-01-31',asset:['A2']}).map(item=>item.asset),['A2']);
-const availabilityWithoutMtbf=P.reliabilityByPlant({
- orders:[o('single',{type:'ZNTE',status:'ENTE'})],
- stoppageNotes:[{order:'single',flag:'X',startDate:'2026-01-01',startTime:'00:00:00',endDate:'2026-01-01',endTime:'01:00:00',tag:'T1'}]
+assert.equal(withoutClock[0].mttrHours,2);
+assert.equal(withoutClock[0].attributionHours,null);
+assert.equal(withoutClock[0].stopHours,null);
+assert.equal(withoutClock[0].mtbfHours,null);
+const overnight=P.reliabilityByPlant({
+ orders:[o('overnight',{type:'ZNTE',status:'ENTE',start:'2026-01-31',startTime:'23:30:00',date:'2026-02-01',referenceTime:'01:30:00'})],
+ stoppageNotes:[{order:'overnight',flag:'X',date:'2026-01-31',createdTime:'23:00:00',tag:'T1',noteType:'CE'}]
 },{from:'2026-01-01',to:'2026-01-31'});
-assert.equal(availabilityWithoutMtbf[0].availability,null);
+assert.equal(overnight[0].mttrHours,2);
+assert.equal(overnight[0].attributionHours,0.5);
+assert.equal(overnight[0].stopHours,2.5);
 const t=P.timing([o('1',{due:'2026-01-11',finished:'2026-01-10'}),o('2',{due:'2026-01-10',finished:'2026-01-12'}),o('3',{status:'ABER',due:'2026-01-01'}),o('4')],'2026-01-15');
 assert.equal(t.onTime,1);assert.equal(t.late,1);assert.equal(t.overdue,1);assert.equal(t.unassessed,1);
 const filtered=P.filter(data,f);

@@ -494,11 +494,32 @@
     const plantReliabilityRanking = [...reliability].sort((a, b) =>
       (b.availability ?? -1) - (a.availability ?? -1) || a.plant.localeCompare(b.plant, 'pt-BR')
     );
+
+    const weighted = (key,countKey) => {
+      const count = reliability.reduce((sum,item)=>sum+(item[countKey]||0),0);
+      return count ? reliability.reduce((sum,item)=>sum+(item[key]||0)*(item[countKey]||0),0)/count : null;
+    };
+    const allTravel=weighted('travelHours','travelCount'),allExecution=weighted('executionHours','executionCount');
+    $('#maintenanceKpis').innerHTML =
+      kpi('Tempo médio de atribuição',duration(weighted('attributionHours','attributionCount')),'Criação da nota → início real','#0027bd') +
+      kpi('Tempo médio de deslocamento',duration(weighted('travelHours','travelCount')),'Apontamento operação 0010','#c2780c') +
+      kpi('Tempo médio de execução',duration(weighted('executionHours','executionCount')),'Demais operações por técnico','#0f8a68') +
+      kpi('Tempo médio de atendimento',duration(allTravel!=null&&allExecution!=null?allTravel+allExecution:null),'Deslocamento + execução, por OS','#0027bd') +
+      kpi('MTTR técnico',duration(weighted('mttrHours','closed')),'Início real → referência SAP','#c43650');
+    $('#maintenanceTable').innerHTML = reliability.length
+      ? '<table><thead><tr><th>Planta / TAG</th><th>Paradas CE/CP</th><th>Atribuição média</th><th>Deslocamento médio</th><th>Execução média</th><th>Atendimento médio</th><th>MTTR técnico</th><th>Parada total média</th></tr></thead><tbody>' +
+        [...reliability].sort((a,b)=>b.events-a.events||a.plant.localeCompare(b.plant,'pt-BR')).map(item=>
+          '<tr><td><b>'+esc(item.plant)+'</b><br><span class="small-note">'+esc(item.tag)+'</span></td>' +
+          '<td>'+num(item.events)+'</td><td>'+duration(item.attributionHours)+'</td>' +
+          '<td>'+duration(item.travelHours)+'</td><td>'+duration(item.executionHours)+'</td>' +
+          '<td>'+duration(item.attendanceHours)+'</td><td>'+duration(item.mttrHours)+'</td><td>'+duration(item.stopHours)+'</td></tr>'
+        ).join('')+'</tbody></table>'
+      : emptyHTML;
     $('#reliabilitySummary').innerHTML =
-      kpi('Avarias encerradas tecnicamente', num(reliabilityEvents), 'Ordens ZNTP/ZNTE com Parada = X e início válido', '#c43650') +
-      kpi('Reparos com duração válida', num(reliabilityClosed), 'Ordens com início e fim da avaria válidos', '#0f8a68');
+      kpi('Avarias encerradas tecnicamente', num(reliabilityEvents), 'Ordens CE/CP com Parada = X e ENTE', '#c43650') +
+      kpi('Reparos com duração válida', num(reliabilityClosed), 'Ordens com início real e referência SAP válidos', '#0f8a68');
     $('#reliabilityTable').innerHTML = plantReliabilityRanking.length
-      ? '<div class="reliability-ranking"><table class="reliability-ranking-table"><thead><tr><th>Rank</th><th>Planta</th><th>Avarias consideradas</th><th>MTBF médio</th><th>Intervalos</th><th>MTTR médio</th><th>Reparos válidos</th><th>Disponibilidade</th></tr></thead><tbody>' +
+      ? '<div class="reliability-ranking"><table class="reliability-ranking-table"><thead><tr><th>Rank</th><th>Planta</th><th>Avarias consideradas</th><th>MTBF médio</th><th>Intervalos</th><th>MTTR técnico</th><th>Reparos válidos</th><th>Disponibilidade</th></tr></thead><tbody>' +
         plantReliabilityRanking.map((item, index) =>
           '<tr><td><span class="reliability-rank">' + (index + 1) + '</span></td>' +
           '<td><b>' + esc(item.plant) + '</b><br><span class="small-note">' + esc(item.tag) + '</span></td>' +
@@ -519,10 +540,10 @@
     const assetReliabilityClosed = assetReliability.reduce((sum, item) => sum + item.closed, 0);
     $('#assetReliabilitySummary').innerHTML =
       kpi('Ativos com avaria registrada', num(assetReliability.length), 'Ordens ZNTP/ZNTE agrupadas pela TAG do ativo', '#0027bd') +
-      kpi('Avarias encerradas tecnicamente', num(assetReliabilityEvents), 'Ordens ZNTP/ZNTE com Parada = X e início válido', '#c43650') +
-      kpi('Reparos com duração válida', num(assetReliabilityClosed), 'Ordens com início e fim da avaria válidos', '#0f8a68');
+      kpi('Avarias encerradas tecnicamente', num(assetReliabilityEvents), 'Ordens CE/CP com Parada = X e ENTE', '#c43650') +
+      kpi('Reparos com duração válida', num(assetReliabilityClosed), 'Ordens com início real e referência SAP válidos', '#0f8a68');
     $('#assetReliabilityTable').innerHTML = assetReliability.length
-      ? '<table><thead><tr><th>Ativo</th><th>Equipamento</th><th>Planta</th><th>Avarias consideradas</th><th>MTBF médio</th><th>Intervalos</th><th>MTTR médio</th><th>Reparos válidos</th><th>Disponibilidade</th></tr></thead><tbody>' +
+      ? '<table><thead><tr><th>Ativo</th><th>Equipamento</th><th>Planta</th><th>Avarias consideradas</th><th>MTBF médio</th><th>Intervalos</th><th>MTTR técnico</th><th>Reparos válidos</th><th>Disponibilidade</th></tr></thead><tbody>' +
         assetReliability.map(item =>
           '<tr><td><b>' + esc(item.asset) + '</b></td><td>' + esc(item.equipment || 'Não informado') + '</td>' +
           '<td>' + esc(item.plant) + '<br><span class="small-note">' + esc(item.tag) + '</span></td>' +
@@ -679,6 +700,7 @@
     if (!s) return;
     modalMode = 'system';
     const filter = { ...f, tag }, source = P.filter(data, filter), n = P.stats(source), a = P.adherence(data, filter);
+    const m=P.reliabilityByPlant(data,filter).find(row=>row.tag===tag);
     const blocks = [
       ['component', 'Itens que mais falharam'],
       ['cause', 'Causas registradas'],
@@ -696,7 +718,9 @@
       field('Longitude', s.lng) +
       field('Bairro', s.district) +
       '</dl>' + photo + '</details>' +
-      '<h3 class="detail-section">Itens, Causas e Medidas</h3><div class="detail-grid">' + blocks + '</div>' +
+      '<h3 class="detail-section">Tempos de manutenção · CE/CP + ENTE</h3>' +
+'<div class="detail-kpis plant-summary"><div><small>Atribuição média</small><b>'+formatHours(m?.attributionHours)+'</b></div><div><small>Deslocamento médio</small><b>'+formatHours(m?.travelHours)+'</b></div><div><small>Execução média</small><b>'+formatHours(m?.executionHours)+'</b></div><div><small>Atendimento médio</small><b>'+formatHours(m?.attendanceHours)+'</b></div><div><small>MTTR técnico</small><b>'+formatHours(m?.mttrHours)+'</b></div></div>' +
+'<h3 class="detail-section">Itens, Causas e Medidas</h3><div class="detail-grid">' + blocks + '</div>' +
       '<h3 class="detail-section">Ordens mais recentes no período</h3><div class="table-wrap">' + table([...source].sort((a, b) => (b.created || '').localeCompare(a.created || '')).slice(0, 50)) + '</div>',
       'INSTALAÇÃO · ÁGUAS DE TERESINA'
     );
@@ -707,6 +731,7 @@
     if (!o) return;
     modalMode = 'order';
     const items = data.items.filter(i => i.order === id), actions = data.actions.filter(i => i.order === id), s = data.systems.find(s => s.tag === o.tag);
+    const event=P.maintenanceEvents(data,{from:'',to:''}).find(e=>e.order.id===id);
     openDetail(
       '<div class="detail-heading"><h2>Ordem ' + esc(o.id) + '</h2><p>' + esc(o.text) + '</p></div>' +
       '<span class="badge ' + P.status(o) + '">' + P.labels[P.status(o)] + '</span>' +
@@ -716,7 +741,9 @@
       field('Equipamento', o.equipment) +
       field('Data de entrada', fmt(o.created)) +
       field('Data de referência', fmt(o.date)) +
-      field('Início real', fmt(o.start)) +
+      field('Início real', fmt(o.start)+(o.startTime?' '+o.startTime:'')) +
+      field('Horário de referência',o.referenceTime) +
+      (event ? field('Tempo de atribuição',formatHours(event.attributionHours)) + field('Deslocamento médio por profissional',formatHours(event.travelHours)) + field('Execução média por profissional',formatHours(event.executionHours)) + field('Tempo de atendimento',formatHours(event.attendanceHours)) + field('MTTR técnico',formatHours(event.mttrHours)) + field('Duração total da parada',formatHours(event.stopHours)) : '') +
       field('Prazo programado', fmt(o.due)) +
       field('Conclusão real', fmt(o.finished)) +
       field('Plano de manutenção', o.plan) +
@@ -896,7 +923,7 @@
     pending = null;
     $('#saveImport').hidden = true;
     const files = selectedFiles.length ? selectedFiles : [...$('#files').files];
-    if (files.length !== 5) return importMessage('Selecione exatamente cinco arquivos: sistemas, ordens, itens, medidas e notas de parada.', true);
+    if (![5,6].includes(files.length)) return importMessage('Selecione os cinco arquivos básicos e, opcionalmente, o sexto arquivo de apontamentos SAP.', true);
     if (files.some(f => !/\.xlsx$/i.test(f.name) || f.size > 25 * 1024 * 1024)) return importMessage('Use arquivos .xlsx de até 25 MB cada.', true);
     $('#validateImport').disabled = true;
     $('#files').disabled = true;
@@ -906,7 +933,7 @@
       importMessage('Preparando leitura das planilhas…');
       const buffers = await Promise.all(files.map(async file => ({ name: file.name, buffer: await file.arrayBuffer() })));
       const result = await new Promise((resolve, reject) => {
-        worker = new Worker('import-worker.js');
+        worker = new Worker('import-worker.js?v=20261105-1');
         const timeout = setTimeout(() => {
           worker.terminate();
           reject(Error('A leitura excedeu três minutos. Reduza o tamanho do conjunto.'));

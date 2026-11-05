@@ -11,10 +11,10 @@
   <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
   <script defer src="config.js"></script>
-  <script defer src="core.js"></script>
+  <script defer src="core.js?v=20261105-1"></script>
   <script defer src="inventory.js"></script>
   <script defer src="ui.js"></script>
-  <script defer src="app.js"></script>
+  <script defer src="app.js?v=20261105-1"></script>
 </head>
 <body>
   <div id="access" class="access">
@@ -141,7 +141,7 @@
         </div>
         <button id="clearFilters" class="clear-filters" title="Limpar filtros">Limpar filtros</button>
       </section>
-      <p class="filter-date-help">O período é aplicado conforme cada análise: data de entrada da ordem, referência do plano, data da nota ou início da avaria.</p>
+      <p class="filter-date-help">O período é aplicado conforme cada análise: data de entrada, referência do plano ou data da nota. Os tempos de manutenção usam os horários SAP informados.</p>
       <div id="activeFilters" class="active-filters" hidden>
         <span>Aplicados</span>
         <div id="activeFilterChips"></div>
@@ -155,7 +155,7 @@
       <section id="empty" class="empty" hidden>
         <span class="empty-icon">↥</span>
         <h2>Sua operação começa pelos dados.</h2>
-        <p>Importe os arquivos de sistemas, ordens, itens, medidas e notas de parada. Os indicadores, diagnósticos de confiabilidade e o mapa serão calculados a partir das suas planilhas.</p>
+        <p>Importe os arquivos de sistemas, ordens, itens, medidas, notas de parada e apontamentos SAP para obter todos os indicadores. Os indicadores, diagnósticos de confiabilidade e o mapa serão calculados a partir das suas planilhas.</p>
         <button id="emptyImport" class="primary" hidden>Importar primeiro conjunto</button>
       </section>
 
@@ -432,18 +432,29 @@
             <div class="card-top">
               <div>
                 <span class="eyebrow">CONFIABILIDADE POR PLANTA</span>
-                <h2>Ranking de disponibilidade, MTBF e MTTR</h2>
+                <h2>Indicadores de manutenção por TAG Planta</h2>
               </div>
             </div>
             <div id="reliabilitySummary" class="kpis"></div>
             <div id="reliabilityTable" class="table-wrap"></div>
           </article>
 
+
+          <article class="card" style="margin-bottom:20px">
+            <div class="card-top"><div>
+              <span class="eyebrow">TEMPOS SAP · POR TAG PLANTA</span>
+              <h2>Atribuição, deslocamento, execução e atendimento</h2>
+            </div></div>
+            <p class="small-note">Atribuição: criação da nota → início real. MTTR técnico: início real → referência SAP. Deslocamento: operação 0010; execução: demais operações, com horas por profissional distinto. "—" indica ausência de data/hora ou apontamento válido.</p>
+            <div id="maintenanceKpis" class="kpis"></div>
+            <div id="maintenanceTable" class="table-wrap"></div>
+          </article>
+
           <article class="card" style="margin-bottom:20px">
             <div class="card-top">
               <div>
                 <span class="eyebrow">CONFIABILIDADE POR ATIVO</span>
-                <h2>MTBF e MTTR por ativo</h2>
+                <h2>MTBF e MTTR por TAG Ativo</h2>
               </div>
             </div>
             <div id="assetReliabilitySummary" class="kpis"></div>
@@ -567,9 +578,9 @@
       <button id="closeImport" aria-label="Fechar">✕</button>
     </div>
     <h2>Uma base atualizada. Uma visão compartilhada.</h2>
-    <p>Selecione ou arraste os cinco arquivos Excel: <strong>sistemas</strong>, <strong>ordens</strong>, <strong>itens</strong>, <strong>medidas</strong> e <strong>notas de parada</strong>. O conjunto será validado antes de substituir a base.</p>
+    <p>Selecione os cinco arquivos básicos e, para os novos tempos, acrescente o sexto: <strong>apontamentos SAP</strong>. O conjunto será validado antes de substituir a base.</p>
     <label class="file-zone" id="dropZone">
-      <span class="file-zone-title">↑ Arraste as 5 planilhas (.xlsx) aqui ou clique para selecionar</span>
+      <span class="file-zone-title">↑ Arraste 5 ou 6 planilhas (.xlsx) aqui ou clique para selecionar</span>
       <input id="files" type="file" accept=".xlsx" multiple>
     </label>
     <div id="fileChecklist" class="file-checklist"></div>

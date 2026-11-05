@@ -16,10 +16,8 @@ supabase secrets set SUPABASE_SERVICE_ROLE_KEY='VALOR_DA_SERVICE_ROLE' --project
 supabase functions deploy admin-create-user --project-ref zvbkbjtajmdfrxonrhen
 ```
 O administrador deve compartilhar a senha inicial com o novo usuário por um canal seguro.
-O painel começa sem dados operacionais. Entre na área administrativa e importe os cinco arquivos XLSX (sistemas, ordens, itens, medidas e notas de parada) para realizar a primeira carga.
-As próximas importações substituem o conjunto completo, após validação e confirmação no painel.
-O conjunto é compartilhado entre os membros autorizados e fica no Supabase; não é incluído no repositório público.
-Se outra sessão atualizar a base entre a leitura e a gravação, a revisão impede sobrescrever essa alteração.
+O painel começa sem dados operacionais. Na área administrativa, importe os cinco arquivos básicos XLSX (sistemas, ordens, itens, medidas e notas de parada) e, para os indicadores de esforço, o sexto XLSX de apontamentos SAP. A importação antiga de cinco arquivos continua possível, mas não fornece tempo de deslocamento/execução.
+O conjunto é compartilhado entre os membros autorizados no Supabase e não é incluído no repositório público. A publicação substitui o conjunto completo após validação e confirmação. A revisão concorrente impede sobrescrever mudanças de outra sessão.
 
 ## Autorizar consulta
 Se necessário, autorize uma conta existente pelo SQL Editor do Supabase:
@@ -31,17 +29,16 @@ on conflict (user_id) do update set role = excluded.role;
 Para um segundo responsável por importações, use admin. Não conceda acesso às tabelas ao papel anon.
 
 ## Dados
-A exportação de ordens deve incluir:
-Ordem; TAG Planta; Centro; Data de referência; Dta.início real; Data de entrada; Status do sistema; Plano de manutenção; Tipo de ordem.
-Os campos opcionais Prazo programado e Conclusão real habilitam a avaliação de pontualidade.
-O arquivo de sistemas deve ter COD_INFORMACAO, NOME, COD_LATITUDE e COD_LONGITUDE.
-Itens: Ordem, Texto code causa, Texto code parte objeto, Texto de code para problema.
-Medidas: Ordem, Texto do código da medida.
-Notas de parada: Ordem, Data da nota, TAG Planta e Parada. A coluna `Parada` usa `X` para marcar ocorrências; Nota e Descrição são opcionais e mantidas para rastreabilidade.
-Para MTBF/MTTR, inclua também Início da avaria, Início da avaria (hora), Fim da avaria e Fim da avaria (hora). Esses campos são opcionais para importar notas.
-O importador procura o cabeçalho nas primeiras 20 linhas e ignora diferenças de caixa, acentos e espaços nos nomes das colunas. Arquivos devem ser XLSX e ter no máximo 25 MB.
-Datas inválidas, identificadores divergentes e coordenadas inválidas impedem a carga.
-O conjunto normalizado tem limite de 19 MB na interface / 20 MB no banco.
+A exportação de **ordens** deve incluir:
+`Ordem`, `TAG Planta`, `Centro`, `Data de referência`, `Hora de referência`, `Dta.início real`, `Início real hr.`, `Data de entrada`, `Status do sistema`, `Plano de manutenção` e `Tipo de ordem`.
+Os campos opcionais `Prazo programado` e `Conclusão real` habilitam pontualidade. 
+O arquivo de sistemas deve conter `COD_INFORMACAO`, `NOME`, `COD_LATITUDE` e `COD_LONGITUDE`.
+Itens: `Ordem`, `Texto code causa`, `Texto code parte objeto`, `Texto de code para problema`.
+Medidas: `Ordem`, `Texto do código da medida`.
+A planilha de **notas de parada** deve conter `Ordem`, `Data da nota`, `TAG Planta`, `Parada`; para atribuição e intervalo entre falhas, inclua `Criado às` (hora SAP de criação). `Tipo de nota` (CE/CP), `Nota` e `Descrição` são preservados quando existentes.
+A planilha de **apontamentos** deve conter `Ordem`, `Operação`, `ID SAP` e `Trabalho real` (horas decimais SAP). `0010` representa deslocamento; todas as demais operações representam execução.
+O importador procura o cabeçalho nas primeiras 20 linhas e ignora diferenças de caixa, acentos e espaços; aceita cinco ou seis arquivos XLSX de até 25 MB cada. O JSON normalizado é limitado a 19 MB no navegador / 20 MB no banco. Não inclua planilhas com dados pessoais desnecessários.
+Datas/hora inválidas, identificadores divergentes ou coordenadas inválidas impedem a carga; tempos incompletos não são preenchidos com valores inventados.
 
 ## Critérios e Funcionalidades Analíticas
 - Centro PITE é o filtro interno para Águas de Teresina. O código não é apresentado na interface.
@@ -62,9 +59,16 @@ O conjunto normalizado tem limite de 19 MB na interface / 20 MB no banco.
 - Causa registrada não equivale automaticamente a causa raiz.
 - Suspensão ainda não tem mapeamento validado.
 - A seção de paradas separa a contagem histórica da quinta planilha (`Parada = X`, ordens distintas por TAG Planta, filtradas pela Data da nota) das ocorrências identificadas pelo texto de ordens/itens. A flag não representa situação atual da planta.
-- MTBF estimado por planta: média dos intervalos entre datas e horas de início de avarias distintas marcadas com `Parada = X`, somente quando a ordem vinculada está tecnicamente encerrada (`ENTE`) e é corretiva `ZNTP` ou emergencial corretiva `ZNTE`. A data/hora de início da nota define o período e o intervalo; ordens abertas, canceladas, de outros tipos ou sem início válido não entram.
-- MTTR estimado por planta: média do tempo entre início e fim da avaria registrados na nota, usando o mesmo conjunto de ordens tecnicamente encerradas (`ENTE`), com `Parada = X` e tipo `ZNTP`/`ZNTE`. São necessárias data e hora válidas de início e fim; hora `00:00:00` é válida. Ordens sem fim válido ou com fim anterior ao início não entram no MTTR.
-- Disponibilidade estimada por planta: `MTBF ÷ (MTBF + MTTR)`, apresentada como percentual quando ambos os indicadores podem ser calculados com os dados e filtros do período. A estimativa depende do histórico de avarias registrado e não substitui medição direta do tempo operacional.
+- **Paradas elegíveis:** notas com `Parada = X` e tipo de nota CE/CP (quando informado), com ordem SAP `ZNTE` ou `ZNTP` e status `ENTE` sem `NEXE`, agrupadas sem duplicar a mesma ordem por planta.
+- **Tempo médio de atribuição:** `(Dta.início real + Início real hr.) − (Data da nota + Criado às)`, em horas por ordem. Intervencões iniciadas antes da criação são sinalizadas como inválidas e não entram na média; hora da avaria não substitui `Criado às`.
+- **Tempo médio de reparo técnico (MTTR):** `(Data de referência + Hora de referência) − (Dta.início real + Início real hr.)`, em horas por ordem, se ambos os marcos existirem e a diferença não for negativa.
+- **Tempo total de parada:** `(Data de referência + Hora de referência) − (Data da nota + Criado às)` (medida documental, não comprova indisponibilidade contínua).
+- **Tempo médio de deslocamento:** por ordem, `soma(Trabalho real, operação 0010) / quantidade de ID SAP distintos da operação 0010`; média das ordens válidas por planta.
+- **Tempo médio de execução:** por ordem, `soma(Trabalho real, operações diferentes de 0010) / quantidade de ID SAP distintos dessas operações`; média das ordens válidas por planta.
+- **Tempo médio de atendimento:** deslocamento médio + execução média por planta, se ambos estiverem disponíveis. Horas apontadas são esforço de equipe, diferentes do intervalo cronológico do MTTR.
+- **MTBF indicativo:** por `TAG Ativo`, média dos intervalos não negativos entre o fechamento por referência de uma CE e a criação da CE seguinte (em ordens distintas); a planta agrega os intervalos dos ativos, não intercala falhas de equipamentos diferentes. Sem horários de criação ou sem recorrência, aparece indisponível.
+- **Disponibilidade estimada:** `MTBF / (MTBF + MTTR)`, apenas quando as duas métricas existirem; não substitui horas operacionais efetivamente medidas.
+
 - Nas tabelas de confiabilidade, a barra de disponibilidade usa verde para valores ≥ 85%, âmbar para 60% a < 85% e vermelho para valores < 60%; sem dados suficientes, o percentual aparece como indisponível.
 - O ranking de confiabilidade por planta é ordenado da maior para a menor disponibilidade; plantas sem disponibilidade calculável aparecem ao final. Em telas móveis, a tabela é substituída por cartões compactos com posição, disponibilidade, MTBF e MTTR.
 - MTBF e MTTR por ativo: mesmas regras de ordem tecnicamente encerrada, flag de parada, tipos `ZNTP`/`ZNTE`, período e horários válidos da confiabilidade por planta, agrupadas pela TAG Ativo da ordem (com a TAG da nota como alternativa quando a ordem não informar ativo), além da planta. Ocorrências sem TAG de ativo não são agrupadas.
