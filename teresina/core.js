@@ -497,7 +497,13 @@ function normalize(tables,files){
   const raw=r['Trabalho real'],work=typeof raw==='number'?raw:Number(text(raw).replace(',','.'));
   return {order:text(r.Ordem),operation:text(r['Operação']).padStart(4,'0'),worker:text(r['ID SAP']),hours:text(raw)===''?null:(Number.isFinite(work)&&work>=0?work:null)};
  }).filter(r=>ids.has(r.order));
- return {systems,orders,items,actions,stoppageNotes,workLogs,meta:{loadedAt:new Date().toISOString(),files,sourceOrders:all.length,excluded:all.length-orders.length,missingReference:orders.filter(o=>!o.date).length,stoppageOrders:new Set(stoppageNotes.map(n=>n.order)).size,workLogs:workLogs.length,workLogOrders:new Set(workLogs.map(l=>l.order)).size,notesWithCreationTime:stoppageNotes.filter(n=>n.createdTime).length,excludedStoppageNotes,missingStoppageNoteDate}};
+ const normalized={systems,orders,items,actions,stoppageNotes,workLogs,meta:{loadedAt:new Date().toISOString(),files,sourceOrders:all.length,excluded:all.length-orders.length,missingReference:orders.filter(o=>!o.date).length,stoppageOrders:new Set(stoppageNotes.map(n=>n.order)).size,workLogs:workLogs.length,workLogOrders:new Set(workLogs.map(l=>l.order)).size,notesWithCreationTime:stoppageNotes.filter(n=>n.createdTime).length,excludedStoppageNotes,missingStoppageNoteDate}};
+ normalized.meta.icm=icmAudit(normalized,orders);
+ const events=maintenanceEvents(normalized,{});
+ normalized.meta.maintenance={eligible:events.length,attribution:events.filter(e=>e.attributionHours!==null).length,repair:events.filter(e=>e.mttrHours!==null).length,
+  travel:events.filter(e=>e.travelHours!==null).length,execution:events.filter(e=>e.executionHours!==null).length,
+  attendance:events.filter(e=>e.attendanceHours!==null).length};
+ return normalized;
 }
 const api={text,upper,status,labels,typeLabels,typeLabel,typeGroup,orderClass,validDate,daysBetween,date,time,period,filter,stats,adherence,rank,timing,byType,topAssets,badActors,icmScope,icmUseful,icmRank,icmAudit,icmMatrix,engineeringMetrics,decisionInsights,stopRecords,flaggedStopOrders,maintenanceEvents,reliabilityByPlant,reliabilityByAsset,systemHealth,dedupe,schemas,optionalSchemas,headerKey,canonicalHeader,kind,normalize};
 if(typeof module!=='undefined')module.exports=api;root.PCM=api;
