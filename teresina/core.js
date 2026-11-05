@@ -145,9 +145,10 @@ function maintenanceEvents(data,f){
   const tag=o.tag||note.tag,asset=text(o.asset)||text(note.asset);
   if(!tag||note.tag!==tag||!matches('tag',tag)||!matches('asset',asset)||!matches('type',o.type)||!matches('priority',note.priority||o.priority))continue;
   const created=timestamp(note.date,note.createdTime),start=timestamp(o.start,o.startTime),end=timestamp(o.date,o.referenceTime);
-  if(!byOrder.has(o.id))byOrder.set(o.id,{order:o,tag,plant:text(note.plant)||tag,asset,equipment:text(o.equipment),notes:[],created:null,start,end,ids:[o.id]});
+  if(!byOrder.has(o.id))byOrder.set(o.id,{order:o,tag,plant:text(note.plant)||tag,asset,equipment:text(o.equipment),notes:[],eventDate:note.date,created:null,start,end,ids:[o.id]});
   const event=byOrder.get(o.id);
   event.notes.push(note.note);
+  if(note.date<event.eventDate)event.eventDate=note.date;
   if(created!==null&&(event.created===null||created<event.created))event.created=created;
  }
  const logsByOrder=new Map;
@@ -213,6 +214,73 @@ function reliabilityByGroup(data,f,byAsset){
 }
 function reliabilityByPlant(data,f){return reliabilityByGroup(data,f,false);}
 function reliabilityByAsset(data,f){return reliabilityByGroup(data,f,true);}
+
+const dashboardMetrics=['attributionHours','travelHours','executionHours','mttrHours','mtbfHours'];
+function maintenanceDashboard(data,f={}){
+ // Os intervalos do MTBF são formados no histórico completo; o filtro de período
+ // decide a qual mês pertence a próxima falha, sem perder a falha anterior.
+ const all=maintenanceEvents(data,{...f,from:'',to:''});
+ const byAsset=new Map;
+ for(const e of all){
+  if(upper(e.order.type)!=='ZNTE'||!e.asset||e.created===null||e.end===null)continue;
+  const key=e.tag+'\u0000'+e.asset;
+  if(!byAsset.has(key))byAsset.set(key,[]);
+  byAsset.get(key).push(e);
+ }
+ const mtbfByOrder=new Map;
+ for(const seq of byAsset.values()){
+  seq.sort((a,b)=>a.created-b.created);
+  for(let i=1;i<seq.length;i++){
+   const value=hoursGap(seq[i-1].end,seq[i].created);
+   if(value!==null)mtbfByOrder.set(seq[i].order.id,value);
+  }
+ }
+ const selected=all.filter(e=>period(e.eventDate,f)).map(e=>({...e,mtbfHours:mtbfByOrder.get(e.order.id)??null}));
+ const mean=(group,key)=>{
+  const values=group.map(e=>e[key]).filter(v=>Number.isFinite(v)&&v>=0);
+  return {value:values.length?values.reduce((a,b)=>a+b,0)/values.length:null,count:values.length};
+ };
+ const summarize=group=>{
+  const out={events:group.length};
+  for(const key of dashboardMetrics){
+   const stat=mean(group,key);out[key]=stat.value;out[key+'Count']=stat.count;
+  }
+  out.attendanceHours=out.travelHours!=null&&out.executionHours!=null?out.travelHours+out.executionHours:null;
+  return out;
+ };
+ const assetGroups=new Map;
+ for(const e of selected){
+  if(!e.asset)continue;
+  const key=e.tag+'\u0000'+e.asset;
+  if(!assetGroups.has(key))assetGroups.set(key,{tag:e.tag,plant:e.plant,asset:e.asset,equipment:e.equipment,events:[]});
+  assetGroups.get(key).events.push(e);
+ }
+ const assets=[...assetGroups.values()].map(x=>({
+  tag:x.tag,plant:x.plant,asset:x.asset,equipment:x.equipment,...summarize(x.events),
+  ids:x.events.map(e=>e.order.id)
+ })).sort((a,b)=>b.events-a.events||a.plant.localeCompare(b.plant,'pt-BR')||a.asset.localeCompare(b.asset,'pt-BR'));
+ const monthGroups=new Map;
+ for(const e of selected){
+  const month=e.eventDate.slice(0,7);
+  if(!monthGroups.has(month))monthGroups.set(month,[]);
+  monthGroups.get(month).push(e);
+ }
+ const monthKey=day=>validDate(day||'')?day.slice(0,7):'';
+ const first=monthKey(f.from)||[...monthGroups.keys()].sort()[0]||'';
+ const last=monthKey(f.to)||[...monthGroups.keys()].sort().at(-1)||'';
+ const months=[];
+ if(first&&last&&first<=last){
+  let year=Number(first.slice(0,4)),month=Number(first.slice(5,7));
+  const endYear=Number(last.slice(0,4)),endMonth=Number(last.slice(5,7));
+  while(year<endYear||(year===endYear&&month<=endMonth)){
+   const key=String(year)+'-'+String(month).padStart(2,'0');
+   months.push({month:key,...summarize(monthGroups.get(key)||[])});
+   if(++month===13){year++;month=1;}
+  }
+ }
+ return {total:summarize(selected),assets,months,events:selected};
+}
+
 function badActors(rows){
  const byAsset=new Map;
  for(const o of rows){
@@ -505,6 +573,6 @@ function normalize(tables,files){
   attendance:events.filter(e=>e.attendanceHours!==null).length};
  return normalized;
 }
-const api={text,upper,status,labels,typeLabels,typeLabel,typeGroup,orderClass,validDate,daysBetween,date,time,period,filter,stats,adherence,rank,timing,byType,topAssets,badActors,icmScope,icmUseful,icmRank,icmAudit,icmMatrix,engineeringMetrics,decisionInsights,stopRecords,flaggedStopOrders,maintenanceEvents,reliabilityByPlant,reliabilityByAsset,systemHealth,dedupe,schemas,optionalSchemas,headerKey,canonicalHeader,kind,normalize};
+const api={text,upper,status,labels,typeLabels,typeLabel,typeGroup,orderClass,validDate,daysBetween,date,time,period,filter,stats,adherence,rank,timing,byType,topAssets,badActors,icmScope,icmUseful,icmRank,icmAudit,icmMatrix,engineeringMetrics,decisionInsights,stopRecords,flaggedStopOrders,maintenanceEvents,maintenanceDashboard,reliabilityByPlant,reliabilityByAsset,systemHealth,dedupe,schemas,optionalSchemas,headerKey,canonicalHeader,kind,normalize};
 if(typeof module!=='undefined')module.exports=api;root.PCM=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
