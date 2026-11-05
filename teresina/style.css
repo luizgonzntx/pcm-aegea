@@ -2943,9 +2943,22 @@ section[data-view]:not([hidden]) {
 .maintenance-selectors select:focus-visible, .maintenance-metric-label select:focus-visible,
 .maintenance-asset-link:focus-visible { outline:2px solid var(--blue); outline-offset:3px; }
 .maintenance-ribbon {
-  display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:14px;
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  grid-template-areas:
+    "assign travel exec repair failure"
+    ". attend attend . .";
+  column-gap:14px;
+  row-gap:24px;
   margin:8px 0 28px;
+  align-items:start;
 }
+.maintenance-step--attributionHours { grid-area:assign; }
+.maintenance-step--travelHours { grid-area:travel; }
+.maintenance-step--executionHours { grid-area:exec; }
+.maintenance-step--attendanceHours { grid-area:attend; }
+.maintenance-step--mttrHours { grid-area:repair; }
+.maintenance-step--mtbfHours { grid-area:failure; }
 .maintenance-step { position:relative; min-width:0; text-align:center; }
 .maintenance-step strong {
   display:flex; align-items:center; justify-content:center; min-height:85px;
@@ -2960,10 +2973,26 @@ section[data-view]:not([hidden]) {
   display:block; margin-top:12px; font-size:13px; font-weight:700;
   color:var(--blue); letter-spacing:-.015em;
 }
-.maintenance-step:not(:last-child)::after {
-  content:"→"; position:absolute; top:30px; right:-16px; z-index:2;
-  font-size:18px; font-weight:800; color:var(--blue); line-height:1;
+.maintenance-step--travelHours::after,
+.maintenance-step--executionHours::after {
+  content:""; position:absolute; left:50%; bottom:-22px; height:19px;
+  border-left:2px solid #00acb3;
 }
+.maintenance-step--attendanceHours::before {
+  content:""; position:absolute; top:-12px; left:50%;
+  width:0; height:10px; border-left:2px solid #00acb3;
+}
+.maintenance-step--attendanceHours::after {
+  content:""; position:absolute; top:-23px; left:25%; width:50%;
+  border-top:2px solid #00acb3;
+}
+.maintenance-step--attendanceHours strong {
+  background:linear-gradient(140deg,#e5f6f6,#f0f7fb);
+  border:1px solid #66c7cd;
+  border-top:3px solid #00b6bf;
+  box-shadow:0 4px 14px rgba(0,128,142,.08);
+}
+.maintenance-step--attendanceHours span { color:#086e86; }
 .maintenance-chart-card, .maintenance-assets-card { margin-top:19px; }
 .maintenance-chart-head { display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
 .maintenance-chart-head .maintenance-metric-label { margin-left:auto; }
@@ -2985,15 +3014,31 @@ section[data-view]:not([hidden]) {
 .maintenance-asset-link { background:none; border:0; padding:0; color:var(--blue); font-weight:800; text-align:left; }
 .maintenance-asset-link:hover { text-decoration:underline; background:none; box-shadow:none; }
 @media (max-width:1300px) {
-  .maintenance-ribbon { grid-template-columns:repeat(3,minmax(0,1fr)); gap:20px 13px; }
-  .maintenance-step:not(:last-child)::after { display:none; }
+  .maintenance-ribbon {
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    grid-template-areas:
+      "assign travel exec"
+      ". attend attend"
+      "repair failure .";
+    row-gap:26px;
+  }
 }
 @media (max-width:690px) {
   .maintenance-intro { align-items:stretch; }
   .maintenance-selectors { display:grid; grid-template-columns:1fr 1fr; gap:10px; width:100%; }
   .maintenance-selectors label { min-width:0; }
   .maintenance-selectors select { min-width:0; width:100%; }
-  .maintenance-ribbon { grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px 10px; }
+  .maintenance-ribbon {
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    grid-template-areas:
+      "travel exec"
+      "attend attend"
+      "assign repair"
+      "failure failure";
+    column-gap:10px;
+    row-gap:26px;
+  }
+  .maintenance-step--attendanceHours::after { left:25%; width:50%; }
   .maintenance-step strong { min-height:69px; font-size:clamp(15px,4vw,23px); }
   .maintenance-step span { font-size:12px; }
   .maintenance-chart-head .maintenance-metric-label { margin-left:0; width:100%; }
