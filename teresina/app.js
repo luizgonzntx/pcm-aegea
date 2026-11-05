@@ -114,6 +114,9 @@
     page = next;
     document.documentElement.dataset.page=next;
     const kpisEl=$('#kpis');if(kpisEl)kpisEl.hidden=next==='stops';
+    const startLabel=$('#fromLabel'),endLabel=$('#toLabel');
+    if(startLabel)startLabel.textContent=next==='stops'?'Período a partir de':'Entrada a partir de';
+    if(endLabel)endLabel.textContent=next==='stops'?'Período até':'Entrada até';
     const titles = {
       overview: 'Visão dos sistemas',
       intelligence: 'Engenharia & Decisão',
@@ -440,7 +443,7 @@
     return (days?days+'d ':'')+h+':'+m+':'+sec;
   }
   function selectMaintenancePlant(tag) {
-    f.tag=tag?[tag]:[];
+    f.tag=tag&&tag!=='__multiple__'?[tag]:[];
     f.asset=[];
     options();
     render();
@@ -451,12 +454,20 @@
     const plants=[...data.systems].sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
     plantPicker.innerHTML='<option value="">Todas as plantas</option>'+plants.map(s=>
       '<option value="'+esc(s.tag)+'">'+esc(s.name)+'</option>').join('');
-    plantPicker.value=selectedValues('tag').length===1?selectedValues('tag')[0]:'';
-    const candidates=P.maintenanceEvents(data,{...f,asset:[]});
+    if(selectedValues('tag').length>1){
+      plantPicker.insertAdjacentHTML('afterbegin','<option value="__multiple__">'+num(selectedValues('tag').length)+' plantas</option>');
+    }
+    plantPicker.value=selectedValues('tag').length===1?selectedValues('tag')[0]:
+      selectedValues('tag').length>1?'__multiple__':'';
+    const candidates=P.maintenanceEvents(data,{...f,asset:[],type:[],priority:[]});
     const list=[...new Set(candidates.map(e=>e.asset).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
     assetPicker.innerHTML='<option value="">Todos os ativos</option>'+list.map(tag=>
       '<option value="'+esc(tag)+'">'+esc(tag)+'</option>').join('');
-    assetPicker.value=selectedValues('asset').length===1?selectedValues('asset')[0]:'';
+    if(selectedValues('asset').length>1){
+      assetPicker.insertAdjacentHTML('afterbegin','<option value="__multiple__">'+num(selectedValues('asset').length)+' ativos</option>');
+    }
+    assetPicker.value=selectedValues('asset').length===1?selectedValues('asset')[0]:
+      selectedValues('asset').length>1?'__multiple__':'';
   }
   function renderMaintenanceTrend() {
     const el=$('#maintenanceTrend'),metric=$('#maintenanceMetric').value;
@@ -1289,7 +1300,7 @@
 
     $('#stopPlantSelect').onchange=event=>selectMaintenancePlant(event.target.value);
     $('#stopAssetSelect').onchange=event=>{
-      f.asset=event.target.value?[event.target.value]:[];
+      f.asset=event.target.value&&event.target.value!=='__multiple__'?[event.target.value]:[];
       options();render();setPage('stops');
     };
     $('#maintenanceMetric').onchange=()=>renderMaintenanceTrend();
