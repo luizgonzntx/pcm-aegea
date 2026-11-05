@@ -11,10 +11,10 @@
   <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
   <script defer src="config.js"></script>
-  <script defer src="core.js?v=20261105-1"></script>
+  <script defer src="core.js?v=20261105-2"></script>
   <script defer src="inventory.js"></script>
   <script defer src="ui.js"></script>
-  <script defer src="app.js?v=20261105-1"></script>
+  <script defer src="app.js?v=20261105-2"></script>
 </head>
 <body>
   <div id="access" class="access">
@@ -317,37 +317,34 @@
             <div>
               <span class="eyebrow blue">ICM · ITENS, CAUSAS E MEDIDAS</span>
               <h2>Entenda o que mais se repete.</h2>
-              <p>Contagem de ordens executadas distintas por registro. Clique nas barras ou linhas para consultar as evidências.</p>
+              <p>Somente corretivas CE/CP com ENTE. Registros em branco ou sem informação útil ficam fora dos rankings; cada OS conta uma vez por categoria.</p>
             </div>
             <div class="section-actions">
               <button id="exportIcmBtn">↓ Exportar Matriz ICM (CSV)</button>
             </div>
           </div>
 
+          <div id="icmSummary" class="kpis"></div>
           <div id="icmCards" class="icm-grid"></div>
-          <p class="small-note">Causas representam os registros das ordens. A confirmação de causa raiz exige investigação técnica (RCA).</p>
+          <p class="small-note">Causa registrada não significa causa raiz comprovada. As medidas aparecem em ranking separado: não há vínculo confiável entre cada medida e cada item apenas pelo número da ordem.</p>
 
           <div class="overview-extra">
             <article class="card">
               <div class="card-top">
                 <div>
-                  <span class="eyebrow">DIAGNÓSTICO CRUZADO DE MODOS DE FALHA</span>
-                  <h2>Matriz Item × Problema × Causa × Medida</h2>
+                  <span class="eyebrow">REGISTROS COMPLETOS DA MESMA LINHA SAP</span>
+                  <h2>Componente × Problema × Causa</h2>
                 </div>
-                <span class="small-note">Combinações mais recorrentes em ordens executadas</span>
+                <span class="small-note">Somente classificações completas, sem cruzar medidas artificialmente</span>
               </div>
               <div id="icmMatrixTable" class="table-wrap"></div>
             </article>
 
-            <article class="card">
-              <div class="card-top">
-                <div>
-                  <span class="eyebrow">RECORRÊNCIA POR EQUIPAMENTO</span>
-                  <h2>Top ativos com mais intervenções no período</h2>
-                </div>
-                <span class="small-note">Ordenado por ordens executadas</span>
-              </div>
-              <div id="topAssetsIcm"></div>
+            <article class="card explanation">
+              <span class="eyebrow blue">QUALIDADE DO REGISTRO</span>
+              <h2>O que entra no ICM?</h2>
+              <p>Somente ordens CE/CP com ENTE. Item, problema e causa precisam estar na mesma linha de item para compor a matriz.</p>
+              <p>Medidas são contabilizadas separadamente por OS. Campos vazios, “Falha inexistente”, “Não informado” e “Não executar” não compõem rankings.</p>
             </article>
           </div>
         </section>
@@ -406,33 +403,19 @@
             <div>
               <span class="eyebrow blue">PARADAS · CONFIABILIDADE OPERACIONAL</span>
               <h2>Onde as paradas se concentram.</h2>
-              <p>Leitura por ano, planta, ativo e motivo usando a data de entrada da ordem.</p>
+              <p>Paradas validadas pela flag X, com ordem CE/CP e status ENTE. Explore os tempos por planta e os ativos afetados.</p>
             </div>
             <div class="section-actions">
-              <button id="exportStopsBtn">↓ Exportar paradas (CSV)</button>
-              <button id="printStopsBtn">▣ Gerar relatório PDF</button>
+              <button id="exportStopsBtn">↓ Exportar ocorrências por texto (CSV)</button>
+              <button id="printStopsBtn">▣ Relatório exploratório PDF</button>
             </div>
           </div>
 
-          <div id="stopKpis" class="kpis"></div>
-
           <article class="card" style="margin-bottom:20px">
             <div class="card-top">
               <div>
-                <span class="eyebrow">FONTE: PLANILHA DE NOTAS</span>
-                <h2>Ordens com flag de parada</h2>
-              </div>
-              <button id="exportFlaggedStopsBtn">↓ Exportar ordens com flag (CSV)</button>
-            </div>
-            <div id="flaggedStopSummary" class="kpis"></div>
-            <div id="flaggedStops" class="table-wrap"></div>
-          </article>
-
-          <article class="card" style="margin-bottom:20px">
-            <div class="card-top">
-              <div>
-                <span class="eyebrow">CONFIABILIDADE POR PLANTA</span>
-                <h2>Indicadores de manutenção por TAG Planta</h2>
+                <span class="eyebrow">DADOS SAP VALIDADOS POR PLANTA</span>
+                <h2>Paradas validadas e MTTR por planta</h2>
               </div>
             </div>
             <div id="reliabilitySummary" class="kpis"></div>
@@ -454,13 +437,17 @@
             <div class="card-top">
               <div>
                 <span class="eyebrow">CONFIABILIDADE POR ATIVO</span>
-                <h2>MTBF e MTTR por TAG Ativo</h2>
+                <h2>MTBF indicativo e MTTR por TAG Ativo</h2>
               </div>
             </div>
             <div id="assetReliabilitySummary" class="kpis"></div>
             <div id="assetReliabilityTable" class="table-wrap"></div>
           </article>
 
+          <details class="card" style="margin-top:16px">
+            <summary><strong>Consulta exploratória por texto (não são paradas confirmadas)</strong></summary>
+            <p class="small-note">Ocorrências inferidas de descrições, problemas e causas. NÃO entram automaticamente nos indicadores validados de MTTR/MTBF.</p>
+            <div id="stopKpis" class="kpis"></div>
           <div class="overview-bottom">
             <article class="card">
               <div class="card-top">
@@ -516,6 +503,21 @@
           </article>
 
           <p class="small-note" style="margin-top:12px">Critério aplicado: a ordem entra quando o texto, problema ou causa indica parada, desligamento, falha ou indisponibilidade. Campos opcionais de confirmação, início, fim, motivo e impacto são usados quando existirem. A duração só aparece para paradas com início e fim preenchidos.</p>
+          </details>
+<details class="card" style="margin-top:16px;margin-bottom:16px"><summary><strong>Auditoria das notas com X (inclui ordens ainda não ENTE)</strong></summary><div class="detail-block">          <article class="card" style="margin-bottom:20px">
+            <div class="card-top">
+              <div>
+                <span class="eyebrow">FONTE: PLANILHA DE NOTAS</span>
+                <h2>Ordens com flag de parada</h2>
+              </div>
+              <button id="exportFlaggedStopsBtn">↓ Exportar ordens com flag (CSV)</button>
+            </div>
+            <div id="flaggedStopSummary" class="kpis"></div>
+            <div id="flaggedStops" class="table-wrap"></div>
+          </article>
+
+</div></details>
+
         </section>
 
         <!-- 6. ORDENS DE MANUTENÇÃO -->

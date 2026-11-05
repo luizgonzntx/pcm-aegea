@@ -49,16 +49,16 @@ Datas/hora inválidas, identificadores divergentes ou coordenadas inválidas imp
 - Análises de PCM integradas:
   - Distribuição por Tipo de Ordem (com filtro rápido em 1 clique).
   - Top Ativos Críticos com maior volume de intervenções executadas.
-  - Matriz Cruzada Item (Componente) × Problema × Causa × Medida para diagnóstico de falhas recorrentes.
+  - Matriz de Componente × Problema × Causa da mesma linha de item. As medidas são rankings independentes, sem presumir vínculo item↔medida pelo número da ordem.
 - Atalhos rápidos de período (Mês, 90 dias, Ano, Tudo), filtro por Prioridade e busca rápida de instalações.
-- Importação com suporte a arrastar e soltar (Drag-and-Drop) e checklist de validação dos 5 arquivos `.xlsx`.
+- Importação com suporte a arrastar e soltar (Drag-and-Drop) e checagem prévia de cinco arquivos obrigatórios e sexto de apontamentos, com cobertura de horários SAP e qualidade do ICM.
 - Exportação CSV nas abas de Ordens, ICM (Matriz Cruzada) e Planos/Prazos (Aderência por Instalação).
 - Data de entrada é criação; referência define competência; início real define começo do serviço.
 - No prazo exige conclusão real <= prazo programado. Sem as datas, não avaliável.
-- ICM conta ordens executadas distintas por item, causa ou medida. Não faz produto cartesiano entre tabelas.
+- ICM considera apenas ZNTE/ZNTP com ENTE. Rankings de componentes, causas e medidas contam ordens distintas, excluem campos vazios/placeholder e não associam itens a medidas sem vínculo explícito. A matriz só apresenta Componente × Problema × Causa registrados na mesma linha de item. Admin mostra cobertura do diagnóstico antes de publicar.
 - Causa registrada não equivale automaticamente a causa raiz.
 - Suspensão ainda não tem mapeamento validado.
-- A seção de paradas separa a contagem histórica da quinta planilha (`Parada = X`, ordens distintas por TAG Planta, filtradas pela Data da nota) das ocorrências identificadas pelo texto de ordens/itens. A flag não representa situação atual da planta.
+- A seção de paradas prioriza CE/CP com Parada = X e ENTE. Consultas baseadas em texto e notas com X sem validação estão em detalhes recolhidos, para não serem confundidas com os indicadores oficiais. A seção de paradas separa a contagem histórica da quinta planilha (`Parada = X`, ordens distintas por TAG Planta, filtradas pela Data da nota) das ocorrências identificadas pelo texto de ordens/itens. A flag não representa situação atual da planta.
 - **Paradas elegíveis:** notas com `Parada = X` e tipo de nota CE/CP (quando informado), com ordem SAP `ZNTE` ou `ZNTP` e status `ENTE` sem `NEXE`, agrupadas sem duplicar a mesma ordem por planta.
 - **Tempo médio de atribuição:** `(Dta.início real + Início real hr.) − (Data da nota + Criado às)`, em horas por ordem. Intervencões iniciadas antes da criação são sinalizadas como inválidas e não entram na média; hora da avaria não substitui `Criado às`.
 - **Tempo médio de reparo técnico (MTTR):** `(Data de referência + Hora de referência) − (Dta.início real + Início real hr.)`, em horas por ordem, se ambos os marcos existirem e a diferença não for negativa.
@@ -105,7 +105,7 @@ A numeração inicial é ignorada (ex.: “1 - ETA Sul”). Nomes completos de s
 `inventory.js` contém a transcrição e os aliases explícitos. A fonte é preliminar, sem data de referência, e não acompanha os filtros de ordens ou o período.
 “Mat.” foi confirmado como **Em manutenção**. A potência (CV) pertence à seção, não a cada linha de equipamento.
 A notação de projeto (ex.: `3+2`), as divergências de quantidades e os campos ausentes foram preservados. Não são calculados totais ou disponibilidade a partir dessas quantidades.
-A numeração repetida da imagem não é usada como identificador. Atualizações deste levantamento devem ser feitas no arquivo; a importação das cinco planilhas operacionais continua separada.
+A numeração repetida da imagem não é usada como identificador. Atualizações deste levantamento devem ser feitas no arquivo; a importação das cinco planilhas básicas (e apontamentos opcionais) continua separada.
 
 ## Publicação de produção no Cloudflare
 

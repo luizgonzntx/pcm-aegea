@@ -385,7 +385,7 @@
   }
 
   function ranks(kind, source = rows) {
-    return kind === 'action' ? P.rank(data.actions, source, 'action') : P.rank(data.items, source, kind);
+    return P.icmRank(data, source, kind);
   }
 
   function rankHTML(list) {
@@ -398,31 +398,27 @@
   }
 
   function renderICM() {
+    const audit=P.icmAudit(data,rows);
+    $('#icmSummary').innerHTML =
+      kpi('Corretivas CE/CP encerradas',num(audit.eligible),'Universo para diagnóstico ICM','#0027bd') +
+      kpi('Diagnóstico completo',num(audit.complete),pct(audit.coverage)+' do universo','#0f8a68') +
+      kpi('Sem causa registrada',num(audit.missingCause),'Ordens sem causa útil','#c2780c') +
+      kpi('Sem medida registrada',num(audit.missingMeasure),'Ordens sem medida útil','#c43650');
     $('#icmCards').innerHTML = [
-      ['component', 'ITENS', 'Itens que mais falharam'],
-      ['cause', 'CAUSAS', 'Causas registradas'],
-      ['action', 'MEDIDAS', 'Intervenções realizadas']
-    ].map(([k, e, h]) =>
-      '<article class="card"><div class="card-top"><div><span class="eyebrow">' + e + '</span><h2>' + h + '</h2></div></div>' + rankHTML(ranks(k)) + '</article>'
+      ['component', 'ITENS', 'Componentes mais recorrentes'],
+      ['cause', 'CAUSAS REGISTRADAS', 'Causas mais recorrentes'],
+      ['action', 'MEDIDAS', 'Medidas mais registradas']
+    ].map(([k, label, title]) =>
+      '<article class="card"><div class="card-top"><div><span class="eyebrow">'+label+'</span><h2>'+title+'</h2></div></div>'+rankHTML(ranks(k))+'</article>'
     ).join('');
-
-    const matrix = P.icmMatrix(data, rows).slice(0, 15);
-    const matrixEl = $('#icmMatrixTable');
-    if (matrixEl) {
-      matrixEl.innerHTML = matrix.length
-        ? '<table><thead><tr><th>Item (Componente)</th><th>Problema</th><th>Causa registrada</th><th>Medida realizada</th><th>OS Exec.</th></tr></thead><tbody>' +
-          matrix.map(m => {
-            const key = rankEvidence.push({ name: m.component + ' → ' + m.cause + ' → ' + m.action, count: m.count, ids: m.ids }) - 1;
-            return '<tr>' +
-              '<td><b>' + esc(m.component) + '</b></td>' +
-              '<td>' + esc(m.problem) + '</td>' +
-              '<td>' + esc(m.cause) + '</td>' +
-              '<td>' + esc(m.action) + '</td>' +
-              '<td><button class="link" data-rank="' + key + '">' + num(m.count) + ' OS ↗</button></td>' +
-              '</tr>';
-          }).join('') + '</tbody></table>'
-        : emptyHTML;
-    }
+    const matrix=P.icmMatrix(data,rows).slice(0,15);
+    $('#icmMatrixTable').innerHTML=matrix.length
+      ? '<table><thead><tr><th>Componente</th><th>Problema</th><th>Causa registrada</th><th>Ordens distintas</th></tr></thead><tbody>' +
+        matrix.map(m=>{
+          const key=rankEvidence.push({name:m.component+' · '+m.problem+' · '+m.cause,count:m.count,ids:m.ids})-1;
+          return '<tr><td><b>'+esc(m.component)+'</b></td><td>'+esc(m.problem)+'</td><td>'+esc(m.cause)+'</td><td><button class="link" data-rank="'+key+'">'+num(m.count)+' OS ↗</button></td></tr>';
+        }).join('')+'</tbody></table>'
+      : emptyHTML;
   }
 
   function renderStops() {
@@ -492,7 +488,7 @@
       return '<div class="availability-cell"><b>' + pct(value) + '</b><span class="availability-bar" aria-hidden="true"><i class="' + level + '" style="width:' + (rate == null ? 0 : rate * 100) + '%"></i></span></div>';
     };
     const plantReliabilityRanking = [...reliability].sort((a, b) =>
-      (b.availability ?? -1) - (a.availability ?? -1) || a.plant.localeCompare(b.plant, 'pt-BR')
+      b.events-a.events || a.plant.localeCompare(b.plant, 'pt-BR')
     );
 
     const weighted = (key,countKey) => {
@@ -516,8 +512,8 @@
         ).join('')+'</tbody></table>'
       : emptyHTML;
     $('#reliabilitySummary').innerHTML =
-      kpi('Avarias encerradas tecnicamente', num(reliabilityEvents), 'Ordens CE/CP com Parada = X e ENTE', '#c43650') +
-      kpi('Reparos com duração válida', num(reliabilityClosed), 'Ordens com início real e referência SAP válidos', '#0f8a68');
+      kpi('Paradas CE/CP validadas', num(reliabilityEvents), 'Ordens CE/CP com Parada = X e ENTE', '#c43650') +
+      kpi('MTTR com horário válido', num(reliabilityClosed), 'Início real e referência SAP válidos', '#0f8a68');
     $('#reliabilityTable').innerHTML = plantReliabilityRanking.length
       ? '<div class="reliability-ranking"><table class="reliability-ranking-table"><thead><tr><th>Rank</th><th>Planta</th><th>Avarias consideradas</th><th>MTBF médio</th><th>Intervalos</th><th>MTTR técnico</th><th>Reparos válidos</th><th>Disponibilidade</th></tr></thead><tbody>' +
         plantReliabilityRanking.map((item, index) =>
@@ -933,7 +929,7 @@
       importMessage('Preparando leitura das planilhas…');
       const buffers = await Promise.all(files.map(async file => ({ name: file.name, buffer: await file.arrayBuffer() })));
       const result = await new Promise((resolve, reject) => {
-        worker = new Worker('import-worker.js?v=20261105-1');
+        worker = new Worker('import-worker.js?v=20261105-2');
         const timeout = setTimeout(() => {
           worker.terminate();
           reject(Error('A leitura excedeu três minutos. Reduza o tamanho do conjunto.'));
@@ -1025,8 +1021,8 @@
     if (!data) return;
     const matrix = P.icmMatrix(data, rows);
     const lines = [
-      ['Item (Componente)', 'Problema', 'Causa Registrada', 'Medida Realizada', 'Ordens Executadas Distintas'].map(safeCsvCell).join(';'),
-      ...matrix.map(m => [m.component, m.problem, m.cause, m.action, m.count].map(safeCsvCell).join(';'))
+      ['Item (Componente)', 'Problema', 'Causa Registrada', 'Ordens Corretivas Encerradas Distintas'].map(safeCsvCell).join(';'),
+      ...matrix.map(m => [m.component, m.problem, m.cause, m.count].map(safeCsvCell).join(';'))
     ];
     downloadCsvFile('ICM_Matriz_Aguas_de_Teresina_' + today() + '.csv', lines);
   }
