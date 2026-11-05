@@ -131,47 +131,84 @@ function flaggedStopOrders(data,f){
  })
   .sort((a,b)=>b.count-a.count||a.plant.localeCompare(b.plant,'pt-BR'));
 }
-function reliabilityByGroup(data,f,byAsset){
- const ordersById=new Map((data.orders||[]).map(order=>[order.id,order]));
- const groups=new Map;
- const matches=(key,value)=>{const selected=Array.isArray(f?.[key])?f[key]:(f?.[key]?[f[key]]:[]);return !selected.length||selected.includes(value);};
+
+function timestamp(day,hour){if(!validDate(day||'')||!hour)return null;const ms=Date.parse(day+'T'+hour+'Z');return Number.isFinite(ms)?ms:null;}
+function hoursGap(from,to){return Number.isFinite(from)&&Number.isFinite(to)&&to>=from?(to-from)/3600000:null;}
+function maintenanceEvents(data,f){
+ const byId=new Map((data.orders||[]).map(o=>[o.id,o]));
+ const byOrder=new Map;
+ const matches=(key,value)=>{const v=f?.[key],selected=Array.isArray(v)?v:(v?[v]:[]);return !selected.length||selected.includes(value);};
  for(const note of (data.stoppageNotes||[])){
-  if(upper(note.flag)!=='X'||!text(note.order)||!validDate(note.startDate||'')||!period(note.startDate,f||{}))continue;
-  const order=ordersById.get(note.order);
-  if(!order||status(order)!=='done'||!['ZNTP','ZNTE'].includes(upper(order.type)))continue;
-  const tag=order.tag||note.tag;
-  if(!tag||tag!==note.tag||!matches('tag',tag)||!matches('asset',note.asset||order?.asset)||!matches('type',order?.type)||!matches('priority',note.priority||order?.priority))continue;
-  const asset=text(order?.asset)||text(note.asset);
-  if(byAsset&&!asset)continue;
-  const groupKey=byAsset?tag+'\u0000'+asset:tag;
-  const start=note.startTime?Date.parse(note.startDate+'T'+note.startTime+'Z'):NaN;
-  if(!Number.isFinite(start))continue;
-  if(!groups.has(groupKey))groups.set(groupKey,{tag,plant:text(note.plant)||tag,asset,equipment:text(order?.equipment),events:new Map});
-  const group=groups.get(groupKey);
-  if(!group.events.has(note.order))group.events.set(note.order,{order:note.order,start:NaN,end:NaN});
-  const event=group.events.get(note.order);
-  if(Number.isFinite(start)&&(!Number.isFinite(event.start)||start<event.start))event.start=start;
-  if(validDate(note.endDate||'')&&note.endTime){
-   const end=Date.parse(note.endDate+'T'+note.endTime+'Z');
-   if(Number.isFinite(end)&&(!Number.isFinite(event.end)||end>event.end))event.end=end;
-  }
+  if(upper(note.flag)!=='X'||!text(note.order)||!period(note.date||'',f||{}))continue;
+  const o=byId.get(note.order);
+  if(!o||status(o)!=='done'||!['ZNTE','ZNTP'].includes(upper(o.type))||!['','CE','CP'].includes(upper(note.noteType)))continue;
+  const tag=o.tag||note.tag,asset=text(o.asset)||text(note.asset);
+  if(!tag||note.tag!==tag||!matches('tag',tag)||!matches('asset',asset)||!matches('type',o.type)||!matches('priority',note.priority||o.priority))continue;
+  const created=timestamp(note.date,note.createdTime),start=timestamp(o.start,o.startTime),end=timestamp(o.date,o.referenceTime);
+  if(!byOrder.has(o.id))byOrder.set(o.id,{order:o,tag,plant:text(note.plant)||tag,asset,equipment:text(o.equipment),notes:[],created:null,start,end,ids:[o.id]});
+  const event=byOrder.get(o.id);
+  event.notes.push(note.note);
+  if(created!==null&&(event.created===null||created<event.created))event.created=created;
  }
- return [...groups.values()].map(group=>{
-  const events=[...group.events.values()];
-  const validStarts=events.filter(event=>Number.isFinite(event.start)).sort((a,b)=>a.start-b.start);
-  let intervalSum=0,intervalCount=0,repairSum=0,closed=0,incomplete=0;
-  for(let i=1;i<validStarts.length;i++){const diff=validStarts[i].start-validStarts[i-1].start;if(diff>0){intervalSum+=diff;intervalCount++;}}
-  for(const event of events){
-   if(!Number.isFinite(event.start)||!Number.isFinite(event.end)||event.end<event.start){incomplete++;continue;}
-   repairSum+=event.end-event.start;closed++;
+ const logsByOrder=new Map;
+ for(const log of (data.workLogs||[])){
+  if(!byOrder.has(log.order)||!text(log.worker)||!Number.isFinite(log.hours)||log.hours<0)continue;
+  if(!logsByOrder.has(log.order))logsByOrder.set(log.order,{travelHours:0,executionHours:0,travelWorkers:new Set,executionWorkers:new Set});
+  const bucket=logsByOrder.get(log.order),travel=text(log.operation).padStart(4,'0')==='0010';
+  if(travel){bucket.travelHours+=log.hours;bucket.travelWorkers.add(log.worker);}
+  else {bucket.executionHours+=log.hours;bucket.executionWorkers.add(log.worker);}
+ }
+ return [...byOrder.values()].map(event=>{
+  const logs=logsByOrder.get(event.order.id);
+  const travelAvg=logs?.travelWorkers.size?logs.travelHours/logs.travelWorkers.size:null;
+  const executionAvg=logs?.executionWorkers.size?logs.executionHours/logs.executionWorkers.size:null;
+  return {...event,
+   attributionHours:hoursGap(event.created,event.start),
+   mttrHours:hoursGap(event.start,event.end),
+   stopHours:hoursGap(event.created,event.end),
+   travelHours:travelAvg,executionHours:executionAvg,
+   attendanceHours:travelAvg!==null&&executionAvg!==null?travelAvg+executionAvg:null,
+   travelPeople:logs?.travelWorkers.size||0,executionPeople:logs?.executionWorkers.size||0,
+   travelPersonHours:logs?.travelHours||0,executionPersonHours:logs?.executionHours||0
+  };
+ });
+}
+function reliabilityByGroup(data,f,byAsset){
+ const groups=new Map;
+ for(const e of maintenanceEvents(data,f)){
+  if(byAsset&&!e.asset)continue;
+  const key=byAsset?e.tag+'\u0000'+e.asset:e.tag;
+  if(!groups.has(key))groups.set(key,{tag:e.tag,plant:e.plant,asset:byAsset?e.asset:'',equipment:byAsset?e.equipment:'',events:[]});
+  groups.get(key).events.push(e);
+ }
+ const average=(arr,key)=>{const v=arr.map(e=>e[key]).filter(x=>Number.isFinite(x)&&x>=0);return {value:v.length?v.reduce((s,x)=>s+x,0)/v.length:null,count:v.length};};
+ return [...groups.values()].map(g=>{
+  const e=g.events;
+  const repair=average(e,'mttrHours'),attrib=average(e,'attributionHours'),stop=average(e,'stopHours');
+  const travel=average(e,'travelHours'),execution=average(e,'executionHours'),attendance=average(e,'attendanceHours');
+  // O MTBF considera somente falhas CE consecutivas do mesmo TAG Ativo.
+  const assets=new Map;
+  for(const v of e){if(upper(v.order.type)!=='ZNTE'||!v.asset)continue;if(!assets.has(v.asset))assets.set(v.asset,[]);assets.get(v.asset).push(v);}
+  let intervalSum=0,intervalCount=0,overlapping=0;
+  for(const timeline of assets.values()){
+   const events=timeline.filter(v=>v.created!==null&&v.end!==null).sort((a,b)=>a.created-b.created);
+   for(let i=1;i<events.length;i++){
+    const gap=hoursGap(events[i-1].end,events[i].created);
+    if(gap!==null){intervalSum+=gap;intervalCount++;}else overlapping++;
+   }
   }
-  const mtbfHours=intervalCount?intervalSum/intervalCount/3600000:null;
-  const mttrHours=closed?repairSum/closed/3600000:null;
-  const availabilityDenominator=mtbfHours+mttrHours;
-  return {tag:group.tag,plant:group.plant,asset:group.asset,equipment:group.equipment,events:events.length,intervals:intervalCount,closed,incomplete,
-   mtbfHours,mttrHours,
-   availability:mtbfHours!=null&&mttrHours!=null&&availabilityDenominator>0?mtbfHours/availabilityDenominator:null,
-   ids:events.map(event=>event.order)};
+  const mtbfHours=intervalCount?intervalSum/intervalCount:null,mttrHours=repair.value;
+  const denominator=mtbfHours+mttrHours;
+  return {tag:g.tag,plant:g.plant,asset:g.asset,equipment:g.equipment,
+   events:e.length,closed:repair.count,incomplete:e.length-repair.count,
+   mttrHours,mtbfHours,intervals:intervalCount,overlapping,
+   attributionHours:attrib.value,attributionCount:attrib.count,
+   travelHours:travel.value,travelCount:travel.count,
+   executionHours:execution.value,executionCount:execution.count,
+   attendanceHours:attendance.value,attendanceCount:attendance.count,
+   stopHours:stop.value,stopCount:stop.count,
+   availability:mtbfHours!=null&&mttrHours!=null&&denominator>0?mtbfHours/denominator:null,
+   ids:e.map(v=>v.order.id)};
  }).sort((a,b)=>b.events-a.events||a.plant.localeCompare(b.plant,'pt-BR')||(byAsset?a.asset.localeCompare(b.asset,'pt-BR'):0));
 }
 function reliabilityByPlant(data,f){return reliabilityByGroup(data,f,false);}
@@ -376,17 +413,22 @@ const schemas={
  orders:['Ordem','TAG Planta','Centro','Data de referência','Dta.início real','Data de entrada','Status do sistema','Plano de manutenção','Tipo de ordem'],
  items:['Ordem','Texto code causa','Texto code parte objeto','Texto de code para problema'],
  actions:['Ordem','Texto do código da medida'],
- stoppageNotes:['Ordem','Data da nota','TAG Planta','Parada']
+ stoppageNotes:['Ordem','Data da nota','TAG Planta','Parada'],
+ workLogs:['Ordem','Operação','ID SAP','Trabalho real']
 };
 const optionalSchemas={
- stoppageNotes:['Início da avaria','Início da avaria (hora)','Fim da avaria','Fim da avaria (hora)']
+ stoppageNotes:['Início da avaria','Início da avaria (hora)','Fim da avaria','Fim da avaria (hora)','Criado às','Tipo de nota'],
+ orders:['Início real hr.','Hora de referência']
 };
 function headerKey(value){return text(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();}
 const canonicalHeaders=new Map(Object.values(schemas).flat().concat(Object.values(optionalSchemas).flat()).map(h=>[headerKey(h),h]));
 const headerAliases=new Map([
  ['numero da ordem','Ordem'],['numero ordem','Ordem'],['n ordem','Ordem'],['no ordem','Ordem'],
  ['flag parada','Parada'],['indicador parada','Parada'],['parada?','Parada'],
- ['data nota','Data da nota'],['data da ocorrencia','Data da nota']
+ ['data nota','Data da nota'],['data da ocorrencia','Data da nota'],
+ ['criado as','Criado às'],['hora de criacao','Criado às'],['hora de criação','Criado às'],
+ ['inicio real hora','Início real hr.'],['hora inicio real','Início real hr.'],
+ ['hora referencia','Hora de referência']
 ].map(([alias,canonical])=>[headerKey(alias),canonical]));
 function canonicalHeader(value){const key=headerKey(value);return canonicalHeaders.get(key)||headerAliases.get(key)||text(value);}
 function kind(headers){
@@ -400,7 +442,7 @@ function normalize(tables,files){
  for(const k of Object.keys(schemas))if(!Array.isArray(tables[k])||(k!=='stoppageNotes'&&!tables[k].length))throw Error('Planilha ausente ou vazia: '+k);
  const coord=(v,min,max)=>{let n=Number(text(v).replace(',','.'));if(!text(v)||!Number.isFinite(n)||n<min||n>max)throw Error('Latitude ou longitude inválida: '+text(v));return n;};
  const systems=dedupe(tables.systems.map(r=>({tag:text(r.COD_INFORMACAO),name:text(r.NOME),type:text(r.COD_ELEMENTO),lat:coord(r.COD_LATITUDE,-90,90),lng:coord(r.COD_LONGITUDE,-180,180),status:text(r.SITUACAO_OPERACIONAL),critical:text(r.CRITICIDADE),address:text(r.ENDERECO_LOGRADOURO),district:text(r.ENDERECO_BAIRRO),photo:text(r.FOTO_FACHADA)})),'tag');
- const optionalDate=v=>text(v)?date(v):'';const tags=new Set(systems.map(s=>s.tag)),all=dedupe(tables.orders.map(r=>({id:text(r.Ordem),note:text(r.Nota),tag:text(r['TAG Planta']),center:upper(r.Centro),date:date(r['Data de referência']),start:date(r['Dta.início real']),created:date(r['Data de entrada']),due:date(r['Prazo programado']),finished:date(r['Conclusão real']),type:text(r['Tipo de ordem']),text:text(r['Texto breve']),status:text(r['Status do sistema']),equipment:text(r['Denominação do objeto técnico']),asset:text(r['TAG Ativo']),plan:text(r['Plano de manutenção']),priority:text(r['Texto prioridade']),activity:text(r['Tipo atividad.manut.']),workCenter:text(r['CenTrabalho princ.']),stopConfirmed:['SIM','S','YES','TRUE','1','CONFIRMADA','CONFIRMADO'].includes(upper(r['Parada confirmada']||r['Parada confirmada?'])),stopStart:optionalDate(r['Início da parada']||r['Inicio da parada']),stopEnd:optionalDate(r['Fim da parada']||r['Final da parada']),stopReason:text(r['Motivo da parada']||r['Motivo parada']),stopImpact:text(r['Impacto operacional']||r['Impacto da parada'])})),'id');
+ const optionalDate=v=>text(v)?date(v):'';const optionalTime=v=>text(v)!==''?time(v):'';const tags=new Set(systems.map(s=>s.tag)),all=dedupe(tables.orders.map(r=>({id:text(r.Ordem),note:text(r.Nota),tag:text(r['TAG Planta']),center:upper(r.Centro),date:date(r['Data de referência']),referenceTime:optionalTime(r['Hora de referência']),start:date(r['Dta.início real']),startTime:optionalTime(r['Início real hr.']),created:date(r['Data de entrada']),due:date(r['Prazo programado']),finished:date(r['Conclusão real']),type:text(r['Tipo de ordem']),text:text(r['Texto breve']),status:text(r['Status do sistema']),equipment:text(r['Denominação do objeto técnico']),asset:text(r['TAG Ativo']),plan:text(r['Plano de manutenção']),priority:text(r['Texto prioridade']),activity:text(r['Tipo atividad.manut.']),workCenter:text(r['CenTrabalho princ.']),stopConfirmed:['SIM','S','YES','TRUE','1','CONFIRMADA','CONFIRMADO'].includes(upper(r['Parada confirmada']||r['Parada confirmada?'])),stopStart:optionalDate(r['Início da parada']||r['Inicio da parada']),stopEnd:optionalDate(r['Fim da parada']||r['Final da parada']),stopReason:text(r['Motivo da parada']||r['Motivo parada']),stopImpact:text(r['Impacto operacional']||r['Impacto da parada'])})),'id');
  const orders=all.filter(o=>o.center==='PITE'&&tags.has(o.tag)),ids=new Set(orders.map(o=>o.id));if(!orders.length)throw Error('Nenhuma ordem de Águas de Teresina corresponde às instalações informadas.');
  const items=tables.items.map(r=>({order:text(r.Ordem),note:text(r.Nota),cause:text(r['Texto code causa']),problem:text(r['Texto de code para problema']),component:text(r['Texto code parte objeto']),item:text(r.Item)})).filter(r=>ids.has(r.order));
  const actions=tables.actions.map(r=>({order:text(r.Ordem),note:text(r.Nota),action:text(r['Texto do código da medida']),item:text(r.Medida)})).filter(r=>ids.has(r.order));
@@ -414,15 +456,19 @@ function normalize(tables,files){
   if(!order||!linkedOrder||!tag||!systemsByTag.has(tag)||(providedTag&&providedTag!==tag)){excludedStoppageNotes++;continue;}
   if(!noteDate)missingStoppageNoteDate++;
   stoppageNotes.push({
-   order,date:noteDate,note:text(r.Nota),description:text(r['Descrição']),
+   order,date:noteDate,createdTime:optionalTime(r['Criado às']),noteType:upper(r['Tipo de nota']),note:text(r.Nota),description:text(r['Descrição']),
    asset:text(r['TAG Ativo']),priority:text(r['Texto prioridade']),
    tag,plant:text(r['DSC Planta'])||systemsByTag.get(tag).name,flag:'X',
    startDate:optionalDate(r['Início da avaria']),startTime:time(r['Início da avaria (hora)']),
    endDate:optionalDate(r['Fim da avaria']),endTime:time(r['Fim da avaria (hora)'])
   });
  }
- return {systems,orders,items,actions,stoppageNotes,meta:{loadedAt:new Date().toISOString(),files,sourceOrders:all.length,excluded:all.length-orders.length,missingReference:orders.filter(o=>!o.date).length,stoppageOrders:new Set(stoppageNotes.map(n=>n.order)).size,excludedStoppageNotes,missingStoppageNoteDate}};
+ const workLogs=(tables.workLogs||[]).map(r=>{
+  const raw=r['Trabalho real'],work=typeof raw==='number'?raw:Number(text(raw).replace(',','.'));
+  return {order:text(r.Ordem),operation:text(r['Operação']).padStart(4,'0'),worker:text(r['ID SAP']),hours:text(raw)===''?null:(Number.isFinite(work)&&work>=0?work:null)};
+ }).filter(r=>ids.has(r.order));
+ return {systems,orders,items,actions,stoppageNotes,workLogs,meta:{loadedAt:new Date().toISOString(),files,sourceOrders:all.length,excluded:all.length-orders.length,missingReference:orders.filter(o=>!o.date).length,stoppageOrders:new Set(stoppageNotes.map(n=>n.order)).size,workLogs:workLogs.length,workLogOrders:new Set(workLogs.map(l=>l.order)).size,notesWithCreationTime:stoppageNotes.filter(n=>n.createdTime).length,excludedStoppageNotes,missingStoppageNoteDate}};
 }
-const api={text,upper,status,labels,typeLabels,typeLabel,typeGroup,orderClass,validDate,daysBetween,date,time,period,filter,stats,adherence,rank,timing,byType,topAssets,badActors,icmMatrix,engineeringMetrics,decisionInsights,stopRecords,flaggedStopOrders,reliabilityByPlant,reliabilityByAsset,systemHealth,dedupe,schemas,optionalSchemas,headerKey,canonicalHeader,kind,normalize};
+const api={text,upper,status,labels,typeLabels,typeLabel,typeGroup,orderClass,validDate,daysBetween,date,time,period,filter,stats,adherence,rank,timing,byType,topAssets,badActors,icmMatrix,engineeringMetrics,decisionInsights,stopRecords,flaggedStopOrders,maintenanceEvents,reliabilityByPlant,reliabilityByAsset,systemHealth,dedupe,schemas,optionalSchemas,headerKey,canonicalHeader,kind,normalize};
 if(typeof module!=='undefined')module.exports=api;root.PCM=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
