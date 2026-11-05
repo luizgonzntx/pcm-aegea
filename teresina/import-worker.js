@@ -1,4 +1,4 @@
-importScripts('https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js','core.js?v=20261026-2');
+importScripts('https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js','core.js?v=20261105-1');
 onmessage=async ({data:files})=>{
 try{
  const tables={},names=[];
