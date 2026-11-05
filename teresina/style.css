@@ -2944,16 +2944,15 @@ section[data-view]:not([hidden]) {
 .maintenance-asset-link:focus-visible { outline:2px solid var(--blue); outline-offset:3px; }
 .maintenance-ribbon {
   display:grid;
-  grid-template-columns:repeat(5,minmax(0,1fr));
+  grid-template-columns:repeat(4,minmax(0,1fr));
   grid-template-areas:
-    "assign travel exec repair failure"
-    ". attend attend . .";
+    "travel exec repair failure"
+    "attend attend . .";
   column-gap:14px;
   row-gap:24px;
   margin:8px 0 28px;
   align-items:start;
 }
-.maintenance-step--attributionHours { grid-area:assign; }
 .maintenance-step--travelHours { grid-area:travel; }
 .maintenance-step--executionHours { grid-area:exec; }
 .maintenance-step--attendanceHours { grid-area:attend; }
@@ -3017,9 +3016,8 @@ section[data-view]:not([hidden]) {
   .maintenance-ribbon {
     grid-template-columns:repeat(3,minmax(0,1fr));
     grid-template-areas:
-      "assign travel exec"
-      ". attend attend"
-      "repair failure .";
+      "travel exec repair"
+      "attend attend failure";
     row-gap:26px;
   }
 }
@@ -3033,8 +3031,7 @@ section[data-view]:not([hidden]) {
     grid-template-areas:
       "travel exec"
       "attend attend"
-      "assign repair"
-      "failure failure";
+      "repair failure";
     column-gap:10px;
     row-gap:26px;
   }
