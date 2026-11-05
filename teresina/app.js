@@ -499,11 +499,12 @@
       const count = reliability.reduce((sum,item)=>sum+(item[countKey]||0),0);
       return count ? reliability.reduce((sum,item)=>sum+(item[key]||0)*(item[countKey]||0),0)/count : null;
     };
+    const allTravel=weighted('travelHours','travelCount'),allExecution=weighted('executionHours','executionCount');
     $('#maintenanceKpis').innerHTML =
       kpi('Tempo médio de atribuição',duration(weighted('attributionHours','attributionCount')),'Criação da nota → início real','#0027bd') +
       kpi('Tempo médio de deslocamento',duration(weighted('travelHours','travelCount')),'Apontamento operação 0010','#c2780c') +
       kpi('Tempo médio de execução',duration(weighted('executionHours','executionCount')),'Demais operações por técnico','#0f8a68') +
-      kpi('Tempo médio de atendimento',duration(weighted('attendanceHours','attendanceCount')),'Deslocamento + execução, por OS','#0027bd') +
+      kpi('Tempo médio de atendimento',duration(allTravel!=null&&allExecution!=null?allTravel+allExecution:null),'Deslocamento + execução, por OS','#0027bd') +
       kpi('MTTR técnico',duration(weighted('mttrHours','closed')),'Início real → referência SAP','#c43650');
     $('#maintenanceTable').innerHTML = reliability.length
       ? '<table><thead><tr><th>Planta / TAG</th><th>Paradas CE/CP</th><th>Atribuição média</th><th>Deslocamento médio</th><th>Execução média</th><th>Atendimento médio</th><th>MTTR técnico</th><th>Parada total média</th></tr></thead><tbody>' +
@@ -699,6 +700,7 @@
     if (!s) return;
     modalMode = 'system';
     const filter = { ...f, tag }, source = P.filter(data, filter), n = P.stats(source), a = P.adherence(data, filter);
+    const m=P.reliabilityByPlant(data,filter).find(row=>row.tag===tag);
     const blocks = [
       ['component', 'Itens que mais falharam'],
       ['cause', 'Causas registradas'],
@@ -716,7 +718,9 @@
       field('Longitude', s.lng) +
       field('Bairro', s.district) +
       '</dl>' + photo + '</details>' +
-      '<h3 class="detail-section">Itens, Causas e Medidas</h3><div class="detail-grid">' + blocks + '</div>' +
+      '<h3 class="detail-section">Tempos de manutenção · CE/CP + ENTE</h3>' +
+'<div class="detail-kpis plant-summary"><div><small>Atribuição média</small><b>'+formatHours(m?.attributionHours)+'</b></div><div><small>Deslocamento médio</small><b>'+formatHours(m?.travelHours)+'</b></div><div><small>Execução média</small><b>'+formatHours(m?.executionHours)+'</b></div><div><small>Atendimento médio</small><b>'+formatHours(m?.attendanceHours)+'</b></div><div><small>MTTR técnico</small><b>'+formatHours(m?.mttrHours)+'</b></div></div>' +
+'<h3 class="detail-section">Itens, Causas e Medidas</h3><div class="detail-grid">' + blocks + '</div>' +
       '<h3 class="detail-section">Ordens mais recentes no período</h3><div class="table-wrap">' + table([...source].sort((a, b) => (b.created || '').localeCompare(a.created || '')).slice(0, 50)) + '</div>',
       'INSTALAÇÃO · ÁGUAS DE TERESINA'
     );
@@ -727,6 +731,7 @@
     if (!o) return;
     modalMode = 'order';
     const items = data.items.filter(i => i.order === id), actions = data.actions.filter(i => i.order === id), s = data.systems.find(s => s.tag === o.tag);
+    const event=P.maintenanceEvents(data,{from:'',to:''}).find(e=>e.order.id===id);
     openDetail(
       '<div class="detail-heading"><h2>Ordem ' + esc(o.id) + '</h2><p>' + esc(o.text) + '</p></div>' +
       '<span class="badge ' + P.status(o) + '">' + P.labels[P.status(o)] + '</span>' +
@@ -736,7 +741,9 @@
       field('Equipamento', o.equipment) +
       field('Data de entrada', fmt(o.created)) +
       field('Data de referência', fmt(o.date)) +
-      field('Início real', fmt(o.start)) +
+      field('Início real', fmt(o.start)+(o.startTime?' '+o.startTime:'')) +
+      field('Horário de referência',o.referenceTime) +
+      (event ? field('Tempo de atribuição',formatHours(event.attributionHours)) + field('Deslocamento médio por profissional',formatHours(event.travelHours)) + field('Execução média por profissional',formatHours(event.executionHours)) + field('Tempo de atendimento',formatHours(event.attendanceHours)) + field('MTTR técnico',formatHours(event.mttrHours)) + field('Duração total da parada',formatHours(event.stopHours)) : '') +
       field('Prazo programado', fmt(o.due)) +
       field('Conclusão real', fmt(o.finished)) +
       field('Plano de manutenção', o.plan) +
