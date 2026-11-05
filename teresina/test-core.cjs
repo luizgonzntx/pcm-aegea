@@ -138,6 +138,33 @@ const overnight=P.reliabilityByPlant({
 assert.equal(overnight[0].mttrHours,2);
 assert.equal(overnight[0].attributionHours,0.5);
 assert.equal(overnight[0].stopHours,2.5);
+
+const dashboard=P.maintenanceDashboard(metricsData,{from:'2026-01-01',to:'2026-03-31'});
+assert.equal(dashboard.total.events,3);
+assert.equal(dashboard.total.attributionHours,4/3);
+assert.equal(dashboard.total.mttrHours,4/3);
+assert.equal(dashboard.total.travelHours,0.75);
+assert.equal(dashboard.total.executionHours,1.5);
+assert.equal(dashboard.total.attendanceHours,2.25);
+assert.equal(dashboard.total.mtbfHours,44);
+assert.equal(dashboard.assets.length,2);
+assert.equal(dashboard.months.length,3);
+assert.equal(dashboard.months[0].month,'2026-01');
+assert.equal(dashboard.months[0].events,3);
+assert.equal(dashboard.months[0].mtbfHours,44);
+assert.equal(dashboard.months[1].month,'2026-02');
+assert.equal(dashboard.months[1].mttrHours,null);
+assert.equal(dashboard.months[1].mtbfHours,null);
+const jan3=P.maintenanceDashboard(metricsData,{from:'2026-01-03',to:'2026-01-31',tag:['T1']});
+assert.equal(jan3.total.events,2);
+assert.equal(jan3.total.mtbfHours,44); // Intervalo usa a falha de janeiro anterior ao filtro.
+const onlyA2=P.maintenanceDashboard(metricsData,{from:'2026-01-01',to:'2026-01-31',tag:['T1'],asset:['A2']});
+assert.equal(onlyA2.total.events,1);
+assert.equal(onlyA2.total.mtbfHours,null);
+assert.equal(onlyA2.assets.length,1);
+assert.equal(onlyA2.assets[0].asset,'A2');
+assert.equal(P.maintenanceDashboard(metricsData,{from:'2026-04-01',to:'2026-04-30'}).total.mttrHours,null);
+
 const t=P.timing([o('1',{due:'2026-01-11',finished:'2026-01-10'}),o('2',{due:'2026-01-10',finished:'2026-01-12'}),o('3',{status:'ABER',due:'2026-01-01'}),o('4')],'2026-01-15');
 assert.equal(t.onTime,1);assert.equal(t.late,1);assert.equal(t.overdue,1);assert.equal(t.unassessed,1);
 const filtered=P.filter(data,f);
