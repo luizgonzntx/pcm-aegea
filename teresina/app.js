@@ -111,14 +111,20 @@
   }
 
   function setPage(next) {
+    const changed=page!==next;
     page = next;
+    document.documentElement.dataset.page=next;
+    const kpisEl=$('#kpis');if(kpisEl)kpisEl.hidden=next==='stops';
+    const startLabel=$('#fromLabel'),endLabel=$('#toLabel');
+    if(startLabel)startLabel.textContent=next==='stops'?'Período a partir de':'Entrada a partir de';
+    if(endLabel)endLabel.textContent=next==='stops'?'Período até':'Entrada até';
     const titles = {
       overview: 'Visão dos sistemas',
       intelligence: 'Engenharia & Decisão',
       icm: 'Itens, causas e medidas',
       deadlines: 'Planos e prazos',
       orders: 'Ordens de manutenção',
-      stops: 'Paradas'
+      stops: 'Indicadores de manutenção'
     };
     $('#pageTitle').textContent = titles[next] || 'Visão dos sistemas';
     $$('[data-page]').forEach(b => {
@@ -128,6 +134,7 @@
     });
     $$('[data-view]').forEach(v => v.hidden = v.dataset.view !== next);
     if (next === 'overview' && map) setTimeout(() => map.invalidateSize(), 60);
+    if(next==='stops'&&changed&&data)renderStops();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -229,7 +236,7 @@
     renderTypeDistribution();
     renderIntelligence();
     renderICM();
-    renderStops();
+    if(page==='stops')renderStops();
     renderTopAssets();
     renderDeadlines();
     renderOrders();
@@ -421,171 +428,124 @@
       : emptyHTML;
   }
 
-  function renderStops() {
-    const records = P.stopRecords(data, rows);
-    const flaggedByPlant = P.flaggedStopOrders(data, f);
-    const flaggedTotal = flaggedByPlant.reduce((sum, item) => sum + item.count, 0);
-    const reliability = P.reliabilityByPlant(data, f);
-    const assetReliability = P.reliabilityByAsset(data, f);
-    const reasons = new Map(), years = new Map(), assets = new Map(), groups = new Map(), plants = new Set();
-    for (const r of records) {
-      const add = (map, key) => {
-        if (!map.has(key)) map.set(key, { total: 0, confirmed: 0 });
-        const item = map.get(key);
-        item.total++;
-        if (r.status === 'Confirmada') item.confirmed++;
-      };
-      add(reasons, r.reason);
-      add(years, r.year);
-      add(assets, r.asset);
-      plants.add(r.tag);
-      const key = [r.year, r.tag, r.asset, r.reason].join('\\u0000');
-      if (!groups.has(key)) groups.set(key, { year: r.year, tag: r.tag, plant: r.plant, asset: r.asset, reason: r.reason, ids: new Set(), total: 0, confirmed: 0, durations: [] });
-      const group = groups.get(key);
-      group.ids.add(r.id);
-      group.total++;
-      if (r.status === 'Confirmada') group.confirmed++;
-      if (r.durationDays != null) group.durations.push(r.durationDays);
+
+  const maintenanceLabels = {
+    attributionHours:'Atribuição', travelHours:'Deslocamento',
+    executionHours:'Execução', attendanceHours:'Atendimento',
+    mttrHours:'MTTR', mtbfHours:'MTBF'
+  };
+  let maintenanceSnapshot = null;
+  function clock(hours) {
+    if(!Number.isFinite(hours)||hours<0)return '—';
+    const total=Math.round(hours*3600),days=Math.floor(total/86400);
+    const remaining=total-days*86400;
+    const h=String(Math.floor(remaining/3600)).padStart(2,'0');
+    const m=String(Math.floor(remaining%3600/60)).padStart(2,'0');
+    const sec=String(remaining%60).padStart(2,'0');
+    return (days?days+'d ':'')+h+':'+m+':'+sec;
+  }
+  function selectMaintenancePlant(tag) {
+    f.tag=tag&&tag!=='__multiple__'?[tag]:[];
+    f.asset=[];
+    options();
+    render();
+    setPage('stops');
+  }
+  function syncMaintenancePickers() {
+    const plantPicker=$('#stopPlantSelect'),assetPicker=$('#stopAssetSelect');
+    const plants=[...data.systems].sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
+    plantPicker.innerHTML='<option value="">Todas as plantas</option>'+plants.map(s=>
+      '<option value="'+esc(s.tag)+'">'+esc(s.name)+'</option>').join('');
+    if(selectedValues('tag').length>1){
+      plantPicker.insertAdjacentHTML('afterbegin','<option value="__multiple__">'+num(selectedValues('tag').length)+' plantas</option>');
     }
-    const reasonList = [...reasons].sort((a, b) => b[1].total - a[1].total || a[0].localeCompare(b[0], 'pt-BR'));
-    const yearList = [...years].sort((a, b) => b[0].localeCompare(a[0]));
-    const assetList = [...assets].sort((a, b) => b[1].total - a[1].total || a[0].localeCompare(b[0], 'pt-BR')).slice(0, 10);
-    const groupList = [...groups.values()].map(g => ({ ...g, ids: [...g.ids], avgDuration: g.durations.length ? g.durations.reduce((sum, value) => sum + value, 0) / g.durations.length : null }))
-      .sort((a, b) => b.total - a.total || b.year.localeCompare(a.year) || a.plant.localeCompare(b.plant, 'pt-BR') || a.asset.localeCompare(b.asset, 'pt-BR'));
-
-    const confirmedCount = records.filter(r => r.status === 'Confirmada').length;
-    $('#stopKpis').innerHTML =
-      kpi('Paradas identificadas', num(records.length), 'Ordens distintas no período', '#c43650') +
-      kpi('Paradas confirmadas', num(confirmedCount), records.length ? pct(confirmedCount / records.length) + ' do total' : 'Sem registros', '#0f8a68') +
-      kpi('Plantas atingidas', num(plants.size), 'Instalações com ocorrência', '#c2780c') +
-      kpi('Ativos envolvidos', num(assets.size), 'Ativos com ocorrência', '#0027bd');
-
-    $('#flaggedStopSummary').innerHTML =
-      kpi('Ordens com Parada = X', num(flaggedTotal), 'Ordens distintas no período da nota', '#c43650') +
-      kpi('Plantas com ocorrências', num(flaggedByPlant.length), 'TAG Planta distinta', '#c2780c');
-    $('#flaggedStops').innerHTML = flaggedByPlant.length
-      ? '<table><thead><tr><th>Planta</th><th>TAG Planta</th><th>Total</th><th>Concluídas</th><th>Em aberto</th><th>Canceladas</th><th>Outras situações</th></tr></thead><tbody>' +
-        flaggedByPlant.map(item => {
-          const key = rankEvidence.push({ name: item.plant + ' · Ordens com flag de parada', count: item.count, ids: item.ids }) - 1;
-          return '<tr><td><b>' + esc(item.plant) + '</b></td><td>' + esc(item.tag) + '</td>' +
-            '<td><button class="link" data-rank="' + key + '">' + num(item.count) + ' OS ↗</button></td>' +
-            '<td>' + num(item.done) + '</td><td>' + num(item.open) + '</td>' +
-            '<td>' + num(item.cancelled) + '</td><td>' + num(item.other) + '</td></tr>';
-        }).join('') + '</tbody></table>'
-      : emptyHTML;
-
-    const reliabilityEvents = reliability.reduce((sum, item) => sum + item.events, 0);
-    const reliabilityClosed = reliability.reduce((sum, item) => sum + item.closed, 0);
-    const duration = hours => {
-      if (hours == null) return '—';
-      return hours >= 24
-        ? (hours / 24).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' dias (' + hours.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' h)'
-        : hours.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' h';
+    plantPicker.value=selectedValues('tag').length===1?selectedValues('tag')[0]:
+      selectedValues('tag').length>1?'__multiple__':'';
+    const candidates=P.maintenanceEvents(data,{...f,asset:[],type:[],priority:[]});
+    const list=[...new Set(candidates.map(e=>e.asset).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+    assetPicker.innerHTML='<option value="">Todos os ativos</option>'+list.map(tag=>
+      '<option value="'+esc(tag)+'">'+esc(tag)+'</option>').join('');
+    if(selectedValues('asset').length>1){
+      assetPicker.insertAdjacentHTML('afterbegin','<option value="__multiple__">'+num(selectedValues('asset').length)+' ativos</option>');
+    }
+    assetPicker.value=selectedValues('asset').length===1?selectedValues('asset')[0]:
+      selectedValues('asset').length>1?'__multiple__':'';
+  }
+  function renderMaintenanceTrend() {
+    const el=$('#maintenanceTrend'),metric=$('#maintenanceMetric').value;
+    const months=maintenanceSnapshot?.months||[];
+    if(!months.length||!months.some(m=>m[metric]!=null)){
+      el.innerHTML='<div class="maintenance-empty">Sem dados para o indicador neste período.</div>';
+      return;
+    }
+    const width=Math.max(740,months.length*76+90),height=310;
+    const left=70,right=26,top=22,bottom=49,plotW=width-left-right,plotH=height-top-bottom;
+    const valid=months.map(m=>m[metric]).filter(v=>v!=null&&Number.isFinite(v));
+    const max=Math.max(...valid,0),ceiling=max>0?max*1.14:1;
+    const x=i=>left+(months.length===1?plotW/2:i*plotW/(months.length-1));
+    const y=v=>top+plotH-(v/ceiling)*plotH;
+    const points=months.map((m,i)=>m[metric]==null?null:{x:x(i),y:y(m[metric]),value:m[metric],month:m.month});
+    const segments=[],active=[];
+    for(const p of points){
+      if(!p){if(active.length)segments.push(active.splice(0));}
+      else active.push(p);
+    }
+    if(active.length)segments.push(active);
+    const smooth=seg=>{
+      if(!seg.length)return '';
+      if(seg.length===1)return 'M '+seg[0].x+' '+seg[0].y;
+      let d='M '+seg[0].x+' '+seg[0].y;
+      for(let i=1;i<seg.length;i++){
+        const prev=seg[i-1],next=seg[i],dx=(next.x-prev.x)/3;
+        d+=' C '+(prev.x+dx)+' '+prev.y+' '+(next.x-dx)+' '+next.y+' '+next.x+' '+next.y;
+      }
+      return d;
     };
-    const availabilityCell = value => {
-      const rate = value == null ? null : Math.max(0, Math.min(1, value));
-      const level = rate == null ? 'unavailable' : rate >= 0.85 ? 'good' : rate >= 0.6 ? 'warn' : 'critical';
-      return '<div class="availability-cell"><b>' + pct(value) + '</b><span class="availability-bar" aria-hidden="true"><i class="' + level + '" style="width:' + (rate == null ? 0 : rate * 100) + '%"></i></span></div>';
-    };
-    const plantReliabilityRanking = [...reliability].sort((a, b) =>
-      b.events-a.events || a.plant.localeCompare(b.plant, 'pt-BR')
-    );
-
-    const weighted = (key,countKey) => {
-      const count = reliability.reduce((sum,item)=>sum+(item[countKey]||0),0);
-      return count ? reliability.reduce((sum,item)=>sum+(item[key]||0)*(item[countKey]||0),0)/count : null;
-    };
-    const allTravel=weighted('travelHours','travelCount'),allExecution=weighted('executionHours','executionCount');
-    $('#maintenanceKpis').innerHTML =
-      kpi('Tempo médio de atribuição',duration(weighted('attributionHours','attributionCount')),'Criação da nota → início real','#0027bd') +
-      kpi('Tempo médio de deslocamento',duration(weighted('travelHours','travelCount')),'Apontamento operação 0010','#c2780c') +
-      kpi('Tempo médio de execução',duration(weighted('executionHours','executionCount')),'Demais operações por técnico','#0f8a68') +
-      kpi('Tempo médio de atendimento',duration(allTravel!=null&&allExecution!=null?allTravel+allExecution:null),'Deslocamento + execução, por OS','#0027bd') +
-      kpi('MTTR técnico',duration(weighted('mttrHours','closed')),'Início real → referência SAP','#c43650');
-    $('#maintenanceTable').innerHTML = reliability.length
-      ? '<table><thead><tr><th>Planta / TAG</th><th>Paradas CE/CP</th><th>Atribuição média</th><th>Deslocamento médio</th><th>Execução média</th><th>Atendimento médio</th><th>MTTR técnico</th><th>Parada total média</th></tr></thead><tbody>' +
-        [...reliability].sort((a,b)=>b.events-a.events||a.plant.localeCompare(b.plant,'pt-BR')).map(item=>
-          '<tr><td><b>'+esc(item.plant)+'</b><br><span class="small-note">'+esc(item.tag)+'</span></td>' +
-          '<td>'+num(item.events)+'</td><td>'+duration(item.attributionHours)+'</td>' +
-          '<td>'+duration(item.travelHours)+'</td><td>'+duration(item.executionHours)+'</td>' +
-          '<td>'+duration(item.attendanceHours)+'</td><td>'+duration(item.mttrHours)+'</td><td>'+duration(item.stopHours)+'</td></tr>'
-        ).join('')+'</tbody></table>'
-      : emptyHTML;
-    $('#reliabilitySummary').innerHTML =
-      kpi('Paradas CE/CP validadas', num(reliabilityEvents), 'Ordens CE/CP com Parada = X e ENTE', '#c43650') +
-      kpi('MTTR com horário válido', num(reliabilityClosed), 'Início real e referência SAP válidos', '#0f8a68');
-    $('#reliabilityTable').innerHTML = plantReliabilityRanking.length
-      ? '<div class="reliability-ranking"><table class="reliability-ranking-table"><thead><tr><th>Rank</th><th>Planta</th><th>Avarias consideradas</th><th>MTBF médio</th><th>Intervalos</th><th>MTTR técnico</th><th>Reparos válidos</th><th>Disponibilidade</th></tr></thead><tbody>' +
-        plantReliabilityRanking.map((item, index) =>
-          '<tr><td><span class="reliability-rank">' + (index + 1) + '</span></td>' +
-          '<td><b>' + esc(item.plant) + '</b><br><span class="small-note">' + esc(item.tag) + '</span></td>' +
-          '<td>' + num(item.events) + '</td><td>' + duration(item.mtbfHours) + '</td><td>' + num(item.intervals) + '</td>' +
-          '<td>' + duration(item.mttrHours) + '</td><td>' + num(item.closed) + '</td><td>' + availabilityCell(item.availability) + '</td></tr>'
-        ).join('') + '</tbody></table><div class="reliability-ranking-cards">' +
-        plantReliabilityRanking.map((item, index) =>
-          '<article class="reliability-rank-card"><div class="reliability-rank-heading"><span class="reliability-rank">' + (index + 1) + '</span>' +
-          '<div class="reliability-rank-plant"><b>' + esc(item.plant) + '</b><small>' + esc(item.tag) + '</small></div>' +
-          '<strong class="reliability-rank-value">' + pct(item.availability) + '</strong></div>' +
-          '<div class="reliability-rank-bar">' + availabilityCell(item.availability) + '</div>' +
-          '<div class="reliability-rank-metrics"><span>MTBF <b>' + duration(item.mtbfHours) + '</b></span><span>MTTR <b>' + duration(item.mttrHours) + '</b></span></div>' +
-          '</article>'
-        ).join('') + '</div></div>'
-      : emptyHTML;
-
-    const assetReliabilityEvents = assetReliability.reduce((sum, item) => sum + item.events, 0);
-    const assetReliabilityClosed = assetReliability.reduce((sum, item) => sum + item.closed, 0);
-    $('#assetReliabilitySummary').innerHTML =
-      kpi('Ativos com avaria registrada', num(assetReliability.length), 'Ordens ZNTP/ZNTE agrupadas pela TAG do ativo', '#0027bd') +
-      kpi('Avarias encerradas tecnicamente', num(assetReliabilityEvents), 'Ordens CE/CP com Parada = X e ENTE', '#c43650') +
-      kpi('Reparos com duração válida', num(assetReliabilityClosed), 'Ordens com início real e referência SAP válidos', '#0f8a68');
-    $('#assetReliabilityTable').innerHTML = assetReliability.length
-      ? '<table><thead><tr><th>Ativo</th><th>Equipamento</th><th>Planta</th><th>Avarias consideradas</th><th>MTBF médio</th><th>Intervalos</th><th>MTTR técnico</th><th>Reparos válidos</th><th>Disponibilidade</th></tr></thead><tbody>' +
-        assetReliability.map(item =>
-          '<tr><td><b>' + esc(item.asset) + '</b></td><td>' + esc(item.equipment || 'Não informado') + '</td>' +
-          '<td>' + esc(item.plant) + '<br><span class="small-note">' + esc(item.tag) + '</span></td>' +
-          '<td>' + num(item.events) + '</td><td>' + duration(item.mtbfHours) + '</td><td>' + num(item.intervals) + '</td>' +
-          '<td>' + duration(item.mttrHours) + '</td><td>' + num(item.closed) + '</td><td>' + availabilityCell(item.availability) + '</td></tr>'
-        ).join('') + '</tbody></table>'
-      : emptyHTML;
-
-    const maxReason = reasonList[0]?.[1].total || 1;
-    $('#stopReasons').innerHTML = reasonList.length
-      ? '<div class="type-list">' + reasonList.map(([reason, item]) =>
-          '<div class="type-row">' +
-          '<div class="row-head"><b>' + esc(reason) + '</b><span>' + num(item.total) + ' OS</span></div>' +
-          '<div class="row-sub"><span>' + num(item.confirmed) + ' confirmadas · ' + num(item.total - item.confirmed) + ' identificadas</span></div>' +
-          '<span class="mini-track"><i style="width:' + (item.total / maxReason * 100) + '%;background:var(--red)"></i></span>' +
-          '</div>'
-        ).join('') + '</div>'
-      : emptyHTML;
-
-    $('#stopYears').innerHTML = yearList.length
-      ? '<table><thead><tr><th>Ano</th><th>Paradas</th><th>Confirmadas</th></tr></thead><tbody>' +
-        yearList.map(([year, item]) => '<tr><td><b>' + esc(year) + '</b></td><td>' + num(item.total) + '</td><td>' + num(item.confirmed) + '</td></tr>').join('') +
-        '</tbody></table>'
-      : emptyHTML;
-
-    $('#stopAssets').innerHTML = assetList.length
-      ? '<div class="type-list">' + assetList.map(([asset, item]) =>
-          '<div class="type-row"><div class="row-head"><b>' + esc(asset) + '</b><span>' + num(item.total) + ' OS</span></div><div class="row-sub"><span>' + num(item.confirmed) + ' confirmadas</span></div><span class="mini-track"><i style="width:' + (item.total / (assetList[0][1].total || 1) * 100) + '%;background:var(--amber)"></i></span></div>'
-        ).join('') + '</div>'
-      : emptyHTML;
-
-    $('#stopGroups').innerHTML = groupList.length
-      ? '<table><thead><tr><th>Ano</th><th>Planta</th><th>Ativo</th><th>Motivo</th><th>Paradas</th><th>Confirmadas</th><th>Duração média</th></tr></thead><tbody>' +
-        groupList.map(g => {
-          const key = rankEvidence.push({ name: g.year + ' · ' + g.plant + ' · ' + g.asset + ' · ' + g.reason, count: g.total, ids: g.ids }) - 1;
-          return '<tr>' +
-            '<td><b>' + esc(g.year) + '</b></td>' +
-            '<td>' + esc(g.plant) + '</td>' +
-            '<td>' + esc(g.asset) + '</td>' +
-            '<td>' + esc(g.reason) + '</td>' +
-            '<td><button class="link" data-rank="' + key + '">' + num(g.total) + ' OS ↗</button></td>' +
-            '<td>' + num(g.confirmed) + '</td>' +
-            '<td>' + (g.avgDuration == null ? '—' : g.avgDuration.toFixed(1) + ' dias') + '</td>' +
-            '</tr>';
-        }).join('') + '</tbody></table>'
-      : emptyHTML;
+    const axis=[0,0.25,0.5,0.75,1].map(frac=>{
+      const value=ceiling*frac,gy=y(value);
+      const label=value>=24?(value/24).toLocaleString('pt-BR',{maximumFractionDigits:1})+'d':
+        value.toLocaleString('pt-BR',{maximumFractionDigits:1})+'h';
+      return '<line x1="'+left+'" y1="'+gy+'" x2="'+(width-right)+'" y2="'+gy+'" class="maintenance-gridline"/>'+
+        '<text x="'+(left-13)+'" y="'+(gy+4)+'" text-anchor="end" class="maintenance-axis-label">'+label+'</text>';
+    }).join('');
+    const labels=months.map((m,i)=>{
+      const [year,month]=m.month.split('-').map(Number);
+      const name=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][month-1]+'/'+String(year).slice(-2);
+      return '<text x="'+x(i)+'" y="'+(height-17)+'" text-anchor="middle" class="maintenance-axis-label">'+name+'</text>';
+    }).join('');
+    const paths=segments.map(seg=>'<path d="'+smooth(seg)+'" class="maintenance-curve"/>').join('');
+    const circles=points.filter(Boolean).map(p=>{
+      const [year,month]=p.month.split('-'),name=month+'/'+year;
+      return '<circle cx="'+p.x+'" cy="'+p.y+'" r="5.5" class="maintenance-point" tabindex="0" aria-label="'+
+        esc(name+': '+clock(p.value))+'"><title>'+esc(name+' · '+maintenanceLabels[metric]+': '+clock(p.value))+
+        '</title></circle>';
+    }).join('');
+    el.innerHTML='<svg xmlns="http://www.w3.org/2000/svg" class="maintenance-linechart" width="'+width+'" height="'+height+
+      '" viewBox="0 0 '+width+' '+height+'" role="img" aria-label="Evolução mensal de '+esc(maintenanceLabels[metric])+'">'+
+      axis+paths+circles+labels+'</svg>';
+  }
+  function renderStops() {
+    syncMaintenancePickers();
+    maintenanceSnapshot=P.maintenanceDashboard(data,{...f,type:[],priority:[]});
+    const metrics=Object.entries(maintenanceLabels);
+    $('#maintenanceOverview').innerHTML=metrics.map(([key,label],i)=>
+      '<article class="maintenance-step" style="--step-index:'+i+'"><strong title="'+esc(label)+'">'+
+      esc(clock(maintenanceSnapshot.total[key]))+'</strong><span>'+esc(label)+'</span></article>'
+    ).join('');
+    renderMaintenanceTrend();
+    const assets=maintenanceSnapshot.assets;
+    $('#maintenanceAssetTable').innerHTML=assets.length
+      ? '<table class="maintenance-assets-table"><thead><tr>'+
+        '<th>Ativo</th><th>Planta</th><th>Ocorrências</th><th>Atribuição</th><th>Deslocamento</th>'+
+        '<th>Execução</th><th>Atendimento</th><th>MTTR</th><th>MTBF</th></tr></thead><tbody>'+
+        assets.map(a=>
+          '<tr><td><button type="button" class="maintenance-asset-link" data-maintenance-asset="'+esc(a.asset)+
+          '" data-maintenance-plant="'+esc(a.tag)+'">'+esc(a.asset)+'</button></td>'+
+          '<td>'+esc(a.plant)+'</td><td>'+num(a.events)+'</td>'+
+          ['attributionHours','travelHours','executionHours','attendanceHours','mttrHours','mtbfHours'].map(key=>
+            '<td class="maintenance-time">'+esc(clock(a[key]))+'</td>').join('')+
+          '</tr>').join('')+'</tbody></table>'
+      : '<div class="maintenance-empty">Sem ativos com registros neste período.</div>';
   }
 
   function renderDeadlines() {
@@ -810,11 +770,11 @@
         '<small>' + esc(s.status || 'Situação não informada') + (s.critical ? ' · Criticidade: ' + esc(s.critical) : '') + '</small>' +
         '<div class="hover-grid"><div><small>Ordens executadas</small><b>' + num(n.done) + '</b></div><div><small>Aderência ao plano</small><b>' + pct(a.rate) + '</b></div></div>' +
         '<div class="hover-footer"><b>Item:</b> ' + esc(top?.name || 'Sem registro') + '<br><b>Causa:</b> ' + esc(cause?.name || 'Sem registro') + '<br><b>Medida:</b> ' + esc(act?.name || 'Sem registro') + '</div>' +
-        '<div class="hover-footer">Clique no ponto para abrir a instalação.</div>';
+        '<div class="hover-footer">Clique no ponto para ver os indicadores.</div>';
       marker.bindPopup(html, { closeButton: false, autoPan: false });
       marker.on('mouseover', () => marker.openPopup());
       marker.on('mouseout', () => marker.closePopup());
-      marker.on('click', () => showSystem(s.tag));
+      marker.on('click', () => selectMaintenancePlant(s.tag));
     });
     fitBounds = coords.length ? L.latLngBounds(coords) : null;
     setTimeout(() => {
@@ -1328,7 +1288,7 @@
       const o = event.target.closest('[data-order]');
       const r = event.target.closest('[data-rank]');
       const tf = event.target.closest('[data-type-filter]');
-      if (s && data) showSystem(s.dataset.system);
+      if (s && data) selectMaintenancePlant(s.dataset.system);
       else if (o && data) showOrder(o.dataset.order);
       else if (r && data) showEvidence(Number(r.dataset.rank));
       else if (tf && data) {
@@ -1340,6 +1300,18 @@
       }
     });
 
+    $('#stopPlantSelect').onchange=event=>selectMaintenancePlant(event.target.value);
+    $('#stopAssetSelect').onchange=event=>{
+      f.asset=event.target.value&&event.target.value!=='__multiple__'?[event.target.value]:[];
+      options();render();setPage('stops');
+    };
+    $('#maintenanceMetric').onchange=()=>renderMaintenanceTrend();
+    document.addEventListener('click',event=>{
+      const asset=event.target.closest('[data-maintenance-asset]');
+      if(!asset||!data)return;
+      f.tag=[asset.dataset.maintenancePlant];f.asset=[asset.dataset.maintenanceAsset];
+      options();render();setPage('stops');
+    });
     $('#search').oninput = () => { pageNo = 1; if (data) renderOrders(); };
     $('#statusFilter').onchange = () => { pageNo = 1; if (data) renderOrders(); };
     if ($('#planFilter')) $('#planFilter').onchange = () => { pageNo = 1; if (data) renderOrders(); };

@@ -114,3 +114,9 @@ O workflow `.github/workflows/deploy-cloudflare.yml` publica alterações de `ma
 Ele valida o painel, gera `dist/`, publica no projeto `pcm-aegea-teresina` e compara os arquivos servidos com o build do commit.
 Usa os secrets de repositório `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID` (também aceita `CF_API_TOKEN` e `CF_ACCOUNT_ID`). Os valores permanecem no GitHub; não devem ser colocados no código.
 O token deve ter permissão de edição do Cloudflare Pages na conta do projeto existente.
+
+## Visão enxuta de indicadores
+A aba **Indicadores** apresenta apenas seis tempos: atribuição, deslocamento, execução, atendimento, MTTR técnico e MTBF indicativo. A seleção de uma planta na lista ou no mapa abre a aba já filtrada. Na aba é possível selecionar outra planta e/ou TAG Ativo.
+O gráfico mensal suavizado usa a **Data da nota** para agrupar ocorrências; meses sem tempos válidos mostram lacunas, nunca zero artificial. Ao selecionar MTBF, o intervalo entre duas falhas CE do mesmo ativo é atribuído ao mês da segunda falha; o evento anterior pode estar fora do intervalo de datas filtrado.
+A tabela detalha os seis indicadores por TAG Ativo, sem apresentar campos de auditoria ou paradas inferidas por texto. O painel mostra um traço quando os horários ou apontamentos não permitem calcular o indicador. A fonte continua auditável no conjunto importado e nas ordens SAP.
+O resultado é obtido por média de ordens elegíveis; deslocamento e execução são primeiro divididos pelo número de técnicos distintos da categoria em cada ordem e só depois consolidados. Atendimento representa a soma dessas duas médias.

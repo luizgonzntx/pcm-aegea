@@ -11,10 +11,10 @@
   <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js"></script>
   <script defer src="config.js"></script>
-  <script defer src="core.js?v=20261105-2"></script>
+  <script defer src="core.js?v=20261105-3"></script>
   <script defer src="inventory.js"></script>
   <script defer src="ui.js"></script>
-  <script defer src="app.js?v=20261105-2"></script>
+  <script defer src="app.js?v=20261105-3"></script>
 </head>
 <body>
   <div id="access" class="access">
@@ -65,7 +65,7 @@
         <button title="ICM" aria-label="ICM" data-page="icm"><span>▥</span> ICM</button>
         <button title="Planos" aria-label="Planos" data-page="deadlines"><span>◷</span> Planos</button>
         <button title="Ordens" aria-label="Ordens" data-page="orders"><span>≡</span> Ordens</button>
-        <button title="Paradas" aria-label="Paradas" data-page="stops"><span>Ⅱ</span> Paradas</button>
+        <button title="Indicadores" aria-label="Indicadores de manutenção" data-page="stops"><span>◷</span> Indicadores</button>
       </nav>
       <div class="rail-bottom">
         <div id="userChip" class="user-chip" hidden>
@@ -105,10 +105,10 @@
           <div><strong>Filtros</strong><span>Refine os indicadores e as ordens exibidas</span></div>
           <span id="activeFilterCount" class="active-filter-count" aria-live="polite"></span>
         </div>
-        <label>Entrada a partir de
+        <label><span id="fromLabel">Entrada a partir de</span>
           <input type="date" id="from">
         </label>
-        <label>Entrada até
+        <label><span id="toLabel">Entrada até</span>
           <input type="date" id="to">
         </label>
         <div class="filter-picker" data-filter-key="tag">
@@ -397,127 +397,58 @@
           </div>
         </section>
 
-        <!-- 5. PARADAS -->
-        <section data-view="stops" hidden>
-          <div class="section-intro">
+        <!-- 5. INDICADORES DE MANUTENÇÃO -->
+        <section data-view="stops" class="maintenance-view" hidden>
+          <div class="section-intro maintenance-intro">
             <div>
-              <span class="eyebrow blue">PARADAS · CONFIABILIDADE OPERACIONAL</span>
-              <h2>Onde as paradas se concentram.</h2>
-              <p>Paradas validadas pela flag X, com ordem CE/CP e status ENTE. Explore os tempos por planta e os ativos afetados.</p>
+              <span class="eyebrow blue">MANUTENÇÃO · TERESINA</span>
+              <h2>Indicadores de manutenção</h2>
             </div>
-            <div class="section-actions">
-              <button id="exportStopsBtn">↓ Exportar ocorrências por texto (CSV)</button>
-              <button id="printStopsBtn">▣ Relatório exploratório PDF</button>
+            <div class="maintenance-selectors">
+              <label for="stopPlantSelect">Planta
+                <select id="stopPlantSelect" aria-label="Selecionar planta">
+                  <option value="">Todas as plantas</option>
+                </select>
+              </label>
+              <label for="stopAssetSelect">Ativo
+                <select id="stopAssetSelect" aria-label="Selecionar ativo">
+                  <option value="">Todos os ativos</option>
+                </select>
+              </label>
             </div>
           </div>
 
-          <article class="card" style="margin-bottom:20px">
+          <div id="maintenanceOverview" class="maintenance-ribbon" aria-label="Indicadores médios de manutenção"></div>
+
+          <article class="card maintenance-chart-card">
+            <div class="card-top maintenance-chart-head">
+              <div>
+                <span class="eyebrow">EVOLUÇÃO MENSAL</span>
+                <h2>Tempos ao longo dos meses</h2>
+              </div>
+              <label class="maintenance-metric-label" for="maintenanceMetric">Indicador
+                <select id="maintenanceMetric" aria-label="Indicador do gráfico mensal">
+                  <option value="attributionHours">Atribuição</option>
+                  <option value="travelHours">Deslocamento</option>
+                  <option value="executionHours">Execução</option>
+                  <option value="attendanceHours">Atendimento</option>
+                  <option value="mttrHours" selected>MTTR</option>
+                  <option value="mtbfHours">MTBF</option>
+                </select>
+              </label>
+            </div>
+            <div id="maintenanceTrend" class="maintenance-chart-scroll"></div>
+          </article>
+
+          <article class="card maintenance-assets-card">
             <div class="card-top">
               <div>
-                <span class="eyebrow">DADOS SAP VALIDADOS POR PLANTA</span>
-                <h2>Paradas validadas e MTTR por planta</h2>
+                <span class="eyebrow">DETALHAMENTO</span>
+                <h2>Indicadores por ativo</h2>
               </div>
             </div>
-            <div id="reliabilitySummary" class="kpis"></div>
-            <div id="reliabilityTable" class="table-wrap"></div>
+            <div id="maintenanceAssetTable" class="table-wrap"></div>
           </article>
-
-
-          <article class="card" style="margin-bottom:20px">
-            <div class="card-top"><div>
-              <span class="eyebrow">TEMPOS SAP · POR TAG PLANTA</span>
-              <h2>Atribuição, deslocamento, execução e atendimento</h2>
-            </div></div>
-            <p class="small-note">Atribuição: criação da nota → início real. MTTR técnico: início real → referência SAP. Deslocamento: operação 0010; execução: demais operações, com horas por profissional distinto. "—" indica ausência de data/hora ou apontamento válido.</p>
-            <div id="maintenanceKpis" class="kpis"></div>
-            <div id="maintenanceTable" class="table-wrap"></div>
-          </article>
-
-          <article class="card" style="margin-bottom:20px">
-            <div class="card-top">
-              <div>
-                <span class="eyebrow">CONFIABILIDADE POR ATIVO</span>
-                <h2>MTBF indicativo e MTTR por TAG Ativo</h2>
-              </div>
-            </div>
-            <div id="assetReliabilitySummary" class="kpis"></div>
-            <div id="assetReliabilityTable" class="table-wrap"></div>
-          </article>
-
-          <details class="card" style="margin-top:16px">
-            <summary><strong>Consulta exploratória por texto (não são paradas confirmadas)</strong></summary>
-            <p class="small-note">Ocorrências inferidas de descrições, problemas e causas. NÃO entram automaticamente nos indicadores validados de MTTR/MTBF.</p>
-            <div id="stopKpis" class="kpis"></div>
-          <div class="overview-bottom">
-            <article class="card">
-              <div class="card-top">
-                <div>
-                  <span class="eyebrow">MOTIVOS IDENTIFICADOS</span>
-                  <h2>Por que a parada foi registrada?</h2>
-                </div>
-                <span class="small-note">Ordens distintas</span>
-              </div>
-              <div id="stopReasons"></div>
-            </article>
-
-            <article class="card">
-              <div class="card-top">
-                <div>
-                  <span class="eyebrow">EVOLUÇÃO ANUAL</span>
-                  <h2>Paradas por ano</h2>
-                </div>
-                <span class="small-note">Data de entrada</span>
-              </div>
-              <div id="stopYears" class="table-wrap"></div>
-            </article>
-          </div>
-
-          <div class="overview-extra">
-            <article class="card">
-              <div class="card-top">
-                <div>
-                  <span class="eyebrow">PARETO DE ATIVOS</span>
-                  <h2>Ativos com mais paradas</h2>
-                </div>
-                <span class="small-note">Ordens distintas</span>
-              </div>
-              <div id="stopAssets"></div>
-            </article>
-            <article class="card explanation">
-              <span class="eyebrow blue">QUALIDADE DO DADO</span>
-              <h2>Identificada × confirmada.</h2>
-              <p>Uma ocorrência é <strong>identificada</strong> quando o texto, problema ou causa aponta uma parada.</p>
-              <p>Ela passa a <strong>confirmada</strong> quando a planilha informa confirmação ou início e fim da parada.</p>
-            </article>
-          </div>
-
-          <article class="card" style="margin-top:20px">
-            <div class="card-top">
-              <div>
-                <span class="eyebrow">PLANTA · ATIVO · MOTIVO</span>
-                <h2>Detalhamento das paradas</h2>
-              </div>
-              <span class="small-note">Clique na quantidade para ver as ordens</span>
-            </div>
-            <div id="stopGroups" class="table-wrap"></div>
-          </article>
-
-          <p class="small-note" style="margin-top:12px">Critério aplicado: a ordem entra quando o texto, problema ou causa indica parada, desligamento, falha ou indisponibilidade. Campos opcionais de confirmação, início, fim, motivo e impacto são usados quando existirem. A duração só aparece para paradas com início e fim preenchidos.</p>
-          </details>
-<details class="card" style="margin-top:16px;margin-bottom:16px"><summary><strong>Auditoria das notas com X (inclui ordens ainda não ENTE)</strong></summary><div class="detail-block">          <article class="card" style="margin-bottom:20px">
-            <div class="card-top">
-              <div>
-                <span class="eyebrow">FONTE: PLANILHA DE NOTAS</span>
-                <h2>Ordens com flag de parada</h2>
-              </div>
-              <button id="exportFlaggedStopsBtn">↓ Exportar ordens com flag (CSV)</button>
-            </div>
-            <div id="flaggedStopSummary" class="kpis"></div>
-            <div id="flaggedStops" class="table-wrap"></div>
-          </article>
-
-</div></details>
-
         </section>
 
         <!-- 6. ORDENS DE MANUTENÇÃO -->
