@@ -127,7 +127,7 @@
         try {
           const buffers = await Promise.all(list.map(async f => ({name:f.name, buffer:await f.arrayBuffer()})));
           const result = await new Promise((resolve, reject) => {
-            worker = new Worker('import-worker.js');
+            worker = new Worker('import-worker.js?v=20261105-1');
             const timeout = setTimeout(() => { worker.terminate(); reject(Error('A leitura excedeu três minutos.')); }, 180000);
             worker.onmessage = e => { if (e.data.progress) return msg(e.data.progress); clearTimeout(timeout); worker.terminate(); worker=null; e.data.error ? reject(Error(e.data.error)) : resolve(e.data.result); };
             worker.onerror = () => { clearTimeout(timeout); worker.terminate(); worker=null; reject(Error('Falha ao ler os arquivos.')); };
