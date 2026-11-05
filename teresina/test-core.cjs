@@ -149,6 +149,50 @@ assert.equal(eng.correctiveEmerg,1);
 assert.equal(eng.palliativeCount,1);
 assert.equal(eng.cavitationCount,1);
 assert.equal(eng.electricalCount,1);
+
+const icmData={
+ orders:[
+  o('ce1',{type:'ZNTE',status:'ENTE'}),
+  o('cp1',{type:'ZNTP',status:'ENTE'}),
+  o('preventiva',{type:'ZTPF',status:'ENTE'}),
+  o('aberta',{type:'ZNTE',status:'ABER'}),
+  o('naoexecutada',{type:'ZNTE',status:'ENTE NEXE'})
+ ],
+ items:[
+  {order:'ce1',component:'Motor',problem:'Superaquecimento',cause:'Curto-circuito'},
+  {order:'ce1',component:'Motor',problem:'Superaquecimento',cause:'Curto-circuito'},
+  {order:'cp1',component:'Não informado',problem:'Vazamento',cause:'Falha inexistente'},
+  {order:'preventiva',component:'Bomba',problem:'Inspeção',cause:'Desgaste'},
+  {order:'aberta',component:'Rotor',problem:'Ruído',cause:'Cavitação'}
+ ],
+ actions:[
+  {order:'ce1',action:'Substituir contator'},
+  {order:'ce1',action:'Ajustar conexão'},
+  {order:'ce1',action:'Substituir contator'},
+  {order:'cp1',action:'Não executar'},
+  {order:'preventiva',action:'Lubrificar'}
+ ]
+};
+assert.equal(P.icmUseful('Não informado'),false);
+assert.equal(P.icmUseful('Falha inexistente'),false);
+assert.equal(P.icmUseful('Troca de selo'),true);
+const icmAudit=P.icmAudit(icmData,icmData.orders);
+assert.deepEqual(
+ (({eligible,components,causes,fullItems,measures,complete,missingCause,missingMeasure})=>
+  ({eligible,components,causes,fullItems,measures,complete,missingCause,missingMeasure}))(icmAudit),
+ {eligible:2,components:1,causes:1,fullItems:1,measures:1,complete:1,missingCause:1,missingMeasure:1}
+);
+const icmMatrix=P.icmMatrix(icmData,icmData.orders);
+assert.equal(icmMatrix.length,1);
+assert.equal(icmMatrix[0].component,'Motor');
+assert.equal(icmMatrix[0].count,1);
+assert.deepEqual(icmMatrix[0].ids,['ce1']);
+assert.equal(Object.hasOwn(icmMatrix[0],'action'),false); // Sem vínculo item↔medida presumido.
+assert.equal(P.icmRank(icmData,icmData.orders,'action').length,2);
+assert.equal(P.icmRank(icmData,icmData.orders,'component').length,1);
+assert.equal(P.icmAudit(icmData,[o('x',{type:'ZTPF',status:'ENTE'})]).eligible,0);
+assert.ok(normalized.meta.icm && normalized.meta.maintenance);
+
 const insights=P.decisionInsights(data,filtered,f);
 assert.equal(insights.length>=3,true);
 const actors=P.badActors(filtered);
