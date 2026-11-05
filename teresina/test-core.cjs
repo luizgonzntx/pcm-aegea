@@ -255,3 +255,21 @@ assert.equal(inventory.find('ETA Sul - Captação').sections[0].powerCv,1750);
 assert.equal(inventory.find('Recalque - ETA Norte').sections[0].powerCv,1050);
 assert.equal(inventory.find('Captação'),null);
 assert.equal(inventory.find('Booster Dirceu Norte'),null);
+
+
+// Contrato da interface: atribuição fica no cálculo histórico, não na visão gerencial.
+const fs=require('node:fs'),path=require('node:path');
+const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');
+const app=fs.readFileSync(path.join(__dirname,'app.js'),'utf8');
+const css=fs.readFileSync(path.join(__dirname,'style.css'),'utf8');
+const metricSelect=html.match(/<select id="maintenanceMetric"[\s\S]*?<\/select>/)?.[0]||'';
+assert.equal((metricSelect.match(/<option /g)||[]).length,5);
+assert.ok(!metricSelect.includes('attributionHours'));
+assert.ok(!app.includes("['attributionHours','Atribuição']"));
+assert.ok(!app.includes('<th>Atribuição</th>'));
+assert.ok(!app.includes("field('Tempo de atribuição'"));
+assert.ok(app.includes("['travelHours','Deslocamento']"));
+assert.ok(css.includes('"travel exec repair failure"'));
+assert.ok(css.includes('"attend attend . ."'));
+assert.equal(P.maintenanceDashboard(metricsData,{from:'2026-01-01',to:'2026-01-31'}).total.attributionHours,4/3);
+console.log('Interface: cinco indicadores gerenciais; histórico de atribuição preservado para auditoria.');
