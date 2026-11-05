@@ -933,7 +933,7 @@
       importMessage('Preparando leitura das planilhas…');
       const buffers = await Promise.all(files.map(async file => ({ name: file.name, buffer: await file.arrayBuffer() })));
       const result = await new Promise((resolve, reject) => {
-        worker = new Worker('import-worker.js');
+        worker = new Worker('import-worker.js?v=20261105-1');
         const timeout = setTimeout(() => {
           worker.terminate();
           reject(Error('A leitura excedeu três minutos. Reduza o tamanho do conjunto.'));
