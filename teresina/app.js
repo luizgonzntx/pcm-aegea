@@ -527,11 +527,23 @@
   function renderStops() {
     syncMaintenancePickers();
     maintenanceSnapshot=P.maintenanceDashboard(data,{...f,type:[],priority:[]});
-    const metrics=Object.entries(maintenanceLabels);
-    $('#maintenanceOverview').innerHTML=metrics.map(([key,label],i)=>
-      '<article class="maintenance-step" style="--step-index:'+i+'"><strong title="'+esc(label)+'">'+
-      esc(clock(maintenanceSnapshot.total[key]))+'</strong><span>'+esc(label)+'</span></article>'
-    ).join('');
+    const metrics=[
+      ['attributionHours','Atribuição'],
+      ['travelHours','Deslocamento'],
+      ['executionHours','Execução'],
+      ['attendanceHours','Atendimento'],
+      ['mttrHours','MTTR'],
+      ['mtbfHours','MTBF']
+    ];
+    const counts=maintenanceSnapshot.total;
+    $('#maintenanceOverview').innerHTML=metrics.map(([key,label])=>{
+      const explanation=key==='attendanceHours'
+        ? 'Deslocamento: '+(counts.travelHoursCount||0)+' ordens; execução: '+(counts.executionHoursCount||0)+' ordens. Soma das médias por categoria.'
+        : label+' · '+(counts[key+'Count']||0)+' registros válidos';
+      return '<article class="maintenance-step maintenance-step--'+key+'" title="'+
+        esc(explanation)+'"><strong>'+
+        esc(clock(counts[key]))+'</strong><span>'+esc(label)+'</span></article>';
+    }).join('');
     renderMaintenanceTrend();
     const assets=maintenanceSnapshot.assets;
     $('#maintenanceAssetTable').innerHTML=assets.length
