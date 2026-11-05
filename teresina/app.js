@@ -537,14 +537,11 @@
     ];
     const counts=maintenanceSnapshot.total;
     $('#maintenanceOverview').innerHTML=metrics.map(([key,label])=>{
-      const samples=key==='attendanceHours'
-        ? Math.min(counts.travelHoursCount||0,counts.executionHoursCount||0)
-        : (counts[key+'Count']||0);
       const explanation=key==='attendanceHours'
-        ? 'Soma das médias de deslocamento e execução'
-        : label;
+        ? 'Deslocamento: '+(counts.travelHoursCount||0)+' ordens; execução: '+(counts.executionHoursCount||0)+' ordens. Soma das médias por categoria.'
+        : label+' · '+(counts[key+'Count']||0)+' registros válidos';
       return '<article class="maintenance-step maintenance-step--'+key+'" title="'+
-        esc(explanation+' · '+samples+' registros válidos')+'"><strong>'+
+        esc(explanation)+'"><strong>'+
         esc(clock(counts[key]))+'</strong><span>'+esc(label)+'</span></article>';
     }).join('');
     renderMaintenanceTrend();
