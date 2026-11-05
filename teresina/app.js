@@ -430,7 +430,7 @@
 
 
   const maintenanceLabels = {
-    attributionHours:'Atribuição', travelHours:'Deslocamento',
+    travelHours:'Deslocamento',
     executionHours:'Execução', attendanceHours:'Atendimento',
     mttrHours:'MTTR', mtbfHours:'MTBF'
   };
@@ -528,7 +528,6 @@
     syncMaintenancePickers();
     maintenanceSnapshot=P.maintenanceDashboard(data,{...f,type:[],priority:[]});
     const metrics=[
-      ['attributionHours','Atribuição'],
       ['travelHours','Deslocamento'],
       ['executionHours','Execução'],
       ['attendanceHours','Atendimento'],
@@ -548,13 +547,13 @@
     const assets=maintenanceSnapshot.assets;
     $('#maintenanceAssetTable').innerHTML=assets.length
       ? '<table class="maintenance-assets-table"><thead><tr>'+
-        '<th>Ativo</th><th>Planta</th><th>Ocorrências</th><th>Atribuição</th><th>Deslocamento</th>'+
+        '<th>Ativo</th><th>Planta</th><th>Ocorrências</th><th>Deslocamento</th>'+
         '<th>Execução</th><th>Atendimento</th><th>MTTR</th><th>MTBF</th></tr></thead><tbody>'+
         assets.map(a=>
           '<tr><td><button type="button" class="maintenance-asset-link" data-maintenance-asset="'+esc(a.asset)+
           '" data-maintenance-plant="'+esc(a.tag)+'">'+esc(a.asset)+'</button></td>'+
           '<td>'+esc(a.plant)+'</td><td>'+num(a.events)+'</td>'+
-          ['attributionHours','travelHours','executionHours','attendanceHours','mttrHours','mtbfHours'].map(key=>
+          ['travelHours','executionHours','attendanceHours','mttrHours','mtbfHours'].map(key=>
             '<td class="maintenance-time">'+esc(clock(a[key]))+'</td>').join('')+
           '</tr>').join('')+'</tbody></table>'
       : '<div class="maintenance-empty">Sem ativos com registros neste período.</div>';
@@ -687,7 +686,7 @@
       field('Bairro', s.district) +
       '</dl>' + photo + '</details>' +
       '<h3 class="detail-section">Tempos de manutenção · CE/CP + ENTE</h3>' +
-'<div class="detail-kpis plant-summary"><div><small>Atribuição média</small><b>'+formatHours(m?.attributionHours)+'</b></div><div><small>Deslocamento médio</small><b>'+formatHours(m?.travelHours)+'</b></div><div><small>Execução média</small><b>'+formatHours(m?.executionHours)+'</b></div><div><small>Atendimento médio</small><b>'+formatHours(m?.attendanceHours)+'</b></div><div><small>MTTR técnico</small><b>'+formatHours(m?.mttrHours)+'</b></div></div>' +
+'<div class="detail-kpis plant-summary"><div><small>Deslocamento médio</small><b>'+formatHours(m?.travelHours)+'</b></div><div><small>Execução média</small><b>'+formatHours(m?.executionHours)+'</b></div><div><small>Atendimento médio</small><b>'+formatHours(m?.attendanceHours)+'</b></div><div><small>MTTR técnico</small><b>'+formatHours(m?.mttrHours)+'</b></div></div>' +
 '<h3 class="detail-section">Itens, Causas e Medidas</h3><div class="detail-grid">' + blocks + '</div>' +
       '<h3 class="detail-section">Ordens mais recentes no período</h3><div class="table-wrap">' + table([...source].sort((a, b) => (b.created || '').localeCompare(a.created || '')).slice(0, 50)) + '</div>',
       'INSTALAÇÃO · ÁGUAS DE TERESINA'
@@ -711,7 +710,7 @@
       field('Data de referência', fmt(o.date)) +
       field('Início real', fmt(o.start)+(o.startTime?' '+o.startTime:'')) +
       field('Horário de referência',o.referenceTime) +
-      (event ? field('Tempo de atribuição',formatHours(event.attributionHours)) + field('Deslocamento médio por profissional',formatHours(event.travelHours)) + field('Execução média por profissional',formatHours(event.executionHours)) + field('Tempo de atendimento',formatHours(event.attendanceHours)) + field('MTTR técnico',formatHours(event.mttrHours)) + field('Duração total da parada',formatHours(event.stopHours)) : '') +
+      (event ? field('Deslocamento médio por profissional',formatHours(event.travelHours)) + field('Execução média por profissional',formatHours(event.executionHours)) + field('Tempo de atendimento',formatHours(event.attendanceHours)) + field('MTTR técnico',formatHours(event.mttrHours)) + field('Duração total da parada',formatHours(event.stopHours)) : '') +
       field('Prazo programado', fmt(o.due)) +
       field('Conclusão real', fmt(o.finished)) +
       field('Plano de manutenção', o.plan) +
