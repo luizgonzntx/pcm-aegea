@@ -111,6 +111,7 @@
   }
 
   function setPage(next) {
+    const changed=page!==next;
     page = next;
     document.documentElement.dataset.page=next;
     const kpisEl=$('#kpis');if(kpisEl)kpisEl.hidden=next==='stops';
@@ -133,6 +134,7 @@
     });
     $$('[data-view]').forEach(v => v.hidden = v.dataset.view !== next);
     if (next === 'overview' && map) setTimeout(() => map.invalidateSize(), 60);
+    if(next==='stops'&&changed&&data)renderStops();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -234,7 +236,7 @@
     renderTypeDistribution();
     renderIntelligence();
     renderICM();
-    renderStops();
+    if(page==='stops')renderStops();
     renderTopAssets();
     renderDeadlines();
     renderOrders();
