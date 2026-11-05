@@ -248,31 +248,61 @@ function badActors(rows){
   return {asset:a.asset,equipment:a.equipment,tag:a.tag,total:a.total,done:a.done,corrective:a.corrective,emergency:a.emergency,open:a.open,rework30d,mtbfDays,ids:[...a.ids]};
  }).filter(a=>a.corrective>0||a.total>=3).sort((a,b)=>b.corrective-a.corrective||b.rework30d-a.rework30d||b.total-a.total);
 }
-function icmMatrix(data,orders){
- const doneIds=new Set(orders.filter(o=>status(o)==='done').map(o=>o.id));
- const actionsByOrder=new Map;
- for(const a of (data.actions||[])){
-  if(!doneIds.has(a.order))continue;
-  const act=text(a.action);
-  if(!act||upper(act)==='NÃO EXECUTAR'||upper(act)==='NAO EXECUTAR')continue;
-  if(!actionsByOrder.has(a.order))actionsByOrder.set(a.order,new Set);
-  actionsByOrder.get(a.order).add(act);
+
+// ICM diagnóstico: somente corretivas CE/CP encerradas tecnicamente.
+// Catálogos de itens e medidas compartilham a OS, mas NÃO provam associação item↔medida.
+function icmUseful(value){
+ const v=headerKey(value);
+ return !!v && !['0','null','undefined','na','n a','nenhum','nenhuma',
+  'nao informado','nao informada','sem informacao','sem registro',
+  'nao aplicavel','nao executar','falha inexistente'].includes(v);
+}
+function icmScope(orders){
+ return new Set((orders||[]).filter(o=>status(o)==='done'&&['ZNTE','ZNTP'].includes(upper(o.type))).map(o=>o.id));
+}
+function icmRank(data,orders,field){
+ const ids=icmScope(orders),values=new Map;
+ const source=field==='action'?data.actions:data.items;
+ for(const row of (source||[])){
+  if(!ids.has(row.order)||!icmUseful(row[field]))continue;
+  const key=text(row[field]);
+  if(!values.has(key))values.set(key,new Set);
+  values.get(key).add(row.order);
  }
- const map=new Map;
+ return [...values].map(([name,orderIds])=>({name,count:orderIds.size,ids:[...orderIds]}))
+   .sort((a,b)=>b.count-a.count||a.name.localeCompare(b.name,'pt-BR'));
+}
+function icmAudit(data,orders){
+ const ids=icmScope(orders),comp=new Set,prob=new Set,cause=new Set,fullItem=new Set,measure=new Set;
+ for(const row of (data.items||[])){
+  if(!ids.has(row.order))continue;
+  const c=icmUseful(row.component),p=icmUseful(row.problem),a=icmUseful(row.cause);
+  if(c)comp.add(row.order);
+  if(p)prob.add(row.order);
+  if(a)cause.add(row.order);
+  if(c&&p&&a)fullItem.add(row.order);
+ }
+ for(const row of (data.actions||[]))if(ids.has(row.order)&&icmUseful(row.action))measure.add(row.order);
+ let complete=0;
+ for(const id of fullItem)if(measure.has(id))complete++;
+ return {eligible:ids.size,components:comp.size,problems:prob.size,causes:cause.size,
+  fullItems:fullItem.size,measures:measure.size,complete,
+  coverage:ids.size?complete/ids.size:null,missingCause:ids.size-cause.size,
+  missingMeasure:ids.size-measure.size,missingItem:ids.size-fullItem.size};
+}
+function icmMatrix(data,orders){
+ const doneIds=icmScope(orders),map=new Map;
  for(const item of (data.items||[])){
   if(!doneIds.has(item.order))continue;
+  // Uma combinação só existe quando os três campos constam da MESMA linha de item.
+  if(!icmUseful(item.component)||!icmUseful(item.problem)||!icmUseful(item.cause))continue;
   const comp=text(item.component),prob=text(item.problem),cause=text(item.cause);
-  if(upper(cause)==='FALHA INEXISTENTE'||upper(prob)==='FALHA INEXISTENTE')continue;
-  if(!comp&&!prob&&!cause)continue;
-  const acts=actionsByOrder.get(item.order);
-  const actList=acts&&acts.size?[...acts]:['Sem medida registrada'];
-  for(const act of actList){
-   const key=[comp||'Não informado',prob||'Não informado',cause||'Não informada',act].join(' || ');
-   if(!map.has(key))map.set(key,{component:comp||'Não informado',problem:prob||'Não informado',cause:cause||'Não informada',action:act,ids:new Set});
-   map.get(key).ids.add(item.order);
-  }
+  const key=[comp,prob,cause].join('\u0000');
+  if(!map.has(key))map.set(key,{component:comp,problem:prob,cause,ids:new Set});
+  map.get(key).ids.add(item.order);
  }
- return [...map.values()].map(r=>({component:r.component,problem:r.problem,cause:r.cause,action:r.action,count:r.ids.size,ids:[...r.ids]})).sort((a,b)=>b.count-a.count||a.component.localeCompare(b.component,'pt-BR'));
+ return [...map.values()].map(r=>({component:r.component,problem:r.problem,cause:r.cause,count:r.ids.size,ids:[...r.ids]}))
+   .sort((a,b)=>b.count-a.count||a.component.localeCompare(b.component,'pt-BR'));
 }
 function engineeringMetrics(data,rows,asOf){
  let preventive=0,predictive=0,correctiveEmerg=0,correctivePlan=0,service=0,engineering=0,reactive=0;
@@ -291,7 +321,7 @@ function engineeringMetrics(data,rows,asOf){
   else if(p.includes('URG'))prioUrg++;
   if(s==='done'){
    doneIds.add(o.id);
-   if(cls==='corrective_emergency'||cls==='corrective_planned'||cls==='service')correctiveDoneIds.add(o.id);
+   if(['ZNTE','ZNTP'].includes(upper(o.type)))correctiveDoneIds.add(o.id);
   }else if(s==='open'&&asOf){
    const refDate=o.created||o.date;
    const age=daysBetween(refDate,asOf);
@@ -309,7 +339,7 @@ function engineeringMetrics(data,rows,asOf){
   if(!doneIds.has(i.order))continue;
   const c=upper(i.cause),pr=upper(i.problem);
   if(c==='FALHA INEXISTENTE'||pr==='FALHA INEXISTENTE')continue;
-  if(text(i.component)||text(i.cause)||text(i.problem))itemsOrders.add(i.order);
+  if(icmUseful(i.component)&&icmUseful(i.problem)&&icmUseful(i.cause))itemsOrders.add(i.order);
   if(c.includes('CAVITA')||c.includes('DETRITO')||pr.includes('VAZAMENTO')||pr.includes('BAIXA VAZ'))cavitationOrders.add(i.order);
   if(c.includes('TENSÃO')||c.includes('TENSAO')||c.includes('ASSIMETRIA')||c.includes('CURTO')||c.includes('SOBRECARGA')||c.includes('PROGRAMA')||c.includes('CONFIGURA'))electricalOrders.add(i.order);
  }
@@ -317,7 +347,7 @@ function engineeringMetrics(data,rows,asOf){
  for(const a of (data.actions||[])){
   if(!doneIds.has(a.order))continue;
   const act=upper(a.action);
-  if(!act||act==='NÃO EXECUTAR'||act==='NAO EXECUTAR')continue;
+  if(!icmUseful(act))continue;
   actionOrders.add(a.order);
   if(act.includes('RESET')||act.includes('REARM')||act.includes('PARAMETRO')||act.includes('PARÂMETRO'))palliativeOrders.add(a.order);
  }
@@ -387,7 +417,7 @@ function decisionInsights(data,rows,f){
    severity:covPct>=80?'good':covPct>=50?'warn':'critical',
    category:'GOVERNANÇA DE DADOS PCM (SAP)',
    title:'Cobertura de Apontamento ICM nas Corretivas: '+covPct+'%',
-   body:'De '+m.correctiveDoneTotal.toLocaleString('pt-BR')+' ordens corretivas/serviços executadas, '+m.corrWithIcm.toLocaleString('pt-BR')+' possuem Item, Causa e Medida completos nas planilhas de catálogo.',
+   body:'De '+m.correctiveDoneTotal.toLocaleString('pt-BR')+' ordens corretivas CE/CP encerradas tecnicamente, '+m.corrWithIcm.toLocaleString('pt-BR')+' possuem Item, Problema e Causa no mesmo registro, além de pelo menos uma Medida na ordem.',
   });
  }
  if(adh.rate!=null){
@@ -469,6 +499,6 @@ function normalize(tables,files){
  }).filter(r=>ids.has(r.order));
  return {systems,orders,items,actions,stoppageNotes,workLogs,meta:{loadedAt:new Date().toISOString(),files,sourceOrders:all.length,excluded:all.length-orders.length,missingReference:orders.filter(o=>!o.date).length,stoppageOrders:new Set(stoppageNotes.map(n=>n.order)).size,workLogs:workLogs.length,workLogOrders:new Set(workLogs.map(l=>l.order)).size,notesWithCreationTime:stoppageNotes.filter(n=>n.createdTime).length,excludedStoppageNotes,missingStoppageNoteDate}};
 }
-const api={text,upper,status,labels,typeLabels,typeLabel,typeGroup,orderClass,validDate,daysBetween,date,time,period,filter,stats,adherence,rank,timing,byType,topAssets,badActors,icmMatrix,engineeringMetrics,decisionInsights,stopRecords,flaggedStopOrders,maintenanceEvents,reliabilityByPlant,reliabilityByAsset,systemHealth,dedupe,schemas,optionalSchemas,headerKey,canonicalHeader,kind,normalize};
+const api={text,upper,status,labels,typeLabels,typeLabel,typeGroup,orderClass,validDate,daysBetween,date,time,period,filter,stats,adherence,rank,timing,byType,topAssets,badActors,icmScope,icmUseful,icmRank,icmAudit,icmMatrix,engineeringMetrics,decisionInsights,stopRecords,flaggedStopOrders,maintenanceEvents,reliabilityByPlant,reliabilityByAsset,systemHealth,dedupe,schemas,optionalSchemas,headerKey,canonicalHeader,kind,normalize};
 if(typeof module!=='undefined')module.exports=api;root.PCM=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
