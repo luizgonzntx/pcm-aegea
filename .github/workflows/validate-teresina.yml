@@ -34,10 +34,13 @@ jobs:
         run: |
           node --check app.js
           node --check pcm-neural-orb.js
+          node --check pcm-neural-knowledge.js
           node --check inventory.js
           node --check ui.js
       - name: Run core tests
-        run: node test-core.cjs
+        run: |
+          node test-core.cjs
+          node test-neural.cjs
       - name: Validate publication assets
         working-directory: .
         run: |
