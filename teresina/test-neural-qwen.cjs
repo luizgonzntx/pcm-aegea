@@ -45,8 +45,8 @@ assert.match(workerSrc,/callback_function/);
 assert.match(uiSrc,/PCM_NEURAL_EVIDENCE\.makePrompt/);
 assert.match(uiSrc,/llm\.ask/);
 assert.doesNotMatch(uiSrc,/type="file"/);
-assert.match(index,/pcm-neural-evidence.js\?v=20261106-8/);
-assert.match(index,/pcm-neural-chat-client.js\?v=20261106-8/);
+assert.match(index,/pcm-neural-evidence.js\?v=20261106-9/);
+assert.match(index,/pcm-neural-chat-client.js\?v=20261106-9/);
 class FakeWorker {
  constructor(){this.listeners={};this.terminated=false;}
  addEventListener(name,cb){this.listeners[name]=cb;}
