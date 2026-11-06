@@ -63,12 +63,12 @@ function makePrompt(ctx,question,target,analysis,focus,history=[]){
  }
  const caveat=slice(trustworthy.caveat,380);
  if(caveat)records.push('Restrição do cálculo: '+caveat);
- const evidence=records.join('\n').slice(0,5100);
+ const evidence=records.join('\n').slice(0,3300);
  const source=[order?'OS '+order.id:'',actualAsset?'TAG '+actualAsset:'',trustworthy.source||''].filter(Boolean).join(' · ').slice(0,340)
    ||'Conhecimento geral de manutenção; nenhuma OS específica identificada';
  const turns=(Array.isArray(history)?history:[]).slice(-4)
   .filter(x=>['user','assistant'].includes(x.role)&&typeof x.content==='string')
-  .map(x=>({role:x.role,content:x.content.slice(0,500)}));
+  .map(x=>({role:x.role,content:x.content.slice(0,360)}));
  const system=[
   'Você é o assistente PCM de engenharia de manutenção da Águas de Teresina. Responda sempre em português do Brasil, claramente e com termos técnicos apropriados.',
   'Responda perguntas livres de manutenção, instrumentação, bombeamento, motores, falhas, indicadores e equipamentos.',
