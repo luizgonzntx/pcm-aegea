@@ -2,7 +2,7 @@
 'use strict';
 const MODEL='Qwen2.5-0.5B-Instruct (WebGPU local)';
 function createClient(workerFactory){
- const factory=workerFactory||(()=>new Worker('pcm-neural-chat-worker.js?v=20261106-8',{type:'module'}));
+ const factory=workerFactory||(()=>new Worker('pcm-neural-chat-worker.js?v=20261106-9',{type:'module'}));
  let worker=null,active=null,serial=0,ready=false,unavailable='';
  const canRun=()=>typeof root.Worker==='function'&&!!root.navigator?.gpu;
  const status=()=>({ready,busy:!!active,available:canRun()&&!unavailable,unavailable,model:MODEL});
