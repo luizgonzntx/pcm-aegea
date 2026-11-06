@@ -23,6 +23,7 @@
     return {orders: tagOrders.get(system.tag) || [], systems: [system]};
   }
   function reliabilityMaps() {
+    if (tagIndexData !== data) reliabilityCacheKey = '';
     // Recalcular apenas quando filtros relevantes ou revisão dos dados mudarem.
     const key = JSON.stringify([revision, f.from, f.to, f.type, f.priority, f.asset]);
     if (key !== reliabilityCacheKey) {
@@ -206,7 +207,7 @@
     });
     $$('[data-view]').forEach(v => v.hidden = v.dataset.view !== next);
     if (next === 'overview' && data) {
-      if (changed) renderMap();
+      if (changed) { renderSystemsList(); renderMap(); }
       if (map) setTimeout(() => map.invalidateSize(), 60);
     }
     if(next==='stops'&&changed&&data)renderStops();
@@ -305,7 +306,7 @@
 
     $('#scope').textContent = (f.tag.length ? num(f.tag.length) + ' instalação(ões)' : num(data.systems.length) + ' instalações') + ' · Entrada: ' + fmt(f.from) + ' a ' + fmt(f.to);
     updateActiveFilters();
-    renderSystemsList();
+    if (page === 'overview') renderSystemsList();
     $('#planSummary').innerHTML =
       '<strong class="plan-number">' + pct(a.rate) + '</strong>' +
       '<div class="sub">' + num(a.done) + ' executadas de ' + num(a.total) + ' ordens do plano</div>' +
