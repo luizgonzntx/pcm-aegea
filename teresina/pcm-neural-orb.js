@@ -277,9 +277,6 @@
   root.querySelectorAll('[data-pcm-question]').forEach(button=>button.addEventListener('click',()=>send(button.dataset.pcmQuestion)));
   form.addEventListener('submit',event=>{event.preventDefault();send(input.value);});
   window.addEventListener('pagehide',()=>llm?.stop('Página encerrada'));
-  document.addEventListener('visibilitychange',()=>{
-    if(document.hidden)llm?.stop('Página em segundo plano');
-  });
   clear.addEventListener('click',()=>{
     requestGeneration++;
     llm?.stop('Nova investigação iniciada');
