@@ -40,6 +40,8 @@ const uiSrc=fs.readFileSync(require('node:path').join(__dirname,'pcm-neural-orb.
 const index=fs.readFileSync(require('node:path').join(__dirname,'index.html'),'utf8');
 assert.match(workerSrc,/Qwen2\.5-0\.5B-Instruct/);
 assert.match(workerSrc,/device:'webgpu'/);
+assert.match(workerSrc,/device:'wasm',dtype:'q8'/);
+assert.doesNotMatch(workerSrc,/if\(!self\.navigator\?\.gpu\)throw/);
 assert.match(workerSrc,/dtype:'q4'/);
 assert.match(workerSrc,/callback_function/);
 assert.match(uiSrc,/PCM_NEURAL_EVIDENCE\.makePrompt/);
@@ -60,9 +62,10 @@ class FakeWorker {
  }
  terminate(){this.terminated=true;}
 }
-Object.defineProperty(globalThis,'navigator',{configurable:true,value:{gpu:{}}});
+Object.defineProperty(globalThis,'navigator',{configurable:true,value:{}});
 globalThis.Worker=FakeWorker;
 const client=C.createClient(()=>new FakeWorker());
+assert.equal(client.status().available,true);
 const events=[];
 client.ask(p.messages,{onProgress:x=>events.push(x.type),onToken:x=>events.push(x)}).then(output=>{
  assert.equal(output,'O motor precisa de inspeção.');
