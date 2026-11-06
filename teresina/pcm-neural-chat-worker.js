@@ -5,7 +5,7 @@ import {pipeline,TextStreamer,env} from 'https://cdn.jsdelivr.net/npm/@huggingfa
 env.allowRemoteModels=true;
 env.allowLocalModels=false;
 env.useBrowserCache=true;
-const MODEL='onnx-community/Qwen2.5-0.5B-Instruct';
+// Limit context and tokens to keep GPU usage bounded on desktop.\nconst MODEL='onnx-community/Qwen2.5-0.5B-Instruct';
 let generator=null;
 let loading=null;
 let occupied=false;
@@ -42,12 +42,12 @@ self.addEventListener('message',async event=>{
       skip_prompt:true,skip_special_tokens:true,
       callback_function:chunk=>report('token',id,{text:String(chunk)})
     });
-    const safe=(Array.isArray(messages)?messages:[]).slice(-9).filter(x=>
+    const safe=(Array.isArray(messages)?messages:[]).slice(-7).filter(x=>
       ['system','user','assistant'].includes(x.role)&&typeof x.content==='string'
-    ).map(m=>({role:m.role,content:m.content.slice(0,9000)}));
+    ).map(m=>({role:m.role,content:m.content.slice(0,4500)}));
     if(!safe.length)throw Error('Pergunta vazia.');
     const result=await model(safe,{
-      max_new_tokens:260,
+      max_new_tokens:160,
       do_sample:false,
       repetition_penalty:1.12,
       streamer
