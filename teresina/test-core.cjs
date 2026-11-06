@@ -169,6 +169,21 @@ assert.equal(onlyA2.assets[0].asset,'A2');
 assert.equal(P.maintenanceDashboard(metricsData,{from:'2026-04-01',to:'2026-04-30'}).total.mttrHours,null);
 
 
+// Regressão: a operação 0010 é exclusivamente deslocamento, nunca MTTR.
+assert.equal(P.isTravelOperation('0010'),true);
+assert.equal(P.isTravelOperation('10'),true);
+assert.equal(P.isTravelOperation('0020'),false);
+const onlyTravel=P.repairIntervals([
+ {operation:'0010',worker:'A',hours:4,startDate:'2026-01-01',startTime:'06:00:00',endDate:'2026-01-01',endTime:'10:00:00'}
+]);
+assert.equal(onlyTravel.hours,null); // Zero duração válida não pode ser inventada.
+const travelAndRepair=P.repairIntervals([
+ {operation:'0010',worker:'A',hours:4,startDate:'2026-01-01',startTime:'06:00:00',endDate:'2026-01-01',endTime:'10:00:00'},
+ {operation:'0020',worker:'A',hours:1,startDate:'2026-01-01',startTime:'08:00:00',endDate:'2026-01-01',endTime:'09:00:00'}
+]);
+assert.equal(travelAndRepair.hours,1); // Mesmo sobreposto, deslocamento não entra.
+assert.equal(travelAndRepair.spanHours,1);
+
 const overlap=P.repairIntervals([
  {operation:'0010',worker:'A',hours:1,startDate:'2026-01-01',startTime:'07:00:00',endDate:'2026-01-01',endTime:'08:00:00'},
  {operation:'0020',worker:'A',hours:2,startDate:'2026-01-01',startTime:'08:00:00',endDate:'2026-01-01',endTime:'10:00:00'},
