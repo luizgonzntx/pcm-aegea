@@ -173,9 +173,11 @@ function maintenanceEvents(data,f){
   if(note.date<event.eventDate)event.eventDate=note.date;
   if(created!==null&&(event.created===null||created<event.created))event.created=created;
  }
- const logsByOrder=new Map;
+ const logsByOrder=new Map,repairLogsByOrder=new Map;
  for(const log of (data.workLogs||[])){
   if(!byOrder.has(log.order)||!Number.isFinite(log.hours)||log.hours<=0)continue;
+  if(!repairLogsByOrder.has(log.order))repairLogsByOrder.set(log.order,[]);
+  repairLogsByOrder.get(log.order).push(log);
   if(!logsByOrder.has(log.order))logsByOrder.set(log.order,{travelHours:0,executionHours:0,travelWorkers:new Set,executionWorkers:new Set});
   const bucket=logsByOrder.get(log.order),travel=text(log.operation).padStart(4,'0')==='0010';
   if(!text(log.worker))continue;
@@ -184,7 +186,7 @@ function maintenanceEvents(data,f){
  }
  return [...byOrder.values()].map(event=>{
   const logs=logsByOrder.get(event.order.id);
-  const repair=repairIntervals((data.workLogs||[]).filter(log=>log.order===event.order.id));
+  const repair=repairIntervals(repairLogsByOrder.get(event.order.id));
   const travelAvg=logs?.travelWorkers.size?logs.travelHours/logs.travelWorkers.size:null;
   const executionAvg=logs?.executionWorkers.size?logs.executionHours/logs.executionWorkers.size:null;
   return {...event,
