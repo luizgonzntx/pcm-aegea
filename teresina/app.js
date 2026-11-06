@@ -199,7 +199,7 @@
       return '<button class="system-row" data-system="' + esc(s.tag) + '">' +
         '<div class="system-row-top"><b>' + esc(s.name) + '</b><span class="badge ' + health + '">' + esc(badgeLabel) + '</span></div>' +
         '<span class="system-meta"><span>' + num(n.done) + ' executadas de ' + num(n.total) + '</span><span>' + (t.overdue ? num(t.overdue) + ' vencida(s)' : esc(s.district || s.tag)) + '</span></span>' +
-        '<span class="system-reliability"><span>MTBF <b>' + formatHours(reliability?.mtbfHours) + '</b></span><span>MTTR <b>' + formatHours(reliability?.mttrHours) + '</b></span><span>Disponibilidade <b>' + pct(reliability?.availability) + '</b></span></span>' +
+        '<span class="system-reliability"><span>MTBF <b>' + formatHours(reliability?.mtbfHours) + '</b></span><span>MTTR ativo <b>' + formatHours(reliability?.mttrHours) + '</b></span></span>' +
         '<span class="mini-track"><i class="' + health + '" style="width:' + (a.rate == null ? 0 : a.rate * 100) + '%"></i></span>' +
         '</button>';
     }).join('');
@@ -432,7 +432,7 @@
   const maintenanceLabels = {
     travelHours:'Deslocamento',
     executionHours:'Execução', attendanceHours:'Atendimento',
-    mttrHours:'MTTR', mtbfHours:'MTBF'
+    mttrHours:'MTTR ativo', mtbfHours:'MTBF'
   };
   let maintenanceSnapshot = null;
   function clock(hours) {
@@ -531,12 +531,14 @@
       ['travelHours','Deslocamento'],
       ['executionHours','Execução'],
       ['attendanceHours','Atendimento'],
-      ['mttrHours','MTTR'],
+      ['mttrHours','MTTR ativo'],
       ['mtbfHours','MTBF']
     ];
     const counts=maintenanceSnapshot.total;
     $('#maintenanceOverview').innerHTML=metrics.map(([key,label])=>{
-      const explanation=key==='attendanceHours'
+      const explanation=key==='mttrHours'
+        ? 'Tempo ativo de reparo apontado no SAP, sem deslocamento e sem sobreposição de técnicos. '+(counts.mttrHoursCount||0)+' OS com horários válidos.'
+        : key==='attendanceHours'
         ? 'Deslocamento: '+(counts.travelHoursCount||0)+' ordens; execução: '+(counts.executionHoursCount||0)+' ordens. Soma das médias por categoria.'
         : label+' · '+(counts[key+'Count']||0)+' registros válidos';
       return '<article class="maintenance-step maintenance-step--'+key+'" title="'+
@@ -548,7 +550,7 @@
     $('#maintenanceAssetTable').innerHTML=assets.length
       ? '<table class="maintenance-assets-table"><thead><tr>'+
         '<th>Ativo</th><th>Planta</th><th>Ocorrências</th><th>Deslocamento</th>'+
-        '<th>Execução</th><th>Atendimento</th><th>MTTR</th><th>MTBF</th></tr></thead><tbody>'+
+        '<th>Execução</th><th>Atendimento</th><th>MTTR ativo</th><th>MTBF</th></tr></thead><tbody>'+
         assets.map(a=>
           '<tr><td><button type="button" class="maintenance-asset-link" data-maintenance-asset="'+esc(a.asset)+
           '" data-maintenance-plant="'+esc(a.tag)+'">'+esc(a.asset)+'</button></td>'+
@@ -686,7 +688,7 @@
       field('Bairro', s.district) +
       '</dl>' + photo + '</details>' +
       '<h3 class="detail-section">Tempos de manutenção · CE/CP + ENTE</h3>' +
-'<div class="detail-kpis plant-summary"><div><small>Deslocamento médio</small><b>'+formatHours(m?.travelHours)+'</b></div><div><small>Execução média</small><b>'+formatHours(m?.executionHours)+'</b></div><div><small>Atendimento médio</small><b>'+formatHours(m?.attendanceHours)+'</b></div><div><small>MTTR técnico</small><b>'+formatHours(m?.mttrHours)+'</b></div></div>' +
+'<div class="detail-kpis plant-summary"><div><small>Deslocamento médio</small><b>'+formatHours(m?.travelHours)+'</b></div><div><small>Execução média</small><b>'+formatHours(m?.executionHours)+'</b></div><div><small>Atendimento médio</small><b>'+formatHours(m?.attendanceHours)+'</b></div><div><small>MTTR ativo</small><b>'+formatHours(m?.mttrHours)+'</b></div></div>' +
 '<h3 class="detail-section">Itens, Causas e Medidas</h3><div class="detail-grid">' + blocks + '</div>' +
       '<h3 class="detail-section">Ordens mais recentes no período</h3><div class="table-wrap">' + table([...source].sort((a, b) => (b.created || '').localeCompare(a.created || '')).slice(0, 50)) + '</div>',
       'INSTALAÇÃO · ÁGUAS DE TERESINA'
@@ -710,7 +712,7 @@
       field('Data de referência', fmt(o.date)) +
       field('Início real', fmt(o.start)+(o.startTime?' '+o.startTime:'')) +
       field('Horário de referência',o.referenceTime) +
-      (event ? field('Deslocamento médio por profissional',formatHours(event.travelHours)) + field('Execução média por profissional',formatHours(event.executionHours)) + field('Tempo de atendimento',formatHours(event.attendanceHours)) + field('MTTR técnico',formatHours(event.mttrHours)) + field('Duração total da parada',formatHours(event.stopHours)) : '') +
+      (event ? field('Deslocamento médio por profissional',formatHours(event.travelHours)) + field('Execução média por profissional',formatHours(event.executionHours)) + field('Tempo de atendimento',formatHours(event.attendanceHours)) + field('MTTR ativo',formatHours(event.mttrHours)) + field('Duração total da parada',formatHours(event.stopHours)) : '') +
       field('Prazo programado', fmt(o.due)) +
       field('Conclusão real', fmt(o.finished)) +
       field('Plano de manutenção', o.plan) +
@@ -900,7 +902,7 @@
       importMessage('Preparando leitura das planilhas…');
       const buffers = await Promise.all(files.map(async file => ({ name: file.name, buffer: await file.arrayBuffer() })));
       const result = await new Promise((resolve, reject) => {
-        worker = new Worker('import-worker.js?v=20261105-2');
+        worker = new Worker('import-worker.js?v=20261106-1');
         const timeout = setTimeout(() => {
           worker.terminate();
           reject(Error('A leitura excedeu três minutos. Reduza o tamanho do conjunto.'));
@@ -923,9 +925,11 @@
       });
       if (new Blob([JSON.stringify(result)]).size > 19 * 1024 * 1024) throw Error('O conjunto processado excede o limite de 19 MB. Reduza o intervalo da exportação.');
       pending = result;
+      const m = result.meta.maintenance || {};
+      const repairRate = m.eligible ? (100*m.repair/m.eligible).toLocaleString('pt-BR',{maximumFractionDigits:1})+'%' : '—';
       $('#importReview').innerHTML =
-        '<div class="detail-kpis"><div><small>Instalações</small><b>' + num(result.systems.length) + '</b></div><div><small>Ordens válidas</small><b>' + num(result.orders.length) + '</b></div><div><small>Itens / medidas</small><b>' + num(result.items.length) + ' / ' + num(result.actions.length) + '</b></div><div><small>Ordens com Parada = X</small><b>' + num(result.meta.stoppageOrders) + '</b></div></div>' +
-        '<p class="small-note">' + num(result.meta.excluded) + ' ordens fora do escopo; ' + num(result.meta.missingReference) + ' sem data de referência; ' + num(result.meta.excludedStoppageNotes) + ' notas sem Ordem válida ou fora das instalações; ' + num(result.meta.missingStoppageNoteDate) + ' sem Data da nota. A base atual será substituída integralmente após salvar.</p>';
+        '<div class="detail-kpis"><div><small>Instalações</small><b>' + num(result.systems.length) + '</b></div><div><small>Ordens válidas</small><b>' + num(result.orders.length) + '</b></div><div><small>Paradas CE/CP</small><b>' + num(m.eligible) + '</b></div><div><small>MTTR ativo válido</small><b>' + repairRate + '</b></div></div>' +
+        '<p class="small-note">' + num(result.meta.excluded) + ' ordens fora do escopo; ' + num(result.meta.missingReference) + ' sem data de referência; ' + num(result.meta.excludedStoppageNotes) + ' notas sem Ordem válida ou fora das instalações; ' + num(result.meta.missingStoppageNoteDate) + ' sem Data da nota. '+num(result.meta.negativeWorkRows)+' registros negativos e '+num(result.meta.duplicateWorkRows)+' duplicatas identificados. A base atual será substituída integralmente após salvar.</p>';
       importMessage('Validação concluída. Confira os totais e salve a atualização.');
       $('#saveImport').hidden = false;
     } catch (e) {
