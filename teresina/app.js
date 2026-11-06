@@ -14,6 +14,7 @@
     return {
       data,
       revision,
+      userId: user.id,
       view: page,
       filters: {...f, tag:[...f.tag], asset:[...f.asset], type:[...f.type], priority:[...f.priority]}
     };
