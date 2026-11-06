@@ -13,9 +13,9 @@
       <header class="pcm-neural-head">
         <div class="pcm-neural-avatar" aria-hidden="true">✦</div>
         <div class="pcm-neural-heading">
-          <span class="pcm-neural-eyebrow">ASSISTENTE DE MANUTENÇÃO · QWEN LOCAL</span>
+          <span class="pcm-neural-eyebrow">PCM NEURAL · CONVERSA</span>
           <strong id="pcm-neural-title">Converse sobre manutenção</strong>
-          <small id="pcm-neural-source-state">Protótipo de análise de manutenção</small>
+          <small id="pcm-neural-source-state">Pronto para conversar</small>
         </div>
         <button type="button" id="pcm-neural-clear" class="pcm-neural-icon-button" title="Nova investigação" aria-label="Limpar conversa e começar nova investigação">↺</button>
         <button type="button" id="pcm-neural-close" class="pcm-neural-icon-button" aria-label="Fechar painel">×</button>
@@ -24,24 +24,24 @@
         <div class="pcm-neural-welcome">
           <div class="pcm-neural-intro-icon" aria-hidden="true">✧</div>
           <h3>O que vamos investigar?</h3>
-          <p>Converse sobre falhas, OS, bombas, indicadores e ICM. O Qwen gera respostas em português usando as evidências disponíveis no painel.</p>
+          <p>Pergunte sobre manutenção, peça uma análise ou solicite que eu revise e melhore uma resposta.</p>
         </div>
         <div id="pcm-neural-prompts" class="pcm-neural-prompts" aria-label="Perguntas sugeridas">
           <button type="button" data-pcm-question="Quantas corretivas estão abertas?"><span>▦</span>Corretivas abertas</button>
-          <button type="button" data-pcm-question="Qual causa mais frequente no ICM?"><span>◎</span>Causas do ICM</button>
+          <button type="button" data-pcm-question="Quais são as causas mais frequentes das falhas?"><span>◎</span>Causas de falhas</button>
           <button type="button" data-pcm-question="Qual é o MTTR ativo?"><span>◷</span>Entender o MTTR</button>
-          <button type="button" data-pcm-question="Há dados incompletos no ICM?"><span>◇</span>Auditar cadastro</button>
+          <button type="button" data-pcm-question="O que devo investigar primeiro nos ativos críticos?"><span>◇</span>Priorizar investigação</button>
         </div>
         <div id="pcm-neural-messages" class="pcm-neural-messages" role="log" aria-label="Histórico de perguntas e respostas" aria-live="polite"></div>
       </div>
       <div class="pcm-neural-bottom">
-        <div class="pcm-neural-tools"><button type="button" id="pcm-neural-pick" class="pcm-neural-pick"><span aria-hidden="true">⌖</span> Escolher um dado da tela</button><button type="button" id="pcm-neural-lite" class="pcm-neural-lite" aria-pressed="false">⚡ Modo leve</button></div>
+        <div class="pcm-neural-tools"><button type="button" id="pcm-neural-pick" class="pcm-neural-pick"><span aria-hidden="true">⌖</span> Analisar um indicador da tela</button></div>
         <form id="pcm-neural-form" autocomplete="off">
           <label class="pcm-neural-visually-hidden" for="pcm-neural-question">Escreva sua dúvida</label>
           <input id="pcm-neural-question" maxlength="500" placeholder="Ex.: Explique a OS 900123456" required>
           <button type="submit" id="pcm-neural-send" aria-label="Enviar pergunta" title="Enviar pergunta">↑</button>
         </form>
-        <small>Qwen conversacional ativo por padrão (WebGPU, primeiro download ~786 MB). Modo leve é opcional. QUEST completo ainda não está integrado.</small>
+        <small>Você pode continuar a conversa, corrigir uma resposta ou pedir uma explicação mais detalhada.</small>
       </div>
     </section>`;
   shell.appendChild(root);
@@ -53,20 +53,27 @@
   const llm=window.PCM_NEURAL_CHAT?.createClient?.()||null;
   const history=[];
   let busy=false,requestGeneration=0,identityKey='';
-  // Qwen é o comportamento padrão em qualquer dispositivo. Modo leve é opcional
-  // e temporário: nunca reutilizar uma preferência antiga que desativou a IA.
-  let liteMode=false;
 
   const form=root.querySelector('#pcm-neural-form');
   const input=root.querySelector('#pcm-neural-question');
   const messages=root.querySelector('#pcm-neural-messages');
   const prompts=root.querySelector('#pcm-neural-prompts');
   const pick=root.querySelector('#pcm-neural-pick');
-  const lite=root.querySelector('#pcm-neural-lite');
   const state=root.querySelector('#pcm-neural-source-state');
   const TARGETS='#kpis .kpi,#icmSummary .kpi,#deadlineCards .kpi,#engKpis .kpi,#maintenanceOverview .maintenance-step,#icmCards .card,.table-wrap tbody tr,.plant-summary>div';
   let drag=null,selectMode=false,highlight=null;
   const short=(value,n=170)=>String(value||'').replace(/\s+/g,' ').trim().slice(0,n);
+  function conversationalText(text,question){
+    let result=String(text||'').replace(/^\s*(?:Fonte|Origem dos dados|Sistema de origem):[^\n]*(?:\n|$)/gim,'').trim();
+    // Preserva as siglas quando o usuário pede explicitamente seu significado.
+    if(!/\b(SAP|ICM|QUEST)\b/i.test(question)){
+      result=result
+        .replace(/\bSAP\b/gi,'histórico de manutenção')
+        .replace(/\bICM\b/gi,'registros técnicos')
+        .replace(/\bQUEST\b/gi,'relatos da equipe');
+    }
+    return result;
+  }
   function getContext(){
     try{return window.PCM_NEURAL_CONTEXT?.()||null;}catch(_){return null;}
   }
@@ -78,6 +85,7 @@
       llm?.stop('Sessão ou dados atualizados');
       history.length=0;
       conversation?.clear();
+      window.PCM_NEURAL_EDITS?.apply?.({action:'reset',value:''});
       messages.replaceChildren();
       busy=false;
       root.querySelector('#pcm-neural-send').disabled=false;
@@ -85,13 +93,10 @@
       root.querySelector('.pcm-neural-welcome').hidden=false;
       identityKey=current;
     }
-    state.textContent=!ctx?'Aguardando sessão autorizada':
-      liteMode?'Modo leve ativo · consultas SAP/ICM rápidas':
-      local?.ready?'Qwen conversacional ativo · processamento local':
-      local?.available?'Qwen habilitado · primeiro uso ~786 MB':
-      'Consultas SAP ativas · WebGPU indisponível neste navegador';
-    lite.setAttribute('aria-pressed',String(liteMode));
-    lite.textContent=liteMode?'⚡ Modo leve: ativo':'⚡ Ativar modo leve';
+    state.textContent=!ctx?'Aguardando seus dados':
+      local?.ready?'Conversa pronta':
+      local?.available?'Assistente disponível · carregamento inicial na primeira pergunta':
+      'Não foi possível usar a IA neste navegador';
   }
   function openPanel(focus=false){
     selectMode=false;
@@ -163,81 +168,63 @@
     input.value='';
     const progress=make('div','pcm-neural-system-message','Preparando consulta…');
     messages.appendChild(progress);
-    let response,serverError=false,modelError='';
+    let answer='',modelError='',editProposal=null;
     try{
+      // A análise numérica é somente contexto para o Qwen; não aparece como
+      // resposta separada, etiqueta de fonte ou aviso técnico ao usuário.
       const engine=window.PCM_NEURAL_ENGINE;
       const trusted=conversation?.ask(ctx,target?'':q,target||null)
-        ||engine?.answer(ctx,target?'':q,target||null);
-      if(!trusted)throw Error('Motor de consulta indisponível');
-      if(window.PCM_CONFIG?.neuralFunction&&typeof window.PCM_NEURAL_REMOTE==='function'){
-        try{response=await window.PCM_NEURAL_REMOTE({question:q,target:target||null});}
-        catch(_){serverError=true;}
+        ||engine?.answer(ctx,target?'':q,target||null)
+        ||{title:'',body:'',facts:[]};
+      if(!llm?.status().available || !window.PCM_NEURAL_EVIDENCE) {
+        throw Error('Este navegador não está oferecendo a aceleração necessária para iniciar a conversa.');
       }
-      if(!response&&!liteMode&&llm?.status().available&&window.PCM_NEURAL_EVIDENCE){
-        const prepared=window.PCM_NEURAL_EVIDENCE.makePrompt(
-          ctx,q,target||null,trusted,conversation?.contextStatus?.(),history
-        );
-        try{
-          let streamed='',lastPaint=0,lastDownloadPaint=0;
-          const output=await llm.ask(prepared.messages,{
-            onProgress:p=>{
-              const now=performance.now();
-              if(p.type==='progress'&&now-lastDownloadPaint<180)return;
-              if(p.type==='progress')lastDownloadPaint=now;
-              if(run!==requestGeneration)return;
-              if(p.type==='status'&&p.status==='generating'){
-                progress.textContent='Qwen respondendo…';
-              }else if(p.type==='status'){
-                progress.textContent='Inicializando Qwen no navegador…';
-              }else if(p.type==='progress'){
-                const percent=Number.isFinite(p.percent)?' · '+Math.round(p.percent)+'%':'';
-                progress.textContent='Carregando modelo local (~786 MB)'+percent+' · '+(p.status||'');
-              }
-            },
-            onToken:token=>{
-              if(run!==requestGeneration)return;
-              streamed+=token;
-              const now=performance.now();
-              if(now-lastPaint>110){
-                progress.textContent='Qwen: '+streamed.slice(-750);
-                lastPaint=now;
-              }
-            }
-          });
-          if(!output.trim())throw Error('Modelo não gerou uma resposta útil.');
-          response={
-            title:'Análise de manutenção · Qwen',
-            body:output.trim().slice(0,2700),
-            facts:(prepared.facts||[]).filter(x=>!/^Experimente/.test(x.label)),
-            caveat:'Texto gerado por modelo de linguagem: verifique as evidências SAP/ICM. '+
-              (trusted.caveat||'Sem confirmação pelo QUEST nesta exportação.'),
-            source:prepared.source,
-            followups:trusted.followups,
-            engine:'llm'
-          };
-          history.push({role:'user',content:subject},{role:'assistant',content:output.trim().slice(0,500)});
-          while(history.length>8)history.shift();
-
-        }catch(error){
-          serverError=true;
-          modelError=short(error?.message||error,180);
-          progress.textContent='Qwen indisponível: '+modelError+'. Consulta SAP de contingência.';
+      const editor=window.PCM_NEURAL_EDITS;
+      const editRequest=!target && editor?.isEditRequest(q);
+      const prepared=editRequest
+        ? {messages:editor.prompt(q)}
+        : window.PCM_NEURAL_EVIDENCE.makePrompt(
+            ctx,q,target||null,trusted,conversation?.contextStatus?.(),history
+          );
+      let streamed='',lastPaint=0,lastDownloadPaint=0;
+      answer=await llm.ask(prepared.messages,{
+        onProgress:p=>{
+          if(run!==requestGeneration)return;
+          const now=performance.now();
+          if(p.type==='progress'&&now-lastDownloadPaint<180)return;
+          if(p.type==='progress')lastDownloadPaint=now;
+          if(p.type==='status'&&p.status==='generating')progress.textContent='Elaborando resposta…';
+          else if(p.type==='status')progress.textContent='Preparando conversa…';
+          else if(p.type==='progress'){
+            const percent=Number.isFinite(p.percent)?' '+Math.round(p.percent)+'%':'';
+            progress.textContent='Carregando assistente'+percent+'…';
+          }
+        },
+        onToken:token=>{
+          if(run!==requestGeneration)return;
+          streamed+=token;
+          const now=performance.now();
+          if(now-lastPaint>120){
+            progress.textContent=streamed.slice(-750);
+            lastPaint=now;
+          }
         }
+      });
+      if(!answer.trim())throw Error('Não recebi uma resposta do modelo.');
+      if(editRequest){
+        editProposal=editor.parse(answer);
+        answer=editProposal
+          ? editor.describe(editProposal)+'?'
+          : 'Posso ajustar o título, a cor, o tamanho do texto e o espaçamento do painel. Alterações em registros de manutenção não são permitidas pelo chat.';
+      }else{
+        answer=conversationalText(answer.trim().slice(0,3500),q);
+        history.push({role:'user',content:subject},{role:'assistant',content:answer.slice(0,900)});
       }
-      if(!response){
-        response={...trusted};
-        if(serverError)response.caveat=(response.caveat||'')+
-          ' Qwen não executado nesta sessão'+(modelError?' ('+modelError+')':'')+'; exibida consulta auditável SAP/ICM.';
-        if(serverError)response.title='Consulta SAP/ICM · Qwen indisponível';
-        if(liteMode)response.caveat=(response.caveat||'')+
-          ' Modo leve ativo neste dispositivo: desative para gerar respostas com Qwen.';
-        else if(!llm?.status().available&&!serverError)response.caveat=(response.caveat||'')+
-          ' Para conversar livremente com Qwen, é necessário WebGPU neste navegador.';
-      }
+      while(history.length>8)history.shift();
       if(run!==requestGeneration||identityKey!==(String(getContext()?.userId||'')+':'+String(getContext()?.revision||'')))return;
       updateState();
     }catch(error){
-      response={title:'Consulta não concluída',body:'A base não pôde ser consultada. Atualize a sessão e tente novamente.',facts:[],source:'Nenhuma análise calculada',caveat:short(error?.message||error,180)};
+      modelError=short(error?.message||error,220);
     }finally{
       progress.remove();
       if(run===requestGeneration){
@@ -246,39 +233,42 @@
       }
     }
     if(run!==requestGeneration)return;
-    const card=make('article','pcm-neural-answer');
-    const cap=make('div','pcm-neural-answer-top');
-    cap.appendChild(make('span','pcm-neural-answer-badge',response.engine==='server'?'ANÁLISE DO SERVIDOR':response.engine==='llm'?'QWEN · IA LOCAL':'CONSULTA AUDITÁVEL SAP'));
-    card.appendChild(cap);
-    card.appendChild(make('h4','',response.title||'Resultado'));
-    card.appendChild(make('p','pcm-neural-answer-text',response.body||'Sem resultado para essa pergunta.'));
-    if(response.facts?.length){
-      const dl=make('dl','pcm-neural-facts');
-      response.facts.slice(0,8).forEach(f=>{
-        const item=make('div','pcm-neural-fact');
-        item.appendChild(make('dt','',f.label));
-        item.appendChild(make('dd','',f.value));
-        dl.appendChild(item);
-      });
-      card.appendChild(dl);
-    }
-    if(response.caveat){
-      const alert=make('div','pcm-neural-caveat');
-      alert.appendChild(make('span','pcm-neural-caveat-mark','!'));
-      alert.appendChild(make('p','',response.caveat));
-      card.appendChild(alert);
-    }
-    card.appendChild(make('small','pcm-neural-reference','Fonte: '+(response.source||'dados do painel')));
-    if(response.followups?.length){
-      const suggestions=make('div','pcm-neural-followups');
-      suggestions.appendChild(make('span','pcm-neural-followups-title','CONTINUAR INVESTIGAÇÃO'));
-      for(const item of response.followups.slice(0,3)){
-        const button=make('button','pcm-neural-followup',item.label);
-        button.type='button';
-        button.addEventListener('click',()=>send(item.question));
-        suggestions.appendChild(button);
+    const card=make('article','pcm-neural-answer'+(modelError?' pcm-neural-answer-error':''));
+    if(modelError){
+      card.appendChild(make('p','pcm-neural-answer-text',
+        'Não consegui responder agora. '+modelError));
+    }else{
+      card.appendChild(make('p','pcm-neural-answer-text',answer));
+      if(editProposal){
+        const controls=make('div','pcm-neural-edit-actions');
+        const apply=make('button','pcm-neural-edit-apply','Aplicar');
+        const cancel=make('button','pcm-neural-edit-cancel','Cancelar');
+        apply.type=cancel.type='button';
+        const freeze=()=>{apply.disabled=true;cancel.disabled=true;};
+        apply.addEventListener('click',()=>{
+          if(identityKey!==(String(getContext()?.userId||'')+':'+String(getContext()?.revision||'')))return;
+          freeze();
+          if(window.PCM_NEURAL_EDITS?.apply(editProposal)){
+            card.querySelector('.pcm-neural-answer-text').textContent='Alteração aplicada ao painel.';
+            const undo=make('button','pcm-neural-edit-cancel','Desfazer');
+            undo.type='button';
+            undo.addEventListener('click',()=>{
+              if(window.PCM_NEURAL_EDITS?.undo()){
+                card.querySelector('.pcm-neural-answer-text').textContent='Alteração desfeita.';
+                undo.disabled=true;
+              }
+            });
+            controls.replaceChildren(undo);
+          }
+        });
+        cancel.addEventListener('click',()=>{
+          freeze();
+          card.querySelector('.pcm-neural-answer-text').textContent='Alteração cancelada.';
+          controls.replaceChildren();
+        });
+        controls.append(apply,cancel);
+        card.appendChild(controls);
       }
-      card.appendChild(suggestions);
     }
     messages.appendChild(card);
     trimMessages();
@@ -286,11 +276,6 @@
   }
   root.querySelectorAll('[data-pcm-question]').forEach(button=>button.addEventListener('click',()=>send(button.dataset.pcmQuestion)));
   form.addEventListener('submit',event=>{event.preventDefault();send(input.value);});
-  lite.addEventListener('click',()=>{
-    liteMode=!liteMode;
-    if(liteMode)llm?.stop('Modo leve ativado pelo usuário');
-    updateState();
-  });
   window.addEventListener('pagehide',()=>llm?.stop('Página encerrada'));
   document.addEventListener('visibilitychange',()=>{
     if(document.hidden)llm?.stop('Página em segundo plano');

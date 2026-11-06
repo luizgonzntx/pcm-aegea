@@ -200,6 +200,7 @@
       stops: 'Indicadores de manutenção'
     };
     $('#pageTitle').textContent = titles[next] || 'Visão dos sistemas';
+    window.PCM_NEURAL_EDITS?.onPageChange?.();
     $$('[data-page]').forEach(b => {
       b.classList.toggle('active', b.dataset.page === next);
       if (b.dataset.page === next) b.setAttribute('aria-current', 'page');

@@ -25,7 +25,7 @@ assert.equal(p.orderId,'900123456');
 assert.match(p.messages.at(-1).content,/Ventilação obstruída/);
 assert.match(p.messages.at(-1).content,/Limpeza realizada/);
 assert.match(p.messages.at(-1).content,/Substituir motor \(previsto\)/);
-assert.match(p.messages.at(-1).content,/QUEST original não está nesta base/);
+assert.match(p.messages.at(-1).content,/não prova, por si só, que o serviço foi executado/);
 assert.doesNotMatch(p.messages.at(-1).content,/Outros trabalhos/);
 assert.equal(p.messages[1].role,'user');
 p=E.makePrompt(ctx,'e a causa da ordem?',null,analytic,{lastOrder:'900123456'},[]);
@@ -44,8 +44,10 @@ assert.match(workerSrc,/dtype:'q4'/);
 assert.match(workerSrc,/callback_function/);
 assert.match(uiSrc,/PCM_NEURAL_EVIDENCE\.makePrompt/);
 assert.match(uiSrc,/llm\.ask/);
+assert.match(uiSrc,/PCM_NEURAL_EDITS/);
+assert.doesNotMatch(uiSrc,/Fonte: |CONSULTA AUDITÁVEL SAP/);
 assert.doesNotMatch(uiSrc,/type="file"/);
-assert.match(index,/pcm-neural-evidence.js\?v=20261106-8/);
+assert.match(index,/pcm-neural-evidence.js\?v=20261106-10/);
 assert.match(index,/pcm-neural-chat-client.js\?v=20261106-9/);
 class FakeWorker {
  constructor(){this.listeners={};this.terminated=false;}

@@ -3041,3 +3041,17 @@ section[data-view]:not([hidden]) {
   .maintenance-chart-head .maintenance-metric-label { margin-left:0; width:100%; }
   .maintenance-metric-label select { width:100%; }
 }
+
+/* Personalizações visuais reversíveis, acionadas pelo assistente. */
+html[data-pcm-text-size="large"] #shell p,
+html[data-pcm-text-size="large"] #shell small,
+html[data-pcm-text-size="large"] #shell button,
+html[data-pcm-text-size="large"] #shell td,
+html[data-pcm-text-size="large"] #shell th,
+html[data-pcm-text-size="large"] #shell input {font-size:15px}
+html[data-pcm-density="compact"] #shell .card,
+html[data-pcm-density="compact"] #shell .kpi,
+html[data-pcm-density="compact"] #shell .system-row {padding:10px 12px}
+html[data-pcm-density="compact"] #shell .grid,
+html[data-pcm-density="compact"] #shell .cards,
+html[data-pcm-density="compact"] #shell .map-layout {gap:8px}
