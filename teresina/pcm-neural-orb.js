@@ -163,7 +163,6 @@
     messages.appendChild(card);
     trimMessages();
     messages.lastElementChild.scrollIntoView({behavior:'smooth',block:'nearest'});
-    input.value='';
   }
   root.querySelectorAll('[data-pcm-question]').forEach(button=>button.addEventListener('click',()=>send(button.dataset.pcmQuestion)));
   form.addEventListener('submit',event=>{event.preventDefault();send(input.value);});
