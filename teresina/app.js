@@ -537,7 +537,7 @@
     const counts=maintenanceSnapshot.total;
     $('#maintenanceOverview').innerHTML=metrics.map(([key,label])=>{
       const explanation=key==='mttrHours'
-        ? 'Tempo ativo de reparo apontado no SAP, sem deslocamento e sem sobreposição de técnicos. '+(counts.mttrHoursCount||0)+' OS com horários válidos.'
+        ? 'Tempo ativo de reparo apontado no SAP. Exclui a operação 0010 (deslocamento) e não duplica horários de técnicos simultâneos. '+(counts.mttrHoursCount||0)+' OS com horários válidos.'
         : key==='attendanceHours'
         ? 'Deslocamento: '+(counts.travelHoursCount||0)+' ordens; execução: '+(counts.executionHoursCount||0)+' ordens. Soma das médias por categoria.'
         : label+' · '+(counts[key+'Count']||0)+' registros válidos';
