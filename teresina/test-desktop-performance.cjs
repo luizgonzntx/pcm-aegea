@@ -32,7 +32,7 @@ assert.doesNotMatch(app,/P\.reliabilityByPlant\(data, sysFilter\)/);
 assert.doesNotMatch(ui,/let liteMode=|isQuickMetric/);
 assert.doesNotMatch(ui,/initialLiteMode|isQuickMetric\(q\)|localStorage\.getItem\('pcm_neural_lite'\)/);
 assert.match(ui,/answer=await llm/);
-assert.doesNotMatch(ui,/llm\?\.stop\('Chat fechado/);
+assert.doesNotMatch(ui,/llm\?\.stop\('Chat fechado/);\nassert.doesNotMatch(ui,/Página em segundo plano|visibilitychange/);
 assert.match(ui,/modelError=short\(error\?\.message\|\|error/);
 assert.match(ui,/streamed\.slice\(-750\)/);
 assert.match(worker,/max_new_tokens:160/);
