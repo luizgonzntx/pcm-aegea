@@ -199,7 +199,7 @@
       return '<button class="system-row" data-system="' + esc(s.tag) + '">' +
         '<div class="system-row-top"><b>' + esc(s.name) + '</b><span class="badge ' + health + '">' + esc(badgeLabel) + '</span></div>' +
         '<span class="system-meta"><span>' + num(n.done) + ' executadas de ' + num(n.total) + '</span><span>' + (t.overdue ? num(t.overdue) + ' vencida(s)' : esc(s.district || s.tag)) + '</span></span>' +
-        '<span class="system-reliability"><span>MTBF <b>' + formatHours(reliability?.mtbfHours) + '</b></span><span>MTTR <b>' + formatHours(reliability?.mttrHours) + '</b></span><span>Disponibilidade <b>' + pct(reliability?.availability) + '</b></span></span>' +
+        '<span class="system-reliability"><span>MTBF <b>' + formatHours(reliability?.mtbfHours) + '</b></span><span>MTTR ativo <b>' + formatHours(reliability?.mttrHours) + '</b></span></span>' +
         '<span class="mini-track"><i class="' + health + '" style="width:' + (a.rate == null ? 0 : a.rate * 100) + '%"></i></span>' +
         '</button>';
     }).join('');
