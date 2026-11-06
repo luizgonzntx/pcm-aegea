@@ -13,6 +13,6 @@ assert.match(app,/db\.auth\.getSession\(\)/);
 assert.match(app,/db\.functions\.invoke\(functionName/);
 assert.match(app,/if \(!functionName \|\| !db \|\| !user/);
 assert.doesNotMatch(app,/service_role|sb_secret_/);
-assert.ok(html.includes('pcm-neural-orb.js?v=20261106-7'));
+assert.ok(html.includes('pcm-neural-orb.js?v=20261106-8'));
 assert.ok(html.includes('pcm-neural-prototype.js?v=20261106-6'));
 console.log('PCM Neural: site sem upload manual, gateway autenticado e fallback SAP validados.');

@@ -6,6 +6,37 @@
   const today = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 
   let db, data = null, revision = 0, user = null, role = '', page = 'overview', pageNo = 1, pending = null, pendingRevision = 0, worker = null, toastTimer, map, markers, fitBounds, rows = [], rankEvidence = [], modalMode = '', loading = false, selectedFiles = [];
+  // Índice por TAG: evita varrer dezenas de milhares de ordens para cada instalação.
+  let tagIndexData = null, tagOrders = new Map();
+  let reliabilityCacheKey = '', reliabilityCacheAll = new Map(), reliabilityCacheAsset = new Map();
+  let mapExtentKey = '';
+  function systemSlice(system) {
+    if (tagIndexData !== data) {
+      tagIndexData = data;
+      tagOrders = new Map();
+      for (const order of data?.orders || []) {
+        if (!tagOrders.has(order.tag)) tagOrders.set(order.tag, []);
+        tagOrders.get(order.tag).push(order);
+      }
+      reliabilityCacheKey = '';
+    }
+    return {orders: tagOrders.get(system.tag) || [], systems: [system]};
+  }
+  function reliabilityMaps() {
+    if (tagIndexData !== data) reliabilityCacheKey = '';
+    // Recalcular apenas quando filtros relevantes ou revisão dos dados mudarem.
+    const key = JSON.stringify([revision, f.from, f.to, f.type, f.priority, f.asset]);
+    if (key !== reliabilityCacheKey) {
+      const general = {...f, tag: [], asset: []};
+      reliabilityCacheAll = new Map(P.reliabilityByPlant(data, general).map(item => [item.tag, item]));
+      reliabilityCacheAsset = f.asset.length
+        ? new Map(P.reliabilityByPlant(data, {...general, asset: [...f.asset]}).map(item => [item.tag, item]))
+        : reliabilityCacheAll;
+      reliabilityCacheKey = key;
+    }
+    return {general: reliabilityCacheAll, asset: reliabilityCacheAsset};
+  }
+
   // O recorte operacional sempre usa a data de entrada da ordem.
   const f = { from: today().slice(0, 4) + '-01-01', to: today().slice(0, 4) + '-12-31', dateField: 'created', tag: [], asset: [], type: [], priority: [] };
   // Exposição local e somente leitura para o assistente do painel; não envia dados para serviços externos.
@@ -175,7 +206,10 @@
       else b.removeAttribute('aria-current');
     });
     $$('[data-view]').forEach(v => v.hidden = v.dataset.view !== next);
-    if (next === 'overview' && map) setTimeout(() => map.invalidateSize(), 60);
+    if (next === 'overview' && data) {
+      if (changed) { renderSystemsList(); renderMap(); }
+      if (map) setTimeout(() => map.invalidateSize(), 60);
+    }
     if(next==='stops'&&changed&&data)renderStops();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -229,13 +263,17 @@
       return;
     }
     const asOf = today();
+    const chosenTags = selectedValues('tag'), chosenAssets = selectedValues('asset');
+    const reliable = reliabilityMaps();
     $('#systemsList').innerHTML = filteredSystems.map(s => {
-      const sysFilter = { ...f, tag: [s.tag], asset: selectedValues('tag').length && !selectedValues('tag').includes(s.tag) ? [] : selectedValues('asset') };
-      const selected = P.filter(data, sysFilter);
-      const a = P.adherence(data, sysFilter);
+      const byAsset = !(chosenTags.length && !chosenTags.includes(s.tag));
+      const sysFilter = { ...f, tag: [s.tag], asset: byAsset ? chosenAssets : [] };
+      const limited = systemSlice(s);
+      const selected = P.filter(limited, sysFilter);
+      const a = P.adherence(limited, sysFilter);
       const n = P.stats(selected);
-      const t = P.timing(P.filter(data, sysFilter, true), asOf);
-      const reliability = P.reliabilityByPlant(data, sysFilter).find(item => item.tag === s.tag);
+      const t = P.timing(P.filter(limited, sysFilter, true), asOf);
+      const reliability = (byAsset ? reliable.asset : reliable.general).get(s.tag);
       const health = P.systemHealth(a.rate, t.overdue);
       const badgeLabel = a.rate == null ? 'Sem plano' : pct(a.rate);
       return '<button class="system-row" data-system="' + esc(s.tag) + '">' +
@@ -268,7 +306,7 @@
 
     $('#scope').textContent = (f.tag.length ? num(f.tag.length) + ' instalação(ões)' : num(data.systems.length) + ' instalações') + ' · Entrada: ' + fmt(f.from) + ' a ' + fmt(f.to);
     updateActiveFilters();
-    renderSystemsList();
+    if (page === 'overview') renderSystemsList();
     $('#planSummary').innerHTML =
       '<strong class="plan-number">' + pct(a.rate) + '</strong>' +
       '<div class="sub">' + num(a.done) + ' executadas de ' + num(a.total) + ' ordens do plano</div>' +
@@ -282,7 +320,7 @@
     renderTopAssets();
     renderDeadlines();
     renderOrders();
-    renderMap();
+    if (page === 'overview') renderMap();
   }
 
   function renderMonthly() {
@@ -812,7 +850,8 @@
       if (!Number.isFinite(s.lat) || !Number.isFinite(s.lng)) return;
       coords.push([s.lat, s.lng]);
       const sysFilter = { ...f, tag: s.tag };
-      const source = P.filter(data, sysFilter), n = P.stats(source), a = P.adherence(data, sysFilter), tim = P.timing(P.filter(data, sysFilter, true), asOf);
+      const limited = systemSlice(s);
+      const source = P.filter(limited, sysFilter), n = P.stats(source), a = P.adherence(limited, sysFilter), tim = P.timing(P.filter(limited, sysFilter, true), asOf);
       const health = P.systemHealth(a.rate, tim.overdue);
       const top = ranks('component', source)[0], cause = ranks('cause', source)[0], act = ranks('action', source)[0];
       const marker = L.marker([s.lat, s.lng], {
@@ -832,10 +871,15 @@
       marker.on('click', () => selectMaintenancePlant(s.tag));
     });
     fitBounds = coords.length ? L.latLngBounds(coords) : null;
-    setTimeout(() => {
-      map.invalidateSize();
-      if (fitBounds) map.fitBounds(fitBounds, { padding: [70, 60], maxZoom: 14 });
-    }, 50);
+    const extent = JSON.stringify(coords);
+    // Evita recarregar tiles e recentralizar o mapa em toda interação de filtros.
+    if (extent !== mapExtentKey) {
+      mapExtentKey = extent;
+      setTimeout(() => {
+        map.invalidateSize();
+        if (fitBounds) map.fitBounds(fitBounds, { padding: [70, 60], maxZoom: 14 });
+      }, 50);
+    }
   }
 
   async function loadData() {
