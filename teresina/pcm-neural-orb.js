@@ -63,6 +63,17 @@
   const TARGETS='#kpis .kpi,#icmSummary .kpi,#deadlineCards .kpi,#engKpis .kpi,#maintenanceOverview .maintenance-step,#icmCards .card,.table-wrap tbody tr,.plant-summary>div';
   let drag=null,selectMode=false,highlight=null;
   const short=(value,n=170)=>String(value||'').replace(/\s+/g,' ').trim().slice(0,n);
+  function conversationalText(text,question){
+    let result=String(text||'').replace(/^\s*(?:Fonte|Origem dos dados|Sistema de origem):[^\n]*(?:\n|$)/gim,'').trim();
+    // Preserva as siglas quando o usuário pede explicitamente seu significado.
+    if(!/\b(SAP|ICM|QUEST)\b/i.test(question)){
+      result=result
+        .replace(/\bSAP\b/gi,'histórico de manutenção')
+        .replace(/\bICM\b/gi,'registros técnicos')
+        .replace(/\bQUEST\b/gi,'relatos da equipe');
+    }
+    return result;
+  }
   function getContext(){
     try{return window.PCM_NEURAL_CONTEXT?.()||null;}catch(_){return null;}
   }
@@ -206,7 +217,7 @@
           ? editor.describe(editProposal)+'?'
           : 'Posso ajustar o título, a cor, o tamanho do texto e o espaçamento do painel. Alterações em registros de manutenção não são permitidas pelo chat.';
       }else{
-        answer=answer.trim().slice(0,3500);
+        answer=conversationalText(answer.trim().slice(0,3500),q);
         history.push({role:'user',content:subject},{role:'assistant',content:answer.slice(0,900)});
       }
       while(history.length>8)history.shift();
