@@ -166,7 +166,7 @@ function createSession(){
    if(!order)return make(ctx,'OS '+explicitOrder+' não encontrada','Não encontrei essa ordem na exportação SAP atualmente autorizada.',[], 'Confira a cobertura da base e o número da ordem.','Ordens SAP');
    return orderReply(ctx,order,combined);
   }
-  const references=/\b(essa|esse|dessa|desse|nela|nele|dele|dela|mesma|mesmo|outra|outras|outros|anteriores|anterior|essa bomba|esse equipamento|daquele)\b/.test(q)||/^e\b/.test(q);
+  const references=/\b(essa|esse|nessa|nesse|nesta|neste|dessa|desse|daquela|daquele|naquela|naquele|nela|nele|dele|dela|mesma|mesmo|outra|outras|outros|anteriores|anterior)\b/.test(q)||/^e\b/.test(q);
   const saysOrder=/\bos\b|\bordem\b/.test(q);
   const asksHistory=/\b(outra|outras|outros|anterior|anteriores|historico|recorr|reincident|quantas vezes|voltou)\b/.test(q);
   const asksIcm=/\b(icm|causa|causas|medida|medidas|problema|falha|componente|diagnostico|condiz|coerente|quest)\b/.test(q);
