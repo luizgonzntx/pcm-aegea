@@ -35,6 +35,7 @@ jobs:
           node --check app.js
           node --check pcm-neural-orb.js
           node --check pcm-neural-knowledge.js
+          node --check pcm-neural-local.js
           node --check inventory.js
           node --check ui.js
       - name: Run core tests
