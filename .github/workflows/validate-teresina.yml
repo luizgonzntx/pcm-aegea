@@ -42,6 +42,7 @@ jobs:
         run: |
           node test-core.cjs
           node test-neural.cjs
+          node test-neural-local.cjs
       - name: Validate publication assets
         working-directory: .
         run: |
