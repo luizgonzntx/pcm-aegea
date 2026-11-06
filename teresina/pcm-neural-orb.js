@@ -68,6 +68,19 @@
   }
   function updateState(){
     const ctx=getContext(),local=llm?.status();
+    const current=ctx?String(ctx.userId||'')+':'+String(ctx.revision||''):'';
+    if(identityKey&&current!==identityKey){
+      requestGeneration++;
+      llm?.stop('Sessão ou dados atualizados');
+      history.length=0;
+      conversation?.clear();
+      messages.replaceChildren();
+      busy=false;
+      root.querySelector('#pcm-neural-send').disabled=false;
+      prompts.classList.remove('pcm-neural-prompts-used');
+      root.querySelector('.pcm-neural-welcome').hidden=false;
+      identityKey=current;
+    }
     state.textContent=!ctx?'Aguardando sessão autorizada':
       local?.ready?'Qwen conversacional ativo · processamento local':
       local?.available?'Qwen local · download inicial ~786 MB na primeira pergunta':
@@ -207,8 +220,10 @@
       response={title:'Consulta não concluída',body:'A base não pôde ser consultada. Atualize a sessão e tente novamente.',facts:[],source:'Nenhuma análise calculada',caveat:short(error?.message||error,180)};
     }finally{
       progress.remove();
-      busy=false;
-      root.querySelector('#pcm-neural-send').disabled=false;
+      if(run===requestGeneration){
+        busy=false;
+        root.querySelector('#pcm-neural-send').disabled=false;
+      }
     }
     if(run!==requestGeneration)return;
     const card=make('article','pcm-neural-answer');
