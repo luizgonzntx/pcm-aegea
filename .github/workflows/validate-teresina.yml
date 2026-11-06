@@ -37,6 +37,7 @@ jobs:
           node --check pcm-neural-knowledge.js
           node --check pcm-neural-prototype.js
           node --check pcm-neural-evidence.js
+          node --check pcm-neural-ui-edit.js
           node --check pcm-neural-chat-client.js
           node --check pcm-neural-chat-worker.js
           node --check pcm-neural-local.js
