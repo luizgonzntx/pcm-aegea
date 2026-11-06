@@ -68,7 +68,7 @@ Datas/hora inválidas, identificadores divergentes ou coordenadas inválidas imp
 - **Tempo médio de execução:** por ordem, `soma(Trabalho real positivo, operações diferentes de 0010, com ID SAP) / quantidade de ID SAP distintos dessas operações`; média das ordens válidas por planta. Apontamentos sem ID SAP ainda podem compor o MTTR ativo, mas não são atribuídos artificialmente a um profissional.
 - **Tempo médio de atendimento:** deslocamento médio + execução média por planta, se ambos estiverem disponíveis. Horas apontadas são esforço de equipe, diferentes do intervalo cronológico do MTTR.
 - **MTBF indicativo:** por `TAG Ativo`, média dos intervalos não negativos entre o fechamento por referência de uma CE e a criação da CE seguinte (em ordens distintas); a planta agrega os intervalos dos ativos, não intercala falhas de equipamentos diferentes. Sem horários de criação ou sem recorrência, aparece indisponível.
-- **Disponibilidade estimada:** `MTBF / (MTBF + MTTR)`, apenas quando as duas métricas existirem; não substitui horas operacionais efetivamente medidas.
+- **Disponibilidade operacional:** não é calculada a partir do MTTR ativo com MTBF indicativo. Exige horas efetivas de operação/indisponibilidade (telemetria ou início/fim real da parada validado).
 
 - Nas tabelas de confiabilidade, a barra de disponibilidade usa verde para valores ≥ 85%, âmbar para 60% a < 85% e vermelho para valores < 60%; sem dados suficientes, o percentual aparece como indisponível.
 - O ranking de confiabilidade por planta é ordenado da maior para a menor disponibilidade; plantas sem disponibilidade calculável aparecem ao final. Em telas móveis, a tabela é substituída por cartões compactos com posição, disponibilidade, MTBF e MTTR.
