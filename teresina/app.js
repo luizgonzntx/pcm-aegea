@@ -18,6 +18,37 @@
       filters: {...f, tag:[...f.tag], asset:[...f.asset], type:[...f.type], priority:[...f.priority]}
     };
   };
+  // Gateway autenticado para inferência central. Nenhuma credencial secreta fica no navegador.
+  // Só é utilizado depois que o backend privado existir e PCM_CONFIG.neuralFunction for definido.
+  window.PCM_NEURAL_REMOTE = async ({ question, target }) => {
+    const functionName = window.PCM_CONFIG?.neuralFunction;
+    if (!functionName || !db || !user || !data || $('#shell')?.hidden) return null;
+    const auth = await db.auth.getSession();
+    if (!auth.data?.session) throw Error('Sessão expirada. Entre novamente para consultar a IA.');
+    const request = {
+      question: String(question || '').slice(0, 500),
+      target: target ? { label: String(target.label || '').slice(0, 140), value: String(target.value || '').slice(0, 180) } : null,
+      filters: { ...f, tag: [...f.tag], asset: [...f.asset], type: [...f.type], priority: [...f.priority] },
+      revision
+    };
+    const { data: response, error } = await db.functions.invoke(functionName, { body: request });
+    if (error) throw Error('Serviço de análise temporariamente indisponível.');
+    if (!response || typeof response.title !== 'string' || typeof response.body !== 'string' || !Array.isArray(response.facts)) {
+      throw Error('Resposta do serviço de IA com formato inválido.');
+    }
+    return {
+      title: response.title.slice(0, 180),
+      body: response.body.slice(0, 6000),
+      facts: response.facts.slice(0, 12).map(fact => ({
+        label: String(fact.label || '').slice(0, 140),
+        value: String(fact.value || '').slice(0, 1300)
+      })),
+      source: String(response.source || 'Serviço privado PCM Neural').slice(0, 400),
+      caveat: String(response.caveat || '').slice(0, 1000),
+      engine: 'server'
+    };
+  };
+
   const emptyHTML = '<div class="no-data">Sem registros para os filtros selecionados.</div>';
 
   const filterLabels = {
