@@ -39,10 +39,10 @@ const workerSrc=fs.readFileSync(require('node:path').join(__dirname,'pcm-neural-
 const uiSrc=fs.readFileSync(require('node:path').join(__dirname,'pcm-neural-orb.js'),'utf8');
 const index=fs.readFileSync(require('node:path').join(__dirname,'index.html'),'utf8');
 assert.match(workerSrc,/Qwen2\.5-0\.5B-Instruct/);
-assert.match(workerSrc,/device:'webgpu'/);
 assert.match(workerSrc,/device:'wasm',dtype:'q8'/);
-assert.doesNotMatch(workerSrc,/if\(!self\.navigator\?\.gpu\)throw/);
-assert.match(workerSrc,/dtype:'q4'/);
+assert.doesNotMatch(workerSrc,/webgpu|navigator\?\.gpu|requestAdapter/i);
+assert.match(workerSrc,/device:'wasm'/);
+assert.match(workerSrc,/dtype:'q8'/);
 assert.match(workerSrc,/callback_function/);
 assert.match(uiSrc,/PCM_NEURAL_EVIDENCE\.makePrompt/);
 assert.match(uiSrc,/llm\.ask/);
@@ -50,7 +50,7 @@ assert.match(uiSrc,/PCM_NEURAL_EDITS/);
 assert.doesNotMatch(uiSrc,/Fonte: |CONSULTA AUDITÁVEL SAP/);
 assert.doesNotMatch(uiSrc,/type="file"/);
 assert.match(index,/pcm-neural-evidence.js\?v=20261106-10/);
-assert.match(index,/pcm-neural-chat-client.js\?v=20261106-11/);
+assert.match(index,/pcm-neural-chat-client.js\?v=20261106-12/);
 class FakeWorker {
  constructor(){this.listeners={};this.terminated=false;}
  addEventListener(name,cb){this.listeners[name]=cb;}
