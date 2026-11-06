@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict');
 const P=require('./core.js'),local=require('./pcm-neural-local.js'),E=require('./pcm-neural-knowledge.js');
 const sizes={
- 'emb.weight':30*96,
+ 'emb.weight':28*96,
  'convs.0.weight':128*96*3,'convs.0.bias':128,
  'convs.1.weight':128*96*5,'convs.1.bias':128,
  'convs.2.weight':128*96*7,'convs.2.bias':128,
