@@ -5,7 +5,8 @@ import {pipeline,TextStreamer,env} from 'https://cdn.jsdelivr.net/npm/@huggingfa
 env.allowRemoteModels=true;
 env.allowLocalModels=false;
 env.useBrowserCache=true;
-// Limit context and tokens to keep GPU usage bounded on desktop.\nconst MODEL='onnx-community/Qwen2.5-0.5B-Instruct';
+// Limit context and tokens to keep GPU usage bounded on desktop.
+const MODEL='onnx-community/Qwen2.5-0.5B-Instruct';
 let generator=null;
 let loading=null;
 let occupied=false;

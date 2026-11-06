@@ -41,7 +41,7 @@
           <input id="pcm-neural-question" maxlength="500" placeholder="Ex.: Explique a OS 900123456" required>
           <button type="submit" id="pcm-neural-send" aria-label="Enviar pergunta" title="Enviar pergunta">↑</button>
         </form>
-        <small>Modo leve: consultas SAP/ICM rápidas. IA Qwen: conversa local com WebGPU (download inicial ~786 MB). QUEST ainda não conectado.</small>
+        <small>Qwen conversacional ativo por padrão (WebGPU, primeiro download ~786 MB). Modo leve é opcional. QUEST completo ainda não está integrado.</small>
       </div>
     </section>`;
   shell.appendChild(root);
@@ -53,21 +53,9 @@
   const llm=window.PCM_NEURAL_CHAT?.createClient?.()||null;
   const history=[];
   let busy=false,requestGeneration=0,identityKey='';
-  // O PC inicia sem ocupar sua GPU. O usuário pode ativar o Qwen quando quiser.
-  function initialLiteMode() {
-    try {
-      const stored=window.localStorage.getItem('pcm_neural_lite');
-      if(stored==='1'||stored==='0')return stored==='1';
-    } catch (_) { /* armazenamento bloqueado: ainda funciona */ }
-    return !/Android|iPhone|iPad|Mobile|Mobi/i.test(navigator.userAgent||'');
-  }
-  let liteMode=initialLiteMode();
-  const normalize=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
-  function isQuickMetric(question) {
-    const q=normalize(question);
-    return /\b(quantas?|total|percentual|porcentagem|ranking|mais frequente|mais recorrente|abertas?|vencidas?|dados incompletos|cobertura icm|aderencia do plano|mttr ativo)\b/.test(q)
-      && !/\b(explique|porque|por que|como|recomend|diagnostic|investigar|possiveis causas)\b/.test(q);
-  }
+  // Qwen é o comportamento padrão em qualquer dispositivo. Modo leve é opcional
+  // e temporário: nunca reutilizar uma preferência antiga que desativou a IA.
+  let liteMode=false;
 
   const form=root.querySelector('#pcm-neural-form');
   const input=root.querySelector('#pcm-neural-question');
@@ -100,7 +88,7 @@
     state.textContent=!ctx?'Aguardando sessão autorizada':
       liteMode?'Modo leve ativo · consultas SAP/ICM rápidas':
       local?.ready?'Qwen conversacional ativo · processamento local':
-      local?.available?'Qwen local disponível · primeiro uso ~786 MB':
+      local?.available?'Qwen habilitado · primeiro uso ~786 MB':
       'Consultas SAP ativas · WebGPU indisponível neste navegador';
     lite.setAttribute('aria-pressed',String(liteMode));
     lite.textContent=liteMode?'⚡ Modo leve: ativo':'⚡ Ativar modo leve';
@@ -114,8 +102,8 @@
     if(focus)input.focus();
   }
   function closePanel(){
-    // Evita deixar centenas de MB de pesos e pipelines WebGPU concorrendo com os mapas.
-    llm?.stop('Chat fechado: GPU liberada');
+    // Preserve o modelo já carregado quando fechar o painel:
+    // recriar os pesos WebGPU a cada abertura aumenta a latência no PC.
     panel.hidden=true;
     selectMode=false;
     orb.classList.remove('pcm-neural-selecting');
@@ -175,7 +163,7 @@
     input.value='';
     const progress=make('div','pcm-neural-system-message','Preparando consulta…');
     messages.appendChild(progress);
-    let response,serverError=false;
+    let response,serverError=false,modelError='';
     try{
       const engine=window.PCM_NEURAL_ENGINE;
       const trusted=conversation?.ask(ctx,target?'':q,target||null)
@@ -185,8 +173,7 @@
         try{response=await window.PCM_NEURAL_REMOTE({question:q,target:target||null});}
         catch(_){serverError=true;}
       }
-      const fastQuery=liteMode||isQuickMetric(q);
-      if(!response&&!fastQuery&&llm?.status().available&&window.PCM_NEURAL_EVIDENCE){
+      if(!response&&!liteMode&&llm?.status().available&&window.PCM_NEURAL_EVIDENCE){
         const prepared=window.PCM_NEURAL_EVIDENCE.makePrompt(
           ctx,q,target||null,trusted,conversation?.contextStatus?.(),history
         );
@@ -233,13 +220,15 @@
 
         }catch(error){
           serverError=true;
-          progress.textContent='Qwen local indisponível: '+short(error?.message||error,180)+'. Usando cálculos SAP.';
+          modelError=short(error?.message||error,180);
+          progress.textContent='Qwen indisponível: '+modelError+'. Consulta SAP de contingência.';
         }
       }
       if(!response){
         response={...trusted};
         if(serverError)response.caveat=(response.caveat||'')+
-          ' Modelo conversacional não pôde ser executado nesta sessão; exibida consulta auditável SAP/ICM.';
+          ' Qwen não executado nesta sessão'+(modelError?' ('+modelError+')':'')+'; exibida consulta auditável SAP/ICM.';
+        if(serverError)response.title='Consulta SAP/ICM · Qwen indisponível';
         if(liteMode)response.caveat=(response.caveat||'')+
           ' Modo leve ativo neste dispositivo: desative para gerar respostas com Qwen.';
         else if(!llm?.status().available&&!serverError)response.caveat=(response.caveat||'')+
@@ -299,8 +288,7 @@
   form.addEventListener('submit',event=>{event.preventDefault();send(input.value);});
   lite.addEventListener('click',()=>{
     liteMode=!liteMode;
-    try{window.localStorage.setItem('pcm_neural_lite',liteMode?'1':'0');}catch(_){}
-    if(liteMode)llm?.stop('Modo leve ativado');
+    if(liteMode)llm?.stop('Modo leve ativado pelo usuário');
     updateState();
   });
   window.addEventListener('pagehide',()=>llm?.stop('Página encerrada'));
