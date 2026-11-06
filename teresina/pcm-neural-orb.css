@@ -100,3 +100,5 @@
 #pcm-neural-panel .pcm-neural-edit-cancel{background:#fff;color:#20456f;border-color:#c9d7eb}
 #pcm-neural-panel .pcm-neural-edit-actions button:disabled{opacity:.5;cursor:default}
 .pcm-neural-answer-error{border-color:#f4e2d4;background:#fffdfb}
+
+.pcm-neural-answer-text{white-space:pre-line}
