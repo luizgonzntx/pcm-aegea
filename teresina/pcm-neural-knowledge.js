@@ -36,8 +36,8 @@ function answer(ctx,question='',target=null){
      const d=neural.dossier,p=neural.classification;
      const quest=(d.quest||[]).slice(0,5).map(x=>x.texto).join(' | ').slice(0,1300);
      const folded=fold(quest);
-     const risky=/\\b(?:precisa|necessario|necessaria|pendente|aguardando|sera|devera|nao foi possivel|nao foi realizada)\\b.{0,85}\\b(?:substitui|troc|instal)/i.test(folded)
-       || /(?:o\\.?s\\.?|ordem).{0,35}(?:foi )?trocad/i.test(folded);
+     const risky=/\b(?:precisa|necessario|necessaria|pendente|aguardando|sera|devera|nao foi possivel|nao foi realizada)\b.{0,85}\b(?:substitui|troc|instal)/i.test(folded)
+       || /(?:o\.?s\.?|ordem).{0,35}(?:foi )?trocad/i.test(folded);
      const swapLabels={sem_evidencia:'Sem evidência suficiente',apenas_prevista:'Apenas prevista',potencial:'Substituição potencial',relatada:'Possível substituição relatada'};
      const stateLabels={nao_informado:'Situação não identificada',fora_de_operacao:'Fora de operação relatado',operacao_relatada:'Em operação relatado',relatos_mistos:'Relatos operacionais mistos'};
      facts.push({label:'QUEST — evidências originais',value:quest||'Sem texto informativo'});
@@ -72,7 +72,7 @@ function answer(ctx,question='',target=null){
        'QUEST privado + Ordens SAP',
        'Rótulos experimentais: existem falsos positivos em trocas previstas/administrativas; cada evento deve ser revisado antes de alterar indicadores.');
    }
-   const re=/\\b(substitui\\w*|troc\\w*)\\b/i;
+   const re=/\b(substitui\w*|troc\w*)\b/i;
    const mentions=rows.filter(o=>re.test(fold(o.text)));
    return result('Substituições · evidência disponível',
       'Encontrei '+num(mentions.length)+' ordens com termos de troca ou substituição apenas no TEXTO BREVE. Isso não prova execução física.',
