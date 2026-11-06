@@ -134,12 +134,15 @@ function flaggedStopOrders(data,f){
 
 function timestamp(day,hour){if(!validDate(day||'')||!hour)return null;const ms=Date.parse(day+'T'+hour+'Z');return Number.isFinite(ms)?ms:null;}
 function hoursGap(from,to){return Number.isFinite(from)&&Number.isFinite(to)&&to>=from?(to-from)/3600000:null;}
+// Convenção SAP desta exportação: operação 0010 é deslocamento, nunca reparo ativo.
+// Uma única regra evita divergência entre deslocamento e MTTR.
+function isTravelOperation(operation){return text(operation).padStart(4,'0')==='0010';}
 // Mede tempo ativo de reparo por OS, somando a união dos períodos efetivos
 // de execução (sem deslocamento nem duplicar intervalos simultâneos).
 function repairIntervals(logs){
  const intervals=[];
  for(const log of logs||[]){
-  if(text(log.operation).padStart(4,'0')==='0010'||!Number.isFinite(log.hours)||log.hours<=0)continue;
+  if(isTravelOperation(log.operation)||!Number.isFinite(log.hours)||log.hours<=0)continue;
   const start=timestamp(log.startDate,log.startTime),end=timestamp(log.endDate,log.endTime);
   if(start!==null&&end!==null&&end>start)intervals.push([start,end]);
  }
@@ -179,7 +182,7 @@ function maintenanceEvents(data,f){
   if(!repairLogsByOrder.has(log.order))repairLogsByOrder.set(log.order,[]);
   repairLogsByOrder.get(log.order).push(log);
   if(!logsByOrder.has(log.order))logsByOrder.set(log.order,{travelHours:0,executionHours:0,travelWorkers:new Set,executionWorkers:new Set});
-  const bucket=logsByOrder.get(log.order),travel=text(log.operation).padStart(4,'0')==='0010';
+  const bucket=logsByOrder.get(log.order),travel=isTravelOperation(log.operation);
   if(!text(log.worker))continue;
   if(travel){bucket.travelHours+=log.hours;bucket.travelWorkers.add(log.worker);}
   else {bucket.executionHours+=log.hours;bucket.executionWorkers.add(log.worker);}
@@ -643,6 +646,6 @@ function normalize(tables,files){
   attendance:events.filter(e=>e.attendanceHours!==null).length};
  return normalized;
 }
-const api={text,upper,status,labels,repairIntervals,typeLabels,typeLabel,typeGroup,orderClass,validDate,daysBetween,date,time,period,filter,stats,adherence,rank,timing,byType,topAssets,badActors,icmScope,icmUseful,icmRank,icmAudit,icmMatrix,engineeringMetrics,decisionInsights,stopRecords,flaggedStopOrders,maintenanceEvents,maintenanceDashboard,reliabilityByPlant,reliabilityByAsset,systemHealth,dedupe,schemas,optionalSchemas,headerKey,canonicalHeader,kind,normalize};
+const api={text,upper,status,labels,isTravelOperation,repairIntervals,typeLabels,typeLabel,typeGroup,orderClass,validDate,daysBetween,date,time,period,filter,stats,adherence,rank,timing,byType,topAssets,badActors,icmScope,icmUseful,icmRank,icmAudit,icmMatrix,engineeringMetrics,decisionInsights,stopRecords,flaggedStopOrders,maintenanceEvents,maintenanceDashboard,reliabilityByPlant,reliabilityByAsset,systemHealth,dedupe,schemas,optionalSchemas,headerKey,canonicalHeader,kind,normalize};
 if(typeof module!=='undefined')module.exports=api;root.PCM=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
