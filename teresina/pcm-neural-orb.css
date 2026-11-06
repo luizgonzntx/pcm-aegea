@@ -46,6 +46,11 @@
 .pcm-neural-caveat p{margin:0;font-size:11px;line-height:1.55;color:#75613e;overflow-wrap:anywhere}
 .pcm-neural-reference{display:block;padding-top:10px;border-top:1px solid #ecf1f7;color:#78869a;font-size:10px;line-height:1.5;overflow-wrap:anywhere}
 .pcm-neural-bottom{display:flex;flex-direction:column;gap:10px;flex:none;padding:13px 16px 15px;border-top:1px solid #e5edf7;background:#fff}
+.pcm-neural-tools{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:7px}
+#pcm-neural-panel .pcm-neural-lite{appearance:none;border:1px solid #bdd9e8;border-radius:999px;background:#f3f8ff;color:#1a4a76;padding:6px 10px;font:inherit;font-size:10px;font-weight:750;line-height:1.35;cursor:pointer}
+#pcm-neural-panel .pcm-neural-lite[aria-pressed="true"]{background:#e5f7e9;border-color:#81c49d;color:#136441}
+#pcm-neural-panel .pcm-neural-lite:focus-visible{outline:2px solid #0877b4;outline-offset:2px}
+#pcm-neural-panel #pcm-neural-send:disabled{opacity:.48;cursor:wait}
 #pcm-neural-panel .pcm-neural-pick{align-self:flex-start;display:flex;align-items:center;gap:6px;padding:0;border:0;background:transparent;color:#0866a9;font-size:11px;font-weight:800;cursor:pointer}
 #pcm-neural-panel .pcm-neural-pick span{font-size:19px;line-height:1}
 #pcm-neural-form{display:flex;align-items:center;gap:9px;padding:5px 6px 5px 14px;border:1px solid #b9d2e8;border-radius:15px;background:#f7faff;transition:box-shadow .18s,border-color .18s}
