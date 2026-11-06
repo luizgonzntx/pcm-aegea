@@ -11,6 +11,8 @@ cp \
   "$ROOT_DIR/teresina/index.html" \
   "$ROOT_DIR/teresina/admin.html" \
   "$ROOT_DIR/teresina/app.js" \
+  "$ROOT_DIR/teresina/pcm-neural-orb.js" \
+  "$ROOT_DIR/teresina/pcm-neural-orb.css" \
   "$ROOT_DIR/teresina/core.js" \
   "$ROOT_DIR/teresina/inventory.js" \
   "$ROOT_DIR/teresina/ui.js" \
