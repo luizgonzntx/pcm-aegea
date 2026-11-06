@@ -134,6 +134,28 @@ function flaggedStopOrders(data,f){
 
 function timestamp(day,hour){if(!validDate(day||'')||!hour)return null;const ms=Date.parse(day+'T'+hour+'Z');return Number.isFinite(ms)?ms:null;}
 function hoursGap(from,to){return Number.isFinite(from)&&Number.isFinite(to)&&to>=from?(to-from)/3600000:null;}
+// Mede tempo ativo de reparo por OS, somando a união dos períodos efetivos
+// de execução (sem deslocamento nem duplicar intervalos simultâneos).
+function repairIntervals(logs){
+ const intervals=[];
+ for(const log of logs||[]){
+  if(text(log.operation).padStart(4,'0')==='0010'||!Number.isFinite(log.hours)||log.hours<=0)continue;
+  const start=timestamp(log.startDate,log.startTime),end=timestamp(log.endDate,log.endTime);
+  if(start!==null&&end!==null&&end>start)intervals.push([start,end]);
+ }
+ if(!intervals.length)return {hours:null,spanHours:null,gapHours:null,intervals:0};
+ intervals.sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
+ let first=intervals[0][0],end=intervals[0][1],total=0;
+ for(let i=1;i<intervals.length;i++){
+  const [nextStart,nextEnd]=intervals[i];
+  if(nextStart<=end)end=Math.max(end,nextEnd);
+  else {total+=end-first;first=nextStart;end=nextEnd;}
+ }
+ total+=end-first;
+ const span=intervals.reduce((max,interval)=>Math.max(max,interval[1]),0)-intervals[0][0];
+ return {hours:total/3600000,spanHours:span/3600000,
+  gapHours:Math.max(0,span-total)/3600000,intervals:intervals.length};
+}
 function maintenanceEvents(data,f){
  const byId=new Map((data.orders||[]).map(o=>[o.id,o]));
  const byOrder=new Map;
@@ -153,19 +175,22 @@ function maintenanceEvents(data,f){
  }
  const logsByOrder=new Map;
  for(const log of (data.workLogs||[])){
-  if(!byOrder.has(log.order)||!text(log.worker)||!Number.isFinite(log.hours)||log.hours<0)continue;
+  if(!byOrder.has(log.order)||!Number.isFinite(log.hours)||log.hours<=0)continue;
   if(!logsByOrder.has(log.order))logsByOrder.set(log.order,{travelHours:0,executionHours:0,travelWorkers:new Set,executionWorkers:new Set});
   const bucket=logsByOrder.get(log.order),travel=text(log.operation).padStart(4,'0')==='0010';
+  if(!text(log.worker))continue;
   if(travel){bucket.travelHours+=log.hours;bucket.travelWorkers.add(log.worker);}
   else {bucket.executionHours+=log.hours;bucket.executionWorkers.add(log.worker);}
  }
  return [...byOrder.values()].map(event=>{
   const logs=logsByOrder.get(event.order.id);
+  const repair=repairIntervals((data.workLogs||[]).filter(log=>log.order===event.order.id));
   const travelAvg=logs?.travelWorkers.size?logs.travelHours/logs.travelWorkers.size:null;
   const executionAvg=logs?.executionWorkers.size?logs.executionHours/logs.executionWorkers.size:null;
   return {...event,
    attributionHours:hoursGap(event.created,event.start),
-   mttrHours:hoursGap(event.start,event.end),
+   referenceMttrHours:hoursGap(event.start,event.end),
+   mttrHours:repair.hours,repairSpanHours:repair.spanHours,repairGapHours:repair.gapHours,repairIntervals:repair.intervals,
    stopHours:hoursGap(event.created,event.end),
    travelHours:travelAvg,executionHours:executionAvg,
    attendanceHours:travelAvg!==null&&executionAvg!==null?travelAvg+executionAvg:null,
@@ -515,6 +540,7 @@ const schemas={
  workLogs:['Ordem','Operação','ID SAP','Trabalho real']
 };
 const optionalSchemas={
+ workLogs:['Data de início de execução real','Hora de início de execução real','Data real do fim de execução','Hora real do fim de execução'],
  stoppageNotes:['Início da avaria','Início da avaria (hora)','Fim da avaria','Fim da avaria (hora)','Criado às','Tipo de nota'],
  orders:['Início real hr.','Hora de referência']
 };
@@ -561,18 +587,60 @@ function normalize(tables,files){
    endDate:optionalDate(r['Fim da avaria']),endTime:time(r['Fim da avaria (hora)'])
   });
  }
- const workLogs=(tables.workLogs||[]).map(r=>{
-  const raw=r['Trabalho real'],work=typeof raw==='number'?raw:Number(text(raw).replace(',','.'));
-  return {order:text(r.Ordem),operation:text(r['Operação']).padStart(4,'0'),worker:text(r['ID SAP']),hours:text(raw)===''?null:(Number.isFinite(work)&&work>=0?work:null)};
- }).filter(r=>ids.has(r.order));
- const normalized={systems,orders,items,actions,stoppageNotes,workLogs,meta:{loadedAt:new Date().toISOString(),files,sourceOrders:all.length,excluded:all.length-orders.length,missingReference:orders.filter(o=>!o.date).length,stoppageOrders:new Set(stoppageNotes.map(n=>n.order)).size,workLogs:workLogs.length,workLogOrders:new Set(workLogs.map(l=>l.order)).size,notesWithCreationTime:stoppageNotes.filter(n=>n.createdTime).length,excludedStoppageNotes,missingStoppageNoteDate}};
+ // Apenas ordens CE/CP executadas e com parada vinculada são usadas nos tempos.
+ // Isso evita publicar 96 mil apontamentos quando o painel utiliza ~5 mil.
+ const eligibleWorkOrders=new Set(stoppageNotes.filter(n=>{
+  const o=ordersById.get(n.order);
+  return o&&status(o)==='done'&&['ZNTE','ZNTP'].includes(upper(o.type))
+   &&['','CE','CP'].includes(upper(n.noteType));
+ }).map(n=>n.order));
+ let duplicateWorkRows=0,negativeWorkRows=0,reverseMatched=0,missingWorkerRows=0;
+ const unique=new Map;
+ for(const r of tables.workLogs||[]){
+  const order=text(r.Ordem);
+  if(!eligibleWorkOrders.has(order))continue;
+  const raw=r['Trabalho real'],parsed=typeof raw==='number'?raw:Number(text(raw).replace(',','.'));
+  const hours=text(raw)===''?null:(Number.isFinite(parsed)?parsed:null);
+  const log={
+   order,operation:text(r['Operação']).padStart(4,'0'),worker:text(r['ID SAP']),
+   hours,
+   startDate:optionalDate(r['Data de início de execução real']),
+   startTime:optionalTime(r['Hora de início de execução real']),
+   endDate:optionalDate(r['Data real do fim de execução']),
+   endTime:optionalTime(r['Hora real do fim de execução'])
+  };
+  // Preserva múltiplas confirmações legítimas, mas elimina linhas idênticas.
+  const signature=JSON.stringify([log.order,log.operation,log.worker,log.hours,
+   log.startDate,log.startTime,log.endDate,log.endTime,
+   text(r['Criado em']),text(r['Criado por']),text(r['Tipo ordem']),text(r['Status do sistema'])]);
+  if(unique.has(signature)){duplicateWorkRows++;continue;}
+  unique.set(signature,log);
+  if(log.hours!==null&&log.hours<0)negativeWorkRows++;
+ }
+ const cleaned=[...unique.values()];
+ const reverseKey=log=>JSON.stringify([log.order,log.operation,log.worker,
+  Math.abs(log.hours).toFixed(6),log.startDate,log.startTime,log.endDate,log.endTime]);
+ const reversalCount=new Map;
+ for(const log of cleaned)if(log.hours!==null&&log.hours<0){
+  const key=reverseKey(log);reversalCount.set(key,(reversalCount.get(key)||0)+1);
+ }
+ const workLogs=[];
+ for(const log of cleaned){
+  if(!Number.isFinite(log.hours)||log.hours<=0)continue;
+  const key=reverseKey(log),cancel=reversalCount.get(key)||0;
+  if(cancel){reversalCount.set(key,cancel-1);reverseMatched++;continue;}
+  if(!log.worker)missingWorkerRows++;
+  workLogs.push(log);
+ }
+ const normalized={systems,orders,items,actions,stoppageNotes,workLogs,meta:{loadedAt:new Date().toISOString(),files,sourceOrders:all.length,excluded:all.length-orders.length,missingReference:orders.filter(o=>!o.date).length,stoppageOrders:new Set(stoppageNotes.map(n=>n.order)).size,workLogs:workLogs.length,workLogOrders:new Set(workLogs.map(l=>l.order)).size,duplicateWorkRows,negativeWorkRows,reverseMatched,missingWorkerRows,notesWithCreationTime:stoppageNotes.filter(n=>n.createdTime).length,excludedStoppageNotes,missingStoppageNoteDate}};
  normalized.meta.icm=icmAudit(normalized,orders);
  const events=maintenanceEvents(normalized,{});
- normalized.meta.maintenance={eligible:events.length,attribution:events.filter(e=>e.attributionHours!==null).length,repair:events.filter(e=>e.mttrHours!==null).length,
+ normalized.meta.maintenance={eligible:events.length,attribution:events.filter(e=>e.attributionHours!==null).length,repair:events.filter(e=>e.mttrHours!==null).length,referenceRepair:events.filter(e=>e.referenceMttrHours!==null).length,
+  repairLong24h:events.filter(e=>e.mttrHours>24).length,
   travel:events.filter(e=>e.travelHours!==null).length,execution:events.filter(e=>e.executionHours!==null).length,
   attendance:events.filter(e=>e.attendanceHours!==null).length};
  return normalized;
 }
-const api={text,upper,status,labels,typeLabels,typeLabel,typeGroup,orderClass,validDate,daysBetween,date,time,period,filter,stats,adherence,rank,timing,byType,topAssets,badActors,icmScope,icmUseful,icmRank,icmAudit,icmMatrix,engineeringMetrics,decisionInsights,stopRecords,flaggedStopOrders,maintenanceEvents,maintenanceDashboard,reliabilityByPlant,reliabilityByAsset,systemHealth,dedupe,schemas,optionalSchemas,headerKey,canonicalHeader,kind,normalize};
+const api={text,upper,status,labels,repairIntervals,typeLabels,typeLabel,typeGroup,orderClass,validDate,daysBetween,date,time,period,filter,stats,adherence,rank,timing,byType,topAssets,badActors,icmScope,icmUseful,icmRank,icmAudit,icmMatrix,engineeringMetrics,decisionInsights,stopRecords,flaggedStopOrders,maintenanceEvents,maintenanceDashboard,reliabilityByPlant,reliabilityByAsset,systemHealth,dedupe,schemas,optionalSchemas,headerKey,canonicalHeader,kind,normalize};
 if(typeof module!=='undefined')module.exports=api;root.PCM=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
