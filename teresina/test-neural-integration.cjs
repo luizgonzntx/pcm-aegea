@@ -1,0 +1,17 @@
+'use strict';
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const file=p=>fs.readFileSync(require('node:path').join(__dirname,p),'utf8');
+const ui=file('pcm-neural-orb.js'),html=file('index.html'),app=file('app.js');
+assert.doesNotMatch(ui,/type="file"|filePicker|Conectar modelo treinado|Trocar modelo local/);
+assert.doesNotMatch(html,/src="pcm-neural-local\.js/);
+assert.match(ui,/PCM_NEURAL_REMOTE/);
+assert.match(ui,/PCM_NEURAL_ENGINE/);
+assert.match(ui,/IA conversacional em desenvolvimento/);
+assert.match(app,/window\.PCM_NEURAL_REMOTE\s*=/);
+assert.match(app,/db\.auth\.getSession\(\)/);
+assert.match(app,/db\.functions\.invoke\(functionName/);
+assert.match(app,/if \(!functionName \|\| !db \|\| !user/);
+assert.doesNotMatch(app,/service_role|sb_secret_/);
+assert.ok(html.includes('pcm-neural-orb.js?v=20261106-5'));
+console.log('PCM Neural: site sem upload manual, gateway autenticado e fallback SAP validados.');
