@@ -35,13 +35,13 @@
         <div id="pcm-neural-messages" class="pcm-neural-messages" role="log" aria-label="Histórico de perguntas e respostas" aria-live="polite"></div>
       </div>
       <div class="pcm-neural-bottom">
-        <button type="button" id="pcm-neural-pick" class="pcm-neural-pick"><span aria-hidden="true">⌖</span> Escolher um dado da tela</button>
+        <div class="pcm-neural-tools"><button type="button" id="pcm-neural-pick" class="pcm-neural-pick"><span aria-hidden="true">⌖</span> Escolher um dado da tela</button><button type="button" id="pcm-neural-lite" class="pcm-neural-lite" aria-pressed="false">⚡ Modo leve</button></div>
         <form id="pcm-neural-form" autocomplete="off">
           <label class="pcm-neural-visually-hidden" for="pcm-neural-question">Escreva sua dúvida</label>
           <input id="pcm-neural-question" maxlength="500" placeholder="Ex.: Explique a OS 900123456" required>
           <button type="submit" id="pcm-neural-send" aria-label="Enviar pergunta" title="Enviar pergunta">↑</button>
         </form>
-        <small>Modelo aberto executado localmente, sem API de IA. Primeiro uso: download ~786 MB; necessita WebGPU. Sem QUEST completo na base atual.</small>
+        <small>Modo leve: consultas SAP/ICM rápidas. IA Qwen: conversa local com WebGPU (download inicial ~786 MB). QUEST ainda não conectado.</small>
       </div>
     </section>`;
   shell.appendChild(root);
@@ -53,12 +53,28 @@
   const llm=window.PCM_NEURAL_CHAT?.createClient?.()||null;
   const history=[];
   let busy=false,requestGeneration=0,identityKey='';
+  // O PC inicia sem ocupar sua GPU. O usuário pode ativar o Qwen quando quiser.
+  function initialLiteMode() {
+    try {
+      const stored=window.localStorage.getItem('pcm_neural_lite');
+      if(stored==='1'||stored==='0')return stored==='1';
+    } catch (_) { /* armazenamento bloqueado: ainda funciona */ }
+    return !/Android|iPhone|iPad|Mobile|Mobi/i.test(navigator.userAgent||'');
+  }
+  let liteMode=initialLiteMode();
+  const normalize=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+  function isQuickMetric(question) {
+    const q=normalize(question);
+    return /\b(quantas?|total|percentual|porcentagem|ranking|mais frequente|mais recorrente|abertas?|vencidas?|dados incompletos|cobertura icm|aderencia do plano|mttr ativo)\b/.test(q)
+      && !/\b(explique|porque|por que|como|recomend|diagnostic|investigar|possiveis causas)\b/.test(q);
+  }
 
   const form=root.querySelector('#pcm-neural-form');
   const input=root.querySelector('#pcm-neural-question');
   const messages=root.querySelector('#pcm-neural-messages');
   const prompts=root.querySelector('#pcm-neural-prompts');
   const pick=root.querySelector('#pcm-neural-pick');
+  const lite=root.querySelector('#pcm-neural-lite');
   const state=root.querySelector('#pcm-neural-source-state');
   const TARGETS='#kpis .kpi,#icmSummary .kpi,#deadlineCards .kpi,#engKpis .kpi,#maintenanceOverview .maintenance-step,#icmCards .card,.table-wrap tbody tr,.plant-summary>div';
   let drag=null,selectMode=false,highlight=null;
@@ -82,9 +98,12 @@
       identityKey=current;
     }
     state.textContent=!ctx?'Aguardando sessão autorizada':
+      liteMode?'Modo leve ativo · consultas SAP/ICM rápidas':
       local?.ready?'Qwen conversacional ativo · processamento local':
-      local?.available?'Qwen local · download inicial ~786 MB na primeira pergunta':
+      local?.available?'Qwen local disponível · primeiro uso ~786 MB':
       'Consultas SAP ativas · WebGPU indisponível neste navegador';
+    lite.setAttribute('aria-pressed',String(liteMode));
+    lite.textContent=liteMode?'⚡ Modo leve: ativo':'⚡ Ativar modo leve';
   }
   function openPanel(focus=false){
     selectMode=false;
@@ -95,6 +114,8 @@
     if(focus)input.focus();
   }
   function closePanel(){
+    // Evita deixar centenas de MB de pesos e pipelines WebGPU concorrendo com os mapas.
+    llm?.stop('Chat fechado: GPU liberada');
     panel.hidden=true;
     selectMode=false;
     orb.classList.remove('pcm-neural-selecting');
@@ -154,7 +175,7 @@
     input.value='';
     const progress=make('div','pcm-neural-system-message','Preparando consulta…');
     messages.appendChild(progress);
-    let response,serverError=false,usedLLM=false;
+    let response,serverError=false;
     try{
       const engine=window.PCM_NEURAL_ENGINE;
       const trusted=conversation?.ask(ctx,target?'':q,target||null)
@@ -164,14 +185,18 @@
         try{response=await window.PCM_NEURAL_REMOTE({question:q,target:target||null});}
         catch(_){serverError=true;}
       }
-      if(!response&&llm?.status().available&&window.PCM_NEURAL_EVIDENCE){
+      const fastQuery=liteMode||isQuickMetric(q);
+      if(!response&&!fastQuery&&llm?.status().available&&window.PCM_NEURAL_EVIDENCE){
         const prepared=window.PCM_NEURAL_EVIDENCE.makePrompt(
           ctx,q,target||null,trusted,conversation?.contextStatus?.(),history
         );
         try{
-          const stream=[];
+          let streamed='',lastPaint=0,lastDownloadPaint=0;
           const output=await llm.ask(prepared.messages,{
             onProgress:p=>{
+              const now=performance.now();
+              if(p.type==='progress'&&now-lastDownloadPaint<180)return;
+              if(p.type==='progress')lastDownloadPaint=now;
               if(run!==requestGeneration)return;
               if(p.type==='status'&&p.status==='generating'){
                 progress.textContent='Qwen respondendo…';
@@ -184,8 +209,12 @@
             },
             onToken:token=>{
               if(run!==requestGeneration)return;
-              stream.push(token);
-              progress.textContent='Qwen: '+stream.join('').slice(-1100);
+              streamed+=token;
+              const now=performance.now();
+              if(now-lastPaint>110){
+                progress.textContent='Qwen: '+streamed.slice(-750);
+                lastPaint=now;
+              }
             }
           });
           if(!output.trim())throw Error('Modelo não gerou uma resposta útil.');
@@ -201,7 +230,7 @@
           };
           history.push({role:'user',content:subject},{role:'assistant',content:output.trim().slice(0,500)});
           while(history.length>8)history.shift();
-          usedLLM=true;
+
         }catch(error){
           serverError=true;
           progress.textContent='Qwen local indisponível: '+short(error?.message||error,180)+'. Usando cálculos SAP.';
@@ -211,8 +240,10 @@
         response={...trusted};
         if(serverError)response.caveat=(response.caveat||'')+
           ' Modelo conversacional não pôde ser executado nesta sessão; exibida consulta auditável SAP/ICM.';
-        if(!llm?.status().available&&!serverError)response.caveat=(response.caveat||'')+
-          ' Para conversar livremente com Qwen no próprio computador, use navegador com WebGPU.';
+        if(liteMode)response.caveat=(response.caveat||'')+
+          ' Modo leve ativo neste dispositivo: desative para gerar respostas com Qwen.';
+        else if(!llm?.status().available&&!serverError)response.caveat=(response.caveat||'')+
+          ' Para conversar livremente com Qwen, é necessário WebGPU neste navegador.';
       }
       if(run!==requestGeneration||identityKey!==(String(getContext()?.userId||'')+':'+String(getContext()?.revision||'')))return;
       updateState();
@@ -266,6 +297,16 @@
   }
   root.querySelectorAll('[data-pcm-question]').forEach(button=>button.addEventListener('click',()=>send(button.dataset.pcmQuestion)));
   form.addEventListener('submit',event=>{event.preventDefault();send(input.value);});
+  lite.addEventListener('click',()=>{
+    liteMode=!liteMode;
+    try{window.localStorage.setItem('pcm_neural_lite',liteMode?'1':'0');}catch(_){}
+    if(liteMode)llm?.stop('Modo leve ativado');
+    updateState();
+  });
+  window.addEventListener('pagehide',()=>llm?.stop('Página encerrada'));
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden)llm?.stop('Página em segundo plano');
+  });
   clear.addEventListener('click',()=>{
     requestGeneration++;
     llm?.stop('Nova investigação iniciada');
