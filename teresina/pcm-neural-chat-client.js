@@ -1,8 +1,8 @@
 (function(root){
 'use strict';
-const MODEL='Qwen2.5-0.5B-Instruct (GPU ou CPU local)';
+const MODEL='Qwen2.5-0.5B-Instruct (CPU/RAM local)';
 function createClient(workerFactory){
- const factory=workerFactory||(()=>new Worker('pcm-neural-chat-worker.js?v=20261106-11',{type:'module'}));
+ const factory=workerFactory||(()=>new Worker('pcm-neural-chat-worker.js?v=20261106-12',{type:'module'}));
  let worker=null,active=null,serial=0,ready=false,unavailable='';
  const canRun=()=>typeof root.Worker==='function';
  const status=()=>({ready,busy:!!active,available:canRun()&&!unavailable,unavailable,model:MODEL});
