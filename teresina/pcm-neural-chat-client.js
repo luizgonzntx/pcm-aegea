@@ -7,6 +7,9 @@ function createClient(workerFactory){
  const canRun=()=>typeof root.Worker==='function';
  const status=()=>({ready,busy:!!active,available:canRun()&&!unavailable,unavailable,model:MODEL});
  function stop(reason='Modelo interrompido'){
+   // Compatibilidade defensiva: versões antigas da UI chamavam stop ao perder foco.
+   // Isso nunca deve interromper uma inferência CPU/RAM em andamento.
+   if(/página em segundo plano|pagina em segundo plano/i.test(String(reason||'')))return;
    if(worker){worker.terminate();worker=null;}
    if(active){active.reject(new Error(reason));active=null;}
    ready=false;
