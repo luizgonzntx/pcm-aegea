@@ -34,13 +34,18 @@
         <div id="pcm-neural-messages" class="pcm-neural-messages" role="log" aria-label="Histórico de perguntas e respostas" aria-live="polite"></div>
       </div>
       <div class="pcm-neural-bottom">
+        <div class="pcm-neural-connect-area">
+          <button type="button" id="pcm-neural-connect" class="pcm-neural-connect">✦ Conectar modelo treinado</button>
+          <input type="file" id="pcm-neural-model-file" accept=".json,application/json" hidden>
+          <span class="pcm-neural-model-hint">Arquivo privado: processado somente neste navegador</span>
+        </div>
         <button type="button" id="pcm-neural-pick" class="pcm-neural-pick"><span aria-hidden="true">⌖</span> Escolher um dado da tela</button>
         <form id="pcm-neural-form" autocomplete="off">
           <label class="pcm-neural-visually-hidden" for="pcm-neural-question">Escreva sua dúvida</label>
           <input id="pcm-neural-question" maxlength="500" placeholder="Ex.: Explique a OS 900123456" required>
           <button type="submit" id="pcm-neural-send" aria-label="Enviar pergunta" title="Enviar pergunta">↑</button>
         </form>
-        <small>Consulta auditável, sem IA generativa conectada. Nenhuma informação SAP é alterada.</small>
+        <small>Modelo local: classificação experimental, não chatbot generativo. Dados QUEST não são enviados ao site ou ao GitHub.</small>
       </div>
     </section>`;
   shell.appendChild(root);
@@ -53,6 +58,8 @@
   const prompts=root.querySelector('#pcm-neural-prompts');
   const pick=root.querySelector('#pcm-neural-pick');
   const state=root.querySelector('#pcm-neural-source-state');
+  const connect=root.querySelector('#pcm-neural-connect');
+  const filePicker=root.querySelector('#pcm-neural-model-file');
   const TARGETS='#kpis .kpi,#icmSummary .kpi,#deadlineCards .kpi,#engKpis .kpi,#maintenanceOverview .maintenance-step,#icmCards .card,.table-wrap tbody tr,.plant-summary>div';
   let drag=null,selectMode=false,highlight=null;
   const short=(value,n=170)=>String(value||'').replace(/\s+/g,' ').trim().slice(0,n);
@@ -60,8 +67,12 @@
     try{return window.PCM_NEURAL_CONTEXT?.()||null;}catch(_){return null;}
   }
   function updateState(){
-    const ctx=getContext();
-    state.textContent=ctx?'Base carregada · Revisão '+(ctx.revision||'—'):'Base ainda não carregada';
+    const ctx=getContext(),net=window.PCM_NEURAL_LOCAL?.status();
+    state.textContent=net?.connected
+      ? 'Modelo neural local conectado · '+net.orders.toLocaleString('pt-BR')+' OS'
+      : (ctx?'Base SAP carregada · modelo ainda não conectado':'Base ainda não carregada');
+    connect.textContent=net?.connected?'✓ Trocar modelo local':'✦ Conectar modelo treinado';
+    connect.classList.toggle('pcm-neural-is-connected',!!net?.connected);
   }
   function openPanel(focus=false){
     selectMode=false;
@@ -150,6 +161,24 @@
     messages.lastElementChild.scrollIntoView({behavior:'smooth',block:'nearest'});
     input.value='';
   }
+  connect.addEventListener('click',()=>filePicker.click());
+  filePicker.addEventListener('change',async()=>{
+    const file=filePicker.files?.[0];
+    if(!file)return;
+    connect.disabled=true;connect.textContent='Lendo modelo privado…';
+    try{
+      const engine=window.PCM_NEURAL_LOCAL;
+      if(!engine)throw Error('Script de inferência indisponível. Atualize a página.');
+      const result=await engine.loadFile(file);
+      updateState();
+      messages.appendChild(make('div','pcm-neural-system-message','Rede neural conectada localmente: '+result.orders.toLocaleString('pt-BR')+' dossiês QUEST. Digite o número de uma OS para ver a classificação e as evidências originais.'));
+      trimMessages();
+      messages.lastElementChild.scrollIntoView({behavior:'smooth',block:'nearest'});
+    }catch(err){
+      messages.appendChild(make('div','pcm-neural-system-message pcm-neural-system-error','Não foi possível carregar o modelo: '+String(err?.message||'arquivo inválido')));
+      trimMessages();
+    }finally{filePicker.value='';connect.disabled=false;updateState();}
+  });
   root.querySelectorAll('[data-pcm-question]').forEach(button=>button.addEventListener('click',()=>send(button.dataset.pcmQuestion)));
   form.addEventListener('submit',event=>{event.preventDefault();send(input.value);});
   close.addEventListener('click',()=>{closePanel();orb.focus();});

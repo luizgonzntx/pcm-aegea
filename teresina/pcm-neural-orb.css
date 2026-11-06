@@ -68,3 +68,13 @@
  .pcm-neural-bottom{padding-bottom:max(12px,env(safe-area-inset-bottom))}
 }
 @media(prefers-reduced-motion:reduce){#pcm-neural-orb,#pcm-neural-form{transition:none}}
+
+/* Conexao privada de pesos + dossies treinados no Colab */
+.pcm-neural-connect-area{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:7px}
+#pcm-neural-panel .pcm-neural-connect{display:flex;align-items:center;gap:8px;border:1px solid #bfd8f0;border-radius:12px;padding:9px 13px;background:#e8f3ff;color:#064785;cursor:pointer;font-size:11px;font-weight:800;text-align:left}
+#pcm-neural-panel .pcm-neural-connect:hover{border-color:#75bbec;background:#d7edfc}
+#pcm-neural-panel .pcm-neural-connect:disabled{opacity:.55;cursor:wait}
+#pcm-neural-panel .pcm-neural-is-connected{border-color:#86d0b3;background:#e6f7ef;color:#136c47}
+.pcm-neural-model-hint{font-size:9px;line-height:1.4;color:#7188a0;flex:1;min-width:125px}
+.pcm-neural-system-message{font-size:11px;line-height:1.5;padding:10px 12px;border:1px solid #a8e1cc;background:#e9fbf4;color:#125a47;border-radius:11px;overflow-wrap:anywhere}
+.pcm-neural-system-error{border-color:#e4b5b5;background:#fff2f2;color:#8a2738}
