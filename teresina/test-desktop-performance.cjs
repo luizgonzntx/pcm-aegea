@@ -31,7 +31,7 @@ assert.match(app,/const limited = systemSlice\(s\)/);
 assert.doesNotMatch(app,/P\.reliabilityByPlant\(data, sysFilter\)/);
 assert.doesNotMatch(ui,/let liteMode=|isQuickMetric/);
 assert.doesNotMatch(ui,/initialLiteMode|isQuickMetric\(q\)|localStorage\.getItem\('pcm_neural_lite'\)/);
-assert.match(ui,/if\(!response&&!liteMode&&llm\?\.status\(\)\.available/);
+assert.match(ui,/answer=await llm\\.ask\\(prepared\\.messages/);
 assert.doesNotMatch(ui,/llm\?\.stop\('Chat fechado/);
 assert.match(ui,/modelError=short\(error\?\.message\|\|error/);
 assert.match(ui,/streamed\.slice\(-750\)/);
