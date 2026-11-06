@@ -226,7 +226,7 @@ function reliabilityByGroup(data,f,byAsset){
    }
   }
   const mtbfHours=intervalCount?intervalSum/intervalCount:null,mttrHours=repair.value;
-  const denominator=mtbfHours+mttrHours;
+  // Não inferir disponibilidade operacional com MTTR ativo e MTBF indicativo.
   return {tag:g.tag,plant:g.plant,asset:g.asset,equipment:g.equipment,
    events:e.length,closed:repair.count,incomplete:e.length-repair.count,
    mttrHours,mtbfHours,intervals:intervalCount,overlapping,
@@ -235,7 +235,7 @@ function reliabilityByGroup(data,f,byAsset){
    executionHours:execution.value,executionCount:execution.count,
    attendanceHours:travel.value!=null&&execution.value!=null?travel.value+execution.value:null,attendanceCount:attendance.count,
    stopHours:stop.value,stopCount:stop.count,
-   availability:mtbfHours!=null&&mttrHours!=null&&denominator>0?mtbfHours/denominator:null,
+   availability:null,
    ids:e.map(v=>v.order.id)};
  }).sort((a,b)=>b.events-a.events||a.plant.localeCompare(b.plant,'pt-BR')||(byAsset?a.asset.localeCompare(b.asset,'pt-BR'):0));
 }
