@@ -1,0 +1,21 @@
+#pcm-neural-layer{position:relative;z-index:1000}
+#pcm-neural-orb{position:fixed;right:22px;bottom:23px;z-index:1300;width:66px;height:66px;border:2px solid #fff;border-radius:50%;box-shadow:0 12px 40px #001e5070;color:#fff;background:linear-gradient(145deg,#003e9b,#0026c1);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;font-size:26px;cursor:grab;touch-action:none;user-select:none}
+#pcm-neural-orb span{font-size:11px;line-height:11px;font-weight:900;letter-spacing:.12em}
+#pcm-neural-orb:hover,#pcm-neural-orb.pcm-neural-selecting{box-shadow:0 0 0 6px #005bd522,0 12px 40px #001e5080}
+#pcm-neural-orb.pcm-neural-dragging{cursor:grabbing;box-shadow:0 0 0 7px #005bd522,0 18px 48px #001e5080}
+.pcm-neural-target{outline:3px solid #005bf0!important;outline-offset:3px!important;background-color:#0066ee10!important}
+#pcm-neural-panel{position:fixed;right:22px;bottom:101px;width:min(380px,calc(100vw - 24px));max-height:min(590px,calc(100vh - 132px));overflow:auto;z-index:1299;background:#fff;border:1px solid #d7e2f5;box-shadow:0 18px 55px #081f4d40;border-radius:18px;color:#122746}
+#pcm-neural-panel[hidden]{display:none!important}
+.pcm-neural-head{display:flex;align-items:center;gap:10px;padding:15px 16px;border-bottom:1px solid #e8eef7;background:#fff}
+.pcm-neural-head>b{display:grid;place-items:center;width:35px;height:35px;border-radius:12px;color:#fff;background:#003cc9;font-size:20px}
+.pcm-neural-head strong{display:block;font-size:15px;color:#102f6a}
+.pcm-neural-head small{display:block;font-size:11px;color:#5b6980}
+#pcm-neural-close{margin-left:auto;border:0;background:#f0f4fb;border-radius:8px;color:#30476c;font-size:22px;width:31px;height:31px;cursor:pointer}
+.pcm-neural-body{padding:16px}
+.pcm-neural-body h3{font-size:16px;line-height:1.4;margin:0 0 9px;color:#132f61;overflow-wrap:anywhere}
+#pcm-neural-value{display:block;font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;color:#003cc9;margin:5px 0 12px;overflow-wrap:anywhere}
+#pcm-neural-value[hidden]{display:none!important}
+#pcm-neural-explanation,#pcm-neural-next{font-size:13px;line-height:1.62;color:#314361;margin:0 0 12px}
+#pcm-neural-next{background:#f1f5fc;border-radius:10px;padding:10px 12px}
+.pcm-neural-body>small{display:block;font-size:11px;line-height:1.5;color:#69768c;border-top:1px solid #e7ebf3;padding-top:12px}
+@media(max-width:600px){#pcm-neural-orb{width:56px;height:56px;right:15px;bottom:15px}#pcm-neural-panel{right:12px;bottom:83px;max-height:calc(100vh - 106px)}}
