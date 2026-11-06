@@ -75,6 +75,12 @@ function answer(ctx,question='',target=null){
  }
  if(wantsICM){
    const a=P.icmAudit(data,rows);
+   if(/condiz|coerente|compativel|relato|quest|tecnico/.test(q)){
+     return result('Conciliação ICM × QUEST ainda indisponível',
+       'O painel tem os campos de ICM da base SAP, mas não contém o texto QUEST completo. Por isso não consigo dizer se a causa e a medida cadastradas condizem com o que o técnico efetivamente relatou.',
+       [{label:'Corretivas CE/CP elegíveis',value:num(a.eligible)},{label:'Com diagnóstico ICM completo',value:num(a.complete)},{label:'Sem causa útil',value:num(a.missingCause)}],
+       'ICM + Ordens SAP','Uma verificação real precisa cruzar os relatos QUEST por OS e operação com os itens, causas e medidas cadastrados.');
+   }
    if(/causa|componente|medida|mais |ranking|top |recorr/.test(q)){
     const key=/medida/.test(q)?'action':/componente|item/.test(q)?'component':'cause';
     const list=P.icmRank(data,rows,key).slice(0,5);
