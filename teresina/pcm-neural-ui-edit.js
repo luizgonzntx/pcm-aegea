@@ -2,6 +2,7 @@
 'use strict';
 // Apenas preferências visuais desta sessão. Nunca modifica registros de manutenção.
 let previous=null;
+let baseTitle='';
 let current={title:'',accent:'blue',size:'normal',density:'comfortable'};
 const allowed={title:'Título do painel',accent:'Cor de destaque',size:'Tamanho do texto',density:'Espaçamento'};
 const accents={blue:'#0027bd',green:'#0f8a68',teal:'#087e8b'};
@@ -57,7 +58,10 @@ function describe(p){
 }
 function render(){
  const page=document.querySelector('#pageTitle');
- if(page&&current.title)page.textContent=current.title;
+ if(page){
+  if(!baseTitle)baseTitle=page.textContent;
+  page.textContent=current.title||baseTitle;
+ }
  const html=document.documentElement;
  html.dataset.pcmTextSize=current.size;
  html.dataset.pcmDensity=current.density;
@@ -76,7 +80,11 @@ function undo(){
  current={...previous};previous=null;
  render();return true;
 }
-function onPageChange(){render();}
+function onPageChange(){
+ const page=document.querySelector('#pageTitle');
+ if(page)baseTitle=page.textContent;
+ render();
+}
 const api={isEditRequest,prompt,parse,describe,apply,undo,onPageChange,state:()=>({...current})};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;
 root.PCM_NEURAL_EDITS=api;
