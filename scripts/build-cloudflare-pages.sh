@@ -13,6 +13,7 @@ cp \
   "$ROOT_DIR/teresina/app.js" \
   "$ROOT_DIR/teresina/pcm-neural-orb.js" \
   "$ROOT_DIR/teresina/pcm-neural-knowledge.js" \
+  "$ROOT_DIR/teresina/pcm-neural-local.js" \
   "$ROOT_DIR/teresina/pcm-neural-orb.css" \
   "$ROOT_DIR/teresina/core.js" \
   "$ROOT_DIR/teresina/inventory.js" \
