@@ -15,18 +15,19 @@
         <div class="pcm-neural-heading">
           <span class="pcm-neural-eyebrow">CENTRAL DE CONSULTAS · PCM</span>
           <strong id="pcm-neural-title">Tire suas dúvidas</strong>
-          <small id="pcm-neural-source-state">Respostas baseadas no painel</small>
+          <small id="pcm-neural-source-state">Protótipo de análise de manutenção</small>
         </div>
+        <button type="button" id="pcm-neural-clear" class="pcm-neural-icon-button" title="Nova investigação" aria-label="Limpar conversa e começar nova investigação">↺</button>
         <button type="button" id="pcm-neural-close" class="pcm-neural-icon-button" aria-label="Fechar painel">×</button>
       </header>
       <div class="pcm-neural-content">
         <div class="pcm-neural-welcome">
           <div class="pcm-neural-intro-icon" aria-hidden="true">✧</div>
-          <h3>O que você quer investigar?</h3>
-          <p>Consulte ordens, indicadores e ICM. As respostas usam os dados carregados e mostram de onde vieram.</p>
+          <h3>O que vamos investigar?</h3>
+          <p>Comece por uma ordem ou ativo e continue perguntando. O protótipo mantém o contexto da investigação e apresenta as evidências do SAP e do ICM.</p>
         </div>
         <div id="pcm-neural-prompts" class="pcm-neural-prompts" aria-label="Perguntas sugeridas">
-          <button type="button" data-pcm-question="Quantas ordens foram executadas?"><span>▦</span>Ordens executadas</button>
+          <button type="button" data-pcm-question="Quantas corretivas estão abertas?"><span>▦</span>Corretivas abertas</button>
           <button type="button" data-pcm-question="Qual causa mais frequente no ICM?"><span>◎</span>Causas do ICM</button>
           <button type="button" data-pcm-question="Qual é o MTTR ativo?"><span>◷</span>Entender o MTTR</button>
           <button type="button" data-pcm-question="Há dados incompletos no ICM?"><span>◇</span>Auditar cadastro</button>
@@ -40,13 +41,15 @@
           <input id="pcm-neural-question" maxlength="500" placeholder="Ex.: Explique a OS 900123456" required>
           <button type="submit" id="pcm-neural-send" aria-label="Enviar pergunta" title="Enviar pergunta">↑</button>
         </form>
-        <small>Consultas SAP com evidências. O modelo conversacional será disponibilizado pelo servidor privado, sem arquivos manuais.</small>
+        <small>Protótipo: perguntas contextuais e cálculos auditáveis. Sem QUEST completo ou modelo generativo conectado.</small>
       </div>
     </section>`;
   shell.appendChild(root);
   const orb=root.querySelector('#pcm-neural-orb');
   const panel=root.querySelector('#pcm-neural-panel');
   const close=root.querySelector('#pcm-neural-close');
+  const clear=root.querySelector('#pcm-neural-clear');
+  const conversation=window.PCM_NEURAL_PROTOTYPE?.createSession?.()||null;
   const form=root.querySelector('#pcm-neural-form');
   const input=root.querySelector('#pcm-neural-question');
   const messages=root.querySelector('#pcm-neural-messages');
@@ -62,10 +65,10 @@
   function updateState(){
     const ctx=getContext();
     state.textContent=!ctx
-      ? 'Aguardando dados da sessão'
+      ? 'Aguardando sessão autorizada'
       : (window.PCM_CONFIG?.neuralFunction
-         ? 'Consultas SAP · servidor neural configurado'
-         : 'Consultas SAP ativas · IA conversacional em desenvolvimento');
+         ? 'Protótipo de investigação · backend configurado'
+         : 'Protótipo de investigação · dados SAP/ICM');
   }
   function openPanel(focus=false){
     selectMode=false;
@@ -116,6 +119,7 @@
     if(!q&&!target)return;
     openPanel(false);
     prompts.classList.add('pcm-neural-prompts-used');
+    root.querySelector('.pcm-neural-welcome').hidden=true;
     const subject=target?'Explique: '+(target.label||'dado selecionado')+(target.value?' · '+target.value:''):q;
     messages.appendChild(make('div','pcm-neural-user-message',subject));
     input.value='';
@@ -130,7 +134,8 @@
       }
       if(!response){
         const engine=window.PCM_NEURAL_ENGINE;
-        response=engine?.answer(getContext(),target?'':q,target||null);
+        response=conversation?.ask(getContext(),target?'':q,target||null)
+          ||engine?.answer(getContext(),target?'':q,target||null);
         if(!response)throw Error('Motor de consulta indisponível');
         if(serverError)response={...response,caveat:'Servidor de IA indisponível nesta consulta. '+(response.caveat||'')};
       }
@@ -139,7 +144,7 @@
     }finally{progress.remove();}
     const card=make('article','pcm-neural-answer');
     const cap=make('div','pcm-neural-answer-top');
-    cap.appendChild(make('span','pcm-neural-answer-badge',response.engine==='server'?'ANÁLISE DO SERVIDOR':'CONSULTA AOS DADOS SAP'));
+    cap.appendChild(make('span','pcm-neural-answer-badge',response.engine==='server'?'ANÁLISE DO SERVIDOR':'PROTÓTIPO · EVIDÊNCIAS SAP'));
     card.appendChild(cap);
     card.appendChild(make('h4','',response.title||'Resultado'));
     card.appendChild(make('p','pcm-neural-answer-text',response.body||'Sem resultado para essa pergunta.'));
@@ -160,12 +165,31 @@
       card.appendChild(alert);
     }
     card.appendChild(make('small','pcm-neural-reference','Fonte: '+(response.source||'dados do painel')));
+    if(response.followups?.length){
+      const suggestions=make('div','pcm-neural-followups');
+      suggestions.appendChild(make('span','pcm-neural-followups-title','CONTINUAR INVESTIGAÇÃO'));
+      for(const item of response.followups.slice(0,3)){
+        const button=make('button','pcm-neural-followup',item.label);
+        button.type='button';
+        button.addEventListener('click',()=>send(item.question));
+        suggestions.appendChild(button);
+      }
+      card.appendChild(suggestions);
+    }
     messages.appendChild(card);
     trimMessages();
     messages.lastElementChild.scrollIntoView({behavior:'smooth',block:'nearest'});
   }
   root.querySelectorAll('[data-pcm-question]').forEach(button=>button.addEventListener('click',()=>send(button.dataset.pcmQuestion)));
   form.addEventListener('submit',event=>{event.preventDefault();send(input.value);});
+  clear.addEventListener('click',()=>{
+    conversation?.clear();
+    messages.replaceChildren();
+    prompts.classList.remove('pcm-neural-prompts-used');
+    root.querySelector('.pcm-neural-welcome').hidden=false;
+    input.value='';
+    input.focus();
+  });
   close.addEventListener('click',()=>{closePanel();orb.focus();});
   pick.addEventListener('click',()=>{
     panel.hidden=true;

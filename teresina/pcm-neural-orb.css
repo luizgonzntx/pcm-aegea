@@ -78,3 +78,12 @@
 .pcm-neural-model-hint{font-size:9px;line-height:1.4;color:#7188a0;flex:1;min-width:125px}
 .pcm-neural-system-message{font-size:11px;line-height:1.5;padding:10px 12px;border:1px solid #a8e1cc;background:#e9fbf4;color:#125a47;border-radius:11px;overflow-wrap:anywhere}
 .pcm-neural-system-error{border-color:#e4b5b5;background:#fff2f2;color:#8a2738}
+
+/* Protótipo de consultoria: atalhos contextualizados e nova investigação */
+.pcm-neural-welcome[hidden]{display:none!important}
+.pcm-neural-followups{display:flex;flex-wrap:wrap;gap:7px;padding:10px 0 0;border-top:1px solid #eaf0f7}
+.pcm-neural-followups-title{flex-basis:100%;font-size:9px;font-weight:900;letter-spacing:.09em;color:#657f9b}
+#pcm-neural-panel .pcm-neural-followup{background:#f0f8ff;border:1px solid #c6deee;border-radius:11px;color:#095388;padding:8px 10px;font-size:10.5px;line-height:1.35;font-weight:750;cursor:pointer;text-align:left}
+#pcm-neural-panel .pcm-neural-followup:hover{background:#e2f4fa;border-color:#70b8d8}
+#pcm-neural-panel #pcm-neural-clear{font-size:20px;line-height:1;font-weight:600}
+#pcm-neural-panel #pcm-neural-clear:hover{background:#ffffff2d}
