@@ -54,6 +54,21 @@ function answer(ctx,question='',target=null){
  const wantsICM=/\bicm\b|\bcausa(s)?\b|\bmedida(s)?\b|componentes?|problemas? cadastrados|diagnostico/.test(q);
  const wantsMTTR=/mttr|tempo.*reparo|tempo de manutencao/.test(q);
  const wantsMTBF=/mtbf|tempo medio entre falhas/.test(q);
+ const asksDefinition=/\b(o que e|oque e|o que significa|significa|significado|defina|definicao|conceito|para que serve)\b/.test(q);
+ if(wantsMTTR&&asksDefinition){
+   return result('MTTR · conceito',
+     'MTTR significa Mean Time To Repair, ou Tempo Médio para Reparo. Ele representa, em média, quanto tempo o equipamento permanece em reparo ativo até voltar à condição de operação considerada no cálculo.',
+     [{label:'Sigla',value:'Mean Time To Repair'},{label:'Leitura prática',value:'média do tempo ativo de reparo'},{label:'Regra deste painel',value:'deslocamento da operação 0010 fica fora; sobreposições de trabalho são unificadas'}],
+     'Metodologia do painel',
+     'O MTTR mede rapidez de reparo; sozinho, não mede frequência de falhas nem disponibilidade total.');
+ }
+ if(wantsMTBF&&asksDefinition){
+   return result('MTBF · conceito',
+     'MTBF significa Mean Time Between Failures, ou Tempo Médio Entre Falhas. Ele representa o intervalo médio entre falhas comparáveis de um mesmo ativo ou sistema, conforme a regra de eventos usada no cálculo.',
+     [{label:'Sigla',value:'Mean Time Between Failures'},{label:'Leitura prática',value:'quanto maior o intervalo, menor a recorrência observada de falhas'}],
+     'Metodologia do painel',
+     'MTBF não deve ser confundido com disponibilidade e depende da qualidade da identificação dos eventos de falha.');
+ }
  const wantsSwap=/substitui|troca(s|r|das|dos|da)?\b|trocad/.test(q);
  const wantsPlan=/aderencia|preventiv|plano/.test(q);
  const wantsCoverage=/incomplet|inconsisten|divergen|auditor|falta(m|ndo)?|problema(s)? na base|dado incorreto/.test(q);
