@@ -114,6 +114,18 @@ function createSession(){
  function entityReply(ctx,question,asset,plant){
    const q=norm(question),rows=P.filter(ctx.data,ctx.filters||{}).filter(o=>(!asset||o.asset===asset)&&(!plant||o.tag===plant));
    const isRanking=/mais (frequent|recorrent|registrad|comum)|ranking|top|principal/.test(q);
+   if(/corretiv|emergencial|preventiv|preditiv/.test(q)&&/quantas|abert|executad|total|numero|situacao/.test(q)){
+     const types=/emergencial/.test(q)?['ZNTE']:/corretiv/.test(q)?['ZNTE','ZNTP']:/preditiv/.test(q)?['ZTPD']:['ZTPF','ZTPC'];
+     const local=rows.filter(o=>types.includes(norm(o.type).toUpperCase()));
+     const stats=P.stats(local);
+     const askedOpen=/abert|pendente/.test(q),askedDone=/executad|concluid/.test(q);
+     const value=askedOpen?stats.open:askedDone?stats.done:stats.total;
+     return make(ctx,'Manutenção da '+(asset||plant),
+       'Na seleção do ativo ou instalação, foram encontradas '+one(value,'ordem','ordens')+' da modalidade consultada'+(askedOpen?' em aberto':askedDone?' executadas':'')+'.',
+       [{label:'Tipos SAP',value:types.join(', ')},{label:'Total',value:format(stats.total)},{label:'Executadas',value:format(stats.done)},{label:'Em aberto',value:format(stats.open)}],
+       'Os status refletem registros SAP, não conclusão operacional confirmada.','Ordens SAP filtradas por TAG e tipo',
+       [{label:'Histórico de ordens',question:'Quais são as outras ordens desse ativo?'},{label:'Causas no ICM',question:'Quais causas aparecem nesse ativo?'}]);
+   }
    if(/causa|medid|icm|component/.test(q)){
      const kind=/medid/.test(q)?'action':/component|item/.test(q)?'component':'cause';
      const ranking=P.icmRank(ctx.data,rows,kind);
