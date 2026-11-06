@@ -171,14 +171,17 @@ function createSession(){
   const asksHistory=/\b(outra|outras|outros|anterior|anteriores|historico|recorr|reincident|quantas vezes|voltou)\b/.test(q);
   const asksIcm=/\b(icm|causa|causas|medida|medidas|problema|falha|componente|diagnostico|condiz|coerente|quest)\b/.test(q);
   const asksRank=/ranking|top|mais frequent|mais recorr|mais comum|mais registrada/.test(q);
-  if(!e.asset&&!e.plant&&references&&memo.lastOrder&&(!asksHistory||!memo.lastAsset)){
+  const mentionsPlant=/\b(instalacao|planta|sistema|unidade)\b/.test(q);
+  const mentionsAsset=/\b(ativo|equipamento|bomba|motor|cm[b]|tag do ativo)\b/.test(q);
+  const mentionsOrder=/\b(os|ordem)\b/.test(q);
+  if(!e.asset&&!e.plant&&references&&memo.lastOrder&&!mentionsPlant&&!mentionsAsset&&(!asksHistory||!memo.lastAsset)){
     const order=keyOrder(ctx,memo.lastOrder);
     if(order&&(asksIcm||/fez|feito|medida|substitu|troca|execut|servic|estado|situacao|status/.test(q)||saysOrder)){
       return orderReply(ctx,order,combined);
     }
   }
   if((e.asset||e.plant)||references&&(memo.lastAsset||memo.lastPlant)){
-    const asset=e.asset||(references?memo.lastAsset:'');
+    const asset=e.asset||(references&&!mentionsPlant?memo.lastAsset:'');
     const plant=e.plant||(references?memo.lastPlant:'');
     if(asset||plant){
       if(asksHistory||asksIcm||/quantas|qual|como|por que|porque|ordens|abert|executad|preventiv|corretiv|sistema/.test(q))return entityReply(ctx,combined,asset,plant);
