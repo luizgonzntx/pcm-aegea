@@ -95,7 +95,7 @@
     }
     state.textContent=!ctx?'Aguardando seus dados':
       local?.ready?'Conversa pronta':
-      local?.available?'Assistente disponível · carregamento inicial na primeira pergunta':
+      local?.available?'Assistente CPU/RAM disponível · carregamento inicial na primeira pergunta':
       'Não foi possível usar a IA neste navegador';
   }
   function openPanel(focus=false){
@@ -194,7 +194,6 @@
           if(p.type==='progress'&&now-lastDownloadPaint<180)return;
           if(p.type==='progress')lastDownloadPaint=now;
           if(p.type==='status'&&p.status==='generating')progress.textContent='Elaborando resposta…';
-          else if(p.type==='status'&&p.status==='cpu-fallback')progress.textContent='Iniciando no processador (RAM)…';
           else if(p.type==='status')progress.textContent='Preparando conversa…';
           else if(p.type==='progress'){
             const percent=Number.isFinite(p.percent)?' '+Math.round(p.percent)+'%':'';
