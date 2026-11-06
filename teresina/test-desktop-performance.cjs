@@ -29,7 +29,7 @@ assert.match(app,/function systemSlice\(system\)/);
 assert.match(app,/const reliable = reliabilityMaps\(\)/);
 assert.match(app,/const limited = systemSlice\(s\)/);
 assert.doesNotMatch(app,/P\.reliabilityByPlant\(data, sysFilter\)/);
-assert.match(ui,/let liteMode=false/);
+assert.doesNotMatch(ui,/let liteMode=|isQuickMetric/);
 assert.doesNotMatch(ui,/initialLiteMode|isQuickMetric\(q\)|localStorage\.getItem\('pcm_neural_lite'\)/);
 assert.match(ui,/if\(!response&&!liteMode&&llm\?\.status\(\)\.available/);
 assert.doesNotMatch(ui,/llm\?\.stop\('Chat fechado/);
