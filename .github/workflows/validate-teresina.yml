@@ -49,6 +49,7 @@ jobs:
           node test-neural-local.cjs
           node test-neural-integration.cjs
           node test-neural-prototype.cjs
+          node test-neural-qwen.cjs
       - name: Validate publication assets
         working-directory: .
         run: |
