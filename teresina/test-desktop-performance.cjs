@@ -39,5 +39,6 @@ assert.match(worker,/max_new_tokens:160/);
 assert.match(worker,/^const MODEL='onnx-community\/Qwen2\.5-0\.5B-Instruct';$/m);
 assert.doesNotMatch(worker,/\\nconst MODEL=/);
 assert.match(worker,/device:'webgpu',dtype:'q4'/);
+assert.match(worker,/device:'wasm',dtype:'q8'/);
 console.log('PCM performance: filtros, aderência e prazos idênticos em 60 plantas e 12 mil OS.');
-console.log('PCM performance: índice de TAG, confiabilidade agregada, Qwen padrão e preservação da GPU validados.');
+console.log('PCM performance: índice de TAG, confiabilidade agregada, Qwen padrão e fallback CPU sem GPU validados.');
