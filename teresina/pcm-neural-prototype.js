@@ -20,9 +20,9 @@ const make=(ctx,title,body,facts=[],caveat='',source='SAP, base do painel',follo
  engine:'prototype'
 });
 function createSession(){
- const memo={lastOrder:'',lastAsset:'',lastPlant:'',revision:null,previousTopic:''};
+ const memo={lastOrder:'',lastAsset:'',lastPlant:'',revision:null,userId:null,previousTopic:''};
  function clear(){
-  memo.lastOrder='';memo.lastAsset='';memo.lastPlant='';memo.revision=null;memo.previousTopic='';
+  memo.lastOrder='';memo.lastAsset='';memo.lastPlant='';memo.revision=null;memo.userId=null;memo.previousTopic='';
  }
  function setOrder(o){
   memo.lastOrder=o.id;
@@ -154,7 +154,7 @@ function createSession(){
  }
  function ask(ctx,question='',target=null){
   if(!ctx?.data||!P){clear();return BASE.answer(ctx,question,target);}
-  if(memo.revision!==ctx.revision){clear();memo.revision=ctx.revision;}
+  if(memo.revision!==ctx.revision||memo.userId!==(ctx.userId||null)){clear();memo.revision=ctx.revision;memo.userId=ctx.userId||null;}
   const q=norm(question),targetText=target?[target.label,target.value].filter(Boolean).join(' '):'';
   const combined=text(question||targetText);
   const explicitOrder=ordNum(combined);
