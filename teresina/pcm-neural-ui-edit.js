@@ -10,7 +10,8 @@ const isEditRequest=q=>{
  const s=String(q||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
  return /\b(mude|altere|edite|troque|renomeie|personalize|ajuste|aumente|diminua|deixe|restaure|reverta|desfaca)\b/.test(s)
    && /\b(painel|dashboard|interface|visual|titulo|titulo da pagina|cor|tema|texto da tela|letras|fonte da tela|espacamento|layout|apresentacao)\b/.test(s)
-   && !/\b(como fazer|como posso|como faço|tutorial)\b/.test(s);
+   && !/\b(como fazer|como posso|como faço|tutorial)\b/.test(s)
+   && !/\b(registros?|ordens?|dados|cadastros?|usuarios?|permissoes?|banco|deletar|excluir|apagar)\b/.test(s);
 };
 const prompt=q=>[
  {role:'system',content:[
