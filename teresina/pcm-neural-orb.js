@@ -108,7 +108,7 @@
   }
   function closePanel(){
     // Preserve o modelo já carregado quando fechar o painel:
-    // recriar os pesos WebGPU a cada abertura aumenta a latência no PC.
+    // recriar os pesos a cada abertura aumenta a latencia.
     panel.hidden=true;
     selectMode=false;
     orb.classList.remove('pcm-neural-selecting');
@@ -177,7 +177,7 @@
         ||engine?.answer(ctx,target?'':q,target||null)
         ||{title:'',body:'',facts:[]};
       if(!llm?.status().available || !window.PCM_NEURAL_EVIDENCE) {
-        throw Error('Este navegador não está oferecendo a aceleração necessária para iniciar a conversa.');
+        throw Error('O modelo local nao esta disponivel neste navegador.');
       }
       const editor=window.PCM_NEURAL_EDITS;
       const editRequest=!target && editor?.isEditRequest(q);
@@ -194,6 +194,7 @@
           if(p.type==='progress'&&now-lastDownloadPaint<180)return;
           if(p.type==='progress')lastDownloadPaint=now;
           if(p.type==='status'&&p.status==='generating')progress.textContent='Elaborando resposta…';
+          else if(p.type==='status'&&p.status==='cpu-fallback')progress.textContent='Iniciando no processador (RAM)…';
           else if(p.type==='status')progress.textContent='Preparando conversa…';
           else if(p.type==='progress'){
             const percent=Number.isFinite(p.percent)?' '+Math.round(p.percent)+'%':'';
