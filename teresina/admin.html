@@ -156,13 +156,13 @@
               '<div><small>Ordens no escopo</small><b>'+n(result.orders.length)+'</b></div>'+
               '<div><small>Paradas CE/CP + ENTE</small><b>'+n(m.eligible)+'</b></div>'+
               '<div><small>MTTR ativo válido</small><b>'+p(m.repair,m.eligible)+'</b></div>'+
-              '<div><small>MTTR ref. (auditoria)</small><b>'+p(m.referenceRepair,m.eligible)+'</b></div>'+
+
               '<div><small>Atendimento com apontamento</small><b>'+p(m.attendance,m.eligible)+'</b></div>'+
               '<div><small>ICM completo (CE/CP)</small><b>'+p(icm.complete,icm.eligible)+'</b></div>'+
             '</div>'+
             '<details class="admin-note"><summary><b>Qualidade do cadastro · '+n(warnings.length)+' ponto(s) de atenção</b></summary>'+
               (warnings.length?'<ul>'+warnings.map(w=>'<li>'+esc(w)+'</li>').join('')+'</ul>':'<p>Os campos avaliados estão completos neste conjunto.</p>')+
-              '<p class="small-note">ICM: '+n(icm.eligible)+' CE/CP encerradas; '+n(icm.missingCause)+' sem causa; '+n(icm.missingMeasure)+' sem medida. Apontamentos úteis: '+n(result.meta.workLogs)+'. Notas com hora de criação: '+n(result.meta.notesWithCreationTime)+'.</p>'+
+              '<p class="small-note">Referência cronológica histórica disponível em '+n(m.referenceRepair)+' ordem(ns); não integra o MTTR ativo. ICM: '+n(icm.eligible)+' CE/CP encerradas; '+n(icm.missingCause)+' sem causa; '+n(icm.missingMeasure)+' sem medida. Apontamentos úteis: '+n(result.meta.workLogs)+'. Notas com hora de criação: '+n(result.meta.notesWithCreationTime)+'.</p>'+
               '<p class="small-note">'+n(result.meta.excluded)+' ordens fora do escopo; '+n(result.meta.excludedStoppageNotes)+' notas descartadas por vínculo inválido; '+n(result.meta.missingStoppageNoteDate)+' notas com X sem data.</p>'+
             '</details>'+
             '<p class="small-note"><b>Publicação:</b> substitui os dados existentes para todos os usuários autorizados. A validação não publica nada.</p>';
