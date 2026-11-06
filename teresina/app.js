@@ -925,9 +925,11 @@
       });
       if (new Blob([JSON.stringify(result)]).size > 19 * 1024 * 1024) throw Error('O conjunto processado excede o limite de 19 MB. Reduza o intervalo da exportação.');
       pending = result;
+      const m = result.meta.maintenance || {};
+      const repairRate = m.eligible ? (100*m.repair/m.eligible).toLocaleString('pt-BR',{maximumFractionDigits:1})+'%' : '—';
       $('#importReview').innerHTML =
-        '<div class="detail-kpis"><div><small>Instalações</small><b>' + num(result.systems.length) + '</b></div><div><small>Ordens válidas</small><b>' + num(result.orders.length) + '</b></div><div><small>Itens / medidas</small><b>' + num(result.items.length) + ' / ' + num(result.actions.length) + '</b></div><div><small>Ordens com Parada = X</small><b>' + num(result.meta.stoppageOrders) + '</b></div></div>' +
-        '<p class="small-note">' + num(result.meta.excluded) + ' ordens fora do escopo; ' + num(result.meta.missingReference) + ' sem data de referência; ' + num(result.meta.excludedStoppageNotes) + ' notas sem Ordem válida ou fora das instalações; ' + num(result.meta.missingStoppageNoteDate) + ' sem Data da nota. A base atual será substituída integralmente após salvar.</p>';
+        '<div class="detail-kpis"><div><small>Instalações</small><b>' + num(result.systems.length) + '</b></div><div><small>Ordens válidas</small><b>' + num(result.orders.length) + '</b></div><div><small>Paradas CE/CP</small><b>' + num(m.eligible) + '</b></div><div><small>MTTR ativo válido</small><b>' + repairRate + '</b></div></div>' +
+        '<p class="small-note">' + num(result.meta.excluded) + ' ordens fora do escopo; ' + num(result.meta.missingReference) + ' sem data de referência; ' + num(result.meta.excludedStoppageNotes) + ' notas sem Ordem válida ou fora das instalações; ' + num(result.meta.missingStoppageNoteDate) + ' sem Data da nota. '+num(result.meta.negativeWorkRows)+' registros negativos e '+num(result.meta.duplicateWorkRows)+' duplicatas identificados. A base atual será substituída integralmente após salvar.</p>';
       importMessage('Validação concluída. Confira os totais e salve a atualização.');
       $('#saveImport').hidden = false;
     } catch (e) {
