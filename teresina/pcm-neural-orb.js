@@ -13,8 +13,8 @@
       <header class="pcm-neural-head">
         <div class="pcm-neural-avatar" aria-hidden="true">✦</div>
         <div class="pcm-neural-heading">
-          <span class="pcm-neural-eyebrow">CENTRAL DE CONSULTAS · PCM</span>
-          <strong id="pcm-neural-title">Tire suas dúvidas</strong>
+          <span class="pcm-neural-eyebrow">ASSISTENTE DE MANUTENÇÃO · QWEN LOCAL</span>
+          <strong id="pcm-neural-title">Converse sobre manutenção</strong>
           <small id="pcm-neural-source-state">Protótipo de análise de manutenção</small>
         </div>
         <button type="button" id="pcm-neural-clear" class="pcm-neural-icon-button" title="Nova investigação" aria-label="Limpar conversa e começar nova investigação">↺</button>
@@ -24,7 +24,7 @@
         <div class="pcm-neural-welcome">
           <div class="pcm-neural-intro-icon" aria-hidden="true">✧</div>
           <h3>O que vamos investigar?</h3>
-          <p>Comece por uma ordem ou ativo e continue perguntando. O protótipo mantém o contexto da investigação e apresenta as evidências do SAP e do ICM.</p>
+          <p>Converse sobre falhas, OS, bombas, indicadores e ICM. O Qwen gera respostas em português usando as evidências disponíveis no painel.</p>
         </div>
         <div id="pcm-neural-prompts" class="pcm-neural-prompts" aria-label="Perguntas sugeridas">
           <button type="button" data-pcm-question="Quantas corretivas estão abertas?"><span>▦</span>Corretivas abertas</button>
@@ -41,7 +41,7 @@
           <input id="pcm-neural-question" maxlength="500" placeholder="Ex.: Explique a OS 900123456" required>
           <button type="submit" id="pcm-neural-send" aria-label="Enviar pergunta" title="Enviar pergunta">↑</button>
         </form>
-        <small>Protótipo: perguntas contextuais e cálculos auditáveis. Sem QUEST completo ou modelo generativo conectado.</small>
+        <small>Modelo aberto executado localmente, sem API de IA. Primeiro uso: download ~786 MB; necessita WebGPU. Sem QUEST completo na base atual.</small>
       </div>
     </section>`;
   shell.appendChild(root);
@@ -50,6 +50,10 @@
   const close=root.querySelector('#pcm-neural-close');
   const clear=root.querySelector('#pcm-neural-clear');
   const conversation=window.PCM_NEURAL_PROTOTYPE?.createSession?.()||null;
+  const llm=window.PCM_NEURAL_CHAT?.createClient?.()||null;
+  const history=[];
+  let busy=false,requestGeneration=0,identityKey='';
+
   const form=root.querySelector('#pcm-neural-form');
   const input=root.querySelector('#pcm-neural-question');
   const messages=root.querySelector('#pcm-neural-messages');
@@ -63,12 +67,24 @@
     try{return window.PCM_NEURAL_CONTEXT?.()||null;}catch(_){return null;}
   }
   function updateState(){
-    const ctx=getContext();
-    state.textContent=!ctx
-      ? 'Aguardando sessão autorizada'
-      : (window.PCM_CONFIG?.neuralFunction
-         ? 'Protótipo de investigação · backend configurado'
-         : 'Protótipo de investigação · dados SAP/ICM');
+    const ctx=getContext(),local=llm?.status();
+    const current=ctx?String(ctx.userId||'')+':'+String(ctx.revision||''):'';
+    if(identityKey&&current!==identityKey){
+      requestGeneration++;
+      llm?.stop('Sessão ou dados atualizados');
+      history.length=0;
+      conversation?.clear();
+      messages.replaceChildren();
+      busy=false;
+      root.querySelector('#pcm-neural-send').disabled=false;
+      prompts.classList.remove('pcm-neural-prompts-used');
+      root.querySelector('.pcm-neural-welcome').hidden=false;
+      identityKey=current;
+    }
+    state.textContent=!ctx?'Aguardando sessão autorizada':
+      local?.ready?'Qwen conversacional ativo · processamento local':
+      local?.available?'Qwen local · download inicial ~786 MB na primeira pergunta':
+      'Consultas SAP ativas · WebGPU indisponível neste navegador';
   }
   function openPanel(focus=false){
     selectMode=false;
@@ -116,35 +132,103 @@
   }
   async function send(question,target){
     const q=short(question,500);
-    if(!q&&!target)return;
+    if((!q&&!target)||busy)return;
+    const ctx=getContext();
+    if(!ctx){updateState();return;}
+    const nextIdentity=String(ctx.userId||'')+':'+String(ctx.revision||'');
+    if(identityKey&&identityKey!==nextIdentity){
+      history.length=0;
+      conversation?.clear();
+      messages.replaceChildren();
+      llm?.stop('Dados da sessão alterados');
+    }
+    identityKey=nextIdentity;
+    const run=++requestGeneration;
+    busy=true;
+    root.querySelector('#pcm-neural-send').disabled=true;
     openPanel(false);
     prompts.classList.add('pcm-neural-prompts-used');
     root.querySelector('.pcm-neural-welcome').hidden=true;
     const subject=target?'Explique: '+(target.label||'dado selecionado')+(target.value?' · '+target.value:''):q;
     messages.appendChild(make('div','pcm-neural-user-message',subject));
     input.value='';
-    let response,serverError=false;
-    const progress=make('div','pcm-neural-system-message','Consultando dados autorizados…');
+    const progress=make('div','pcm-neural-system-message','Preparando consulta…');
     messages.appendChild(progress);
+    let response,serverError=false,usedLLM=false;
     try{
-      // A URL e os pesos do modelo nunca são expostos pelo frontend. O Supabase autentica o usuário.
-      if(window.PCM_CONFIG?.neuralFunction && typeof window.PCM_NEURAL_REMOTE==='function'){
+      const engine=window.PCM_NEURAL_ENGINE;
+      const trusted=conversation?.ask(ctx,target?'':q,target||null)
+        ||engine?.answer(ctx,target?'':q,target||null);
+      if(!trusted)throw Error('Motor de consulta indisponível');
+      if(window.PCM_CONFIG?.neuralFunction&&typeof window.PCM_NEURAL_REMOTE==='function'){
         try{response=await window.PCM_NEURAL_REMOTE({question:q,target:target||null});}
-        catch(error){serverError=true;}
+        catch(_){serverError=true;}
+      }
+      if(!response&&llm?.status().available&&window.PCM_NEURAL_EVIDENCE){
+        const prepared=window.PCM_NEURAL_EVIDENCE.makePrompt(
+          ctx,q,target||null,trusted,conversation?.contextStatus?.(),history
+        );
+        try{
+          const stream=[];
+          const output=await llm.ask(prepared.messages,{
+            onProgress:p=>{
+              if(run!==requestGeneration)return;
+              if(p.type==='status'&&p.status==='generating'){
+                progress.textContent='Qwen respondendo…';
+              }else if(p.type==='status'){
+                progress.textContent='Inicializando Qwen no navegador…';
+              }else if(p.type==='progress'){
+                const percent=Number.isFinite(p.percent)?' · '+Math.round(p.percent)+'%':'';
+                progress.textContent='Carregando modelo local (~786 MB)'+percent+' · '+(p.status||'');
+              }
+            },
+            onToken:token=>{
+              if(run!==requestGeneration)return;
+              stream.push(token);
+              progress.textContent='Qwen: '+stream.join('').slice(-1100);
+            }
+          });
+          if(!output.trim())throw Error('Modelo não gerou uma resposta útil.');
+          response={
+            title:'Análise de manutenção · Qwen',
+            body:output.trim().slice(0,2700),
+            facts:(prepared.facts||[]).filter(x=>!/^Experimente/.test(x.label)),
+            caveat:'Texto gerado por modelo de linguagem: verifique as evidências SAP/ICM. '+
+              (trusted.caveat||'Sem confirmação pelo QUEST nesta exportação.'),
+            source:prepared.source,
+            followups:trusted.followups,
+            engine:'llm'
+          };
+          history.push({role:'user',content:subject},{role:'assistant',content:output.trim().slice(0,500)});
+          while(history.length>8)history.shift();
+          usedLLM=true;
+        }catch(error){
+          serverError=true;
+          progress.textContent='Qwen local indisponível: '+short(error?.message||error,180)+'. Usando cálculos SAP.';
+        }
       }
       if(!response){
-        const engine=window.PCM_NEURAL_ENGINE;
-        response=conversation?.ask(getContext(),target?'':q,target||null)
-          ||engine?.answer(getContext(),target?'':q,target||null);
-        if(!response)throw Error('Motor de consulta indisponível');
-        if(serverError)response={...response,caveat:'Servidor de IA indisponível nesta consulta. '+(response.caveat||'')};
+        response={...trusted};
+        if(serverError)response.caveat=(response.caveat||'')+
+          ' Modelo conversacional não pôde ser executado nesta sessão; exibida consulta auditável SAP/ICM.';
+        if(!llm?.status().available&&!serverError)response.caveat=(response.caveat||'')+
+          ' Para conversar livremente com Qwen no próprio computador, use navegador com WebGPU.';
       }
-    }catch(_){
-      response={title:'Não foi possível consultar',body:'A análise não pôde ser concluída nesta sessão. Atualize a base no painel e tente novamente.',facts:[],source:'Nenhuma análise calculada'};
-    }finally{progress.remove();}
+      if(run!==requestGeneration||identityKey!==(String(getContext()?.userId||'')+':'+String(getContext()?.revision||'')))return;
+      updateState();
+    }catch(error){
+      response={title:'Consulta não concluída',body:'A base não pôde ser consultada. Atualize a sessão e tente novamente.',facts:[],source:'Nenhuma análise calculada',caveat:short(error?.message||error,180)};
+    }finally{
+      progress.remove();
+      if(run===requestGeneration){
+        busy=false;
+        root.querySelector('#pcm-neural-send').disabled=false;
+      }
+    }
+    if(run!==requestGeneration)return;
     const card=make('article','pcm-neural-answer');
     const cap=make('div','pcm-neural-answer-top');
-    cap.appendChild(make('span','pcm-neural-answer-badge',response.engine==='server'?'ANÁLISE DO SERVIDOR':'PROTÓTIPO · EVIDÊNCIAS SAP'));
+    cap.appendChild(make('span','pcm-neural-answer-badge',response.engine==='server'?'ANÁLISE DO SERVIDOR':response.engine==='llm'?'QWEN · IA LOCAL':'CONSULTA AUDITÁVEL SAP'));
     card.appendChild(cap);
     card.appendChild(make('h4','',response.title||'Resultado'));
     card.appendChild(make('p','pcm-neural-answer-text',response.body||'Sem resultado para essa pergunta.'));
@@ -183,6 +267,11 @@
   root.querySelectorAll('[data-pcm-question]').forEach(button=>button.addEventListener('click',()=>send(button.dataset.pcmQuestion)));
   form.addEventListener('submit',event=>{event.preventDefault();send(input.value);});
   clear.addEventListener('click',()=>{
+    requestGeneration++;
+    llm?.stop('Nova investigação iniciada');
+    busy=false;
+    root.querySelector('#pcm-neural-send').disabled=false;
+    history.length=0;
     conversation?.clear();
     messages.replaceChildren();
     prompts.classList.remove('pcm-neural-prompts-used');

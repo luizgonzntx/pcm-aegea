@@ -13,6 +13,9 @@ cp \
   "$ROOT_DIR/teresina/app.js" \
   "$ROOT_DIR/teresina/pcm-neural-orb.js" \
   "$ROOT_DIR/teresina/pcm-neural-prototype.js" \
+  "$ROOT_DIR/teresina/pcm-neural-evidence.js" \
+  "$ROOT_DIR/teresina/pcm-neural-chat-client.js" \
+  "$ROOT_DIR/teresina/pcm-neural-chat-worker.js" \
   "$ROOT_DIR/teresina/pcm-neural-knowledge.js" \
   "$ROOT_DIR/teresina/pcm-neural-local.js" \
   "$ROOT_DIR/teresina/pcm-neural-orb.css" \

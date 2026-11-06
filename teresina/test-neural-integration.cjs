@@ -7,12 +7,12 @@ assert.doesNotMatch(ui,/type="file"|filePicker|Conectar modelo treinado|Trocar m
 assert.doesNotMatch(html,/src="pcm-neural-local\.js/);
 assert.match(ui,/PCM_NEURAL_REMOTE/);
 assert.match(ui,/PCM_NEURAL_ENGINE/);
-assert.match(ui,/Protótipo de investigação/);
+assert.match(ui,/QWEN LOCAL/);
 assert.match(app,/window\.PCM_NEURAL_REMOTE\s*=/);
 assert.match(app,/db\.auth\.getSession\(\)/);
 assert.match(app,/db\.functions\.invoke\(functionName/);
 assert.match(app,/if \(!functionName \|\| !db \|\| !user/);
 assert.doesNotMatch(app,/service_role|sb_secret_/);
-assert.ok(html.includes('pcm-neural-orb.js?v=20261106-6'));
+assert.ok(html.includes('pcm-neural-orb.js?v=20261106-7'));
 assert.ok(html.includes('pcm-neural-prototype.js?v=20261106-6'));
 console.log('PCM Neural: site sem upload manual, gateway autenticado e fallback SAP validados.');
