@@ -8,6 +8,16 @@
   let db, data = null, revision = 0, user = null, role = '', page = 'overview', pageNo = 1, pending = null, pendingRevision = 0, worker = null, toastTimer, map, markers, fitBounds, rows = [], rankEvidence = [], modalMode = '', loading = false, selectedFiles = [];
   // O recorte operacional sempre usa a data de entrada da ordem.
   const f = { from: today().slice(0, 4) + '-01-01', to: today().slice(0, 4) + '-12-31', dateField: 'created', tag: [], asset: [], type: [], priority: [] };
+  // Exposição local e somente leitura para o assistente do painel; não envia dados para serviços externos.
+  window.PCM_NEURAL_CONTEXT = () => {
+    if (!user || !data || $('#shell')?.hidden) return null;
+    return {
+      data,
+      revision,
+      view: page,
+      filters: {...f, tag:[...f.tag], asset:[...f.asset], type:[...f.type], priority:[...f.priority]}
+    };
+  };
   const emptyHTML = '<div class="no-data">Sem registros para os filtros selecionados.</div>';
 
   const filterLabels = {
