@@ -66,8 +66,8 @@
           <div><span class="eyebrow blue">ÁREA RESTRITA</span><h2>Publicar atualização da base</h2><p class="small-note" id="sessionLabel"></p></div>
           <button id="logoutBtn" type="button">Sair</button>
         </div>
-        <p class="admin-subtitle">Importe as cinco bases principais e, se disponível, a sexta de apontamentos. Valide as informações antes de publicar.</p>
-        <p class="small-note"><b>Obrigatórios:</b> Sistemas · Ordens · Itens e causas · Medidas · Notas com parada. <b>Adicional:</b> Apontamentos SAP.</p>
+        <p class="admin-subtitle">Importe as cinco bases principais e a sexta de apontamentos para calcular o MTTR ativo. Valide as informações antes de publicar.</p>
+        <p class="small-note"><b>Obrigatórios:</b> Sistemas · Ordens · Itens e causas · Medidas · Notas com parada. <b>Para MTTR ativo:</b> Apontamentos SAP com datas e horários reais de início/fim.</p>
         <input id="files" type="file" accept=".xlsx" multiple>
         <div id="fileList" class="admin-files"></div>
         <div id="review" hidden></div>
@@ -128,7 +128,7 @@
         try {
           const buffers = await Promise.all(list.map(async f => ({name:f.name, buffer:await f.arrayBuffer()})));
           const result = await new Promise((resolve, reject) => {
-            worker = new Worker('import-worker.js?v=20261105-2');
+            worker = new Worker('import-worker.js?v=20261106-1');
             const timeout = setTimeout(() => { worker.terminate(); reject(Error('A leitura excedeu três minutos.')); }, 180000);
             worker.onmessage = e => { if (e.data.progress) return msg(e.data.progress); clearTimeout(timeout); worker.terminate(); worker=null; e.data.error ? reject(Error(e.data.error)) : resolve(e.data.result); };
             worker.onerror = () => { clearTimeout(timeout); worker.terminate(); worker=null; reject(Error('Falha ao ler os arquivos.')); };
@@ -142,8 +142,11 @@
           const p=(value,total)=>total?(100*value/total).toLocaleString('pt-BR',{maximumFractionDigits:1})+'%':'—';
           const warnings=[];
           if(!m.eligible)warnings.push('Não foram encontradas paradas CE/CP com ENTE e flag X.');
-          if(m.attribution<m.eligible)warnings.push(n(m.eligible-m.attribution)+' ordem(ns) sem atribuição calculável (verifique “Criado às” e início real).');
-          if(m.repair<m.eligible)warnings.push(n(m.eligible-m.repair)+' ordem(ns) sem MTTR calculável (verifique início real e hora de referência).');
+          if(m.repair<m.eligible)warnings.push(n(m.eligible-m.repair)+' ordem(ns) sem início e fim válidos de execução nos apontamentos SAP.');
+          if(m.repairLong24h)warnings.push(n(m.repairLong24h)+' ordem(ns) com mais de 24 h de reparo ativo; conferir os apontamentos.');
+          if(result.meta.negativeWorkRows)warnings.push(n(result.meta.negativeWorkRows)+' lançamento(s) negativo(s) detectado(s); '+n(result.meta.reverseMatched)+' lançamento(s) positivo(s) neutralizado(s).');
+          if(result.meta.duplicateWorkRows)warnings.push(n(result.meta.duplicateWorkRows)+' linha(s) duplicada(s) eliminada(s) dos apontamentos.');
+          if(result.meta.missingWorkerRows)warnings.push(n(result.meta.missingWorkerRows)+' apontamento(s) sem ID SAP: contribuem ao tempo ativo se tiverem horário válido, mas não às médias por profissional.');
           if(m.attendance<m.eligible)warnings.push(n(m.eligible-m.attendance)+' ordem(ns) sem deslocamento e execução completos.');
           if(icm.eligible&&icm.complete<icm.eligible)warnings.push(n(icm.eligible-icm.complete)+' corretiva(s) sem cadastro completo de item, problema, causa e medida.');
           $('#review').innerHTML =
@@ -152,14 +155,14 @@
               '<div><small>Plantas</small><b>'+n(result.systems.length)+'</b></div>'+
               '<div><small>Ordens no escopo</small><b>'+n(result.orders.length)+'</b></div>'+
               '<div><small>Paradas CE/CP + ENTE</small><b>'+n(m.eligible)+'</b></div>'+
-              '<div><small>MTTR válido</small><b>'+p(m.repair,m.eligible)+'</b></div>'+
-              '<div><small>Atribuição válida</small><b>'+p(m.attribution,m.eligible)+'</b></div>'+
+              '<div><small>MTTR ativo válido</small><b>'+p(m.repair,m.eligible)+'</b></div>'+
+              '<div><small>MTTR ref. (auditoria)</small><b>'+p(m.referenceRepair,m.eligible)+'</b></div>'+
               '<div><small>Atendimento com apontamento</small><b>'+p(m.attendance,m.eligible)+'</b></div>'+
               '<div><small>ICM completo (CE/CP)</small><b>'+p(icm.complete,icm.eligible)+'</b></div>'+
             '</div>'+
             '<details class="admin-note"><summary><b>Qualidade do cadastro · '+n(warnings.length)+' ponto(s) de atenção</b></summary>'+
               (warnings.length?'<ul>'+warnings.map(w=>'<li>'+esc(w)+'</li>').join('')+'</ul>':'<p>Os campos avaliados estão completos neste conjunto.</p>')+
-              '<p class="small-note">ICM: '+n(icm.eligible)+' CE/CP encerradas; '+n(icm.missingCause)+' sem causa; '+n(icm.missingMeasure)+' sem medida. Apontamentos relacionados: '+n(result.meta.workLogs)+'. Notas com hora de criação: '+n(result.meta.notesWithCreationTime)+'.</p>'+
+              '<p class="small-note">ICM: '+n(icm.eligible)+' CE/CP encerradas; '+n(icm.missingCause)+' sem causa; '+n(icm.missingMeasure)+' sem medida. Apontamentos úteis: '+n(result.meta.workLogs)+'. Notas com hora de criação: '+n(result.meta.notesWithCreationTime)+'.</p>'+
               '<p class="small-note">'+n(result.meta.excluded)+' ordens fora do escopo; '+n(result.meta.excludedStoppageNotes)+' notas descartadas por vínculo inválido; '+n(result.meta.missingStoppageNoteDate)+' notas com X sem data.</p>'+
             '</details>'+
             '<p class="small-note"><b>Publicação:</b> substitui os dados existentes para todos os usuários autorizados. A validação não publica nada.</p>';
