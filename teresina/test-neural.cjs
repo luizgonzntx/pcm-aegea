@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict');
 const P=require('./core.js');
 const E=require('./pcm-neural-knowledge.js');
-const mk=(id,text,type='ZNTE',status='ENTE')=>({id,center:'PITE',tag:'PL-THE-ETA0001',asset:'THE-A-1',type,status,created:'2026-11-03',date:'2026-11-03',text,priority:'',equipment:'CMB',plan:'PM-1',start:'2026-11-03',finished:'2026-11-03'});
+const mk=(id,text,type='ZNTE',status='ENTE')=>({id,center:'PITE',tag:'PL-THE-ETA0001',asset:'THE-A-00001',type,status,created:'2026-11-03',date:'2026-11-03',text,priority:'',equipment:'CMB',plan:'PM-1',start:'2026-11-03',finished:'2026-11-03'});
 const data={
  systems:[{tag:'PL-THE-ETA0001',name:'ETA Teste'}],
  orders:[mk('900123456','Inspeção geral'),mk('900123457','Substituir CMB', 'ZNTP','ABER'),mk('900123458','Foi realizado ajuste', 'ZNTE','ENTE')],
@@ -46,6 +46,6 @@ r=ask('Esse ICM condiz com o QUEST?');
 assert.equal(r.title,'Conciliação ICM × QUEST ainda indisponível');
 r=E.answer(ctx,'',{label:'ETA Teste',value:'PL-THE-ETA0001'});
 assert.equal(r.title,'Instalação · ETA Teste');
-r=E.answer(ctx,'',{label:'THE-A-1',value:''});
-assert.equal(r.title,'Ativo · THE-A-1');
+r=E.answer(ctx,'',{label:'THE-A-00001',value:''});
+assert.equal(r.title,'Ativo · THE-A-00001');
 console.log('PCM Neural: 14 testes de consultas concluídos.');
