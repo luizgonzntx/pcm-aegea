@@ -184,7 +184,7 @@ function createSession(){
     const asset=e.asset||(references&&!mentionsPlant?memo.lastAsset:'');
     const plant=e.plant||(references?memo.lastPlant:'');
     if(asset||plant){
-      if(asksHistory||asksIcm||/quantas|qual|como|por que|porque|ordens|abert|executad|preventiv|corretiv|sistema/.test(q))return entityReply(ctx,combined,asset,plant);
+      if(e.asset||e.plant||asksHistory||asksIcm||/quantas|qual|como|por que|porque|ordens|abert|executad|preventiv|corretiv|sistema/.test(q))return entityReply(ctx,combined,asset,plant);
     }
   }
   if(asksRank&&!e.asset&&!e.plant&&!references){
