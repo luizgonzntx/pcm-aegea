@@ -14,7 +14,8 @@ function answer(ctx,question='',target=null){
  const source=(label)=>label+' · Base SAP do painel, revisão '+(ctx.revision||'não informada')+'. '+scope;
  const result=(title,body,facts=[],label='Ordens SAP',caveat='')=>({title,body,facts,source:source(label),caveat});
  const seen=(arr,k)=>new Set(arr.map(x=>x[k]).filter(positive)).size;
- const findId=txt(question).match(/(?:\b(?:os|o\.s\.|ordem)\s*[:#nº°-]*\s*)(\d{6,12})\b/i)||txt(question).match(/\b([789]\d{8})\b/);
+ const lookup=txt(question)||(target?[target.label,target.value].filter(positive).join(' '):'');
+ const findId=lookup.match(/(?:\b(?:os|o\.s\.|ordem)\s*[:#nº°-]*\s*)(\d{6,12})\b/i)||lookup.match(/\b([789]\d{8})\b/);
  if(findId){
    const id=findId[1],o=(data.orders||[]).find(x=>x.id===id);
    if(!o)return result('Ordem não encontrada','Não localizei a OS '+id+' na base disponível. Confira se a exportação inclui a ordem e se ela pertence ao escopo de Teresina.',[], 'Ordens SAP','A pesquisa por número de OS usa a base completa carregada, não apenas o filtro de período.');
@@ -115,7 +116,23 @@ function answer(ctx,question='',target=null){
      'O período utiliza a data de entrada, a menos que a métrica consultada tenha regra própria.');
  }
  if(target){
-   const label=txt(target.label),val=txt(target.value),h=fold(label);
+   const label=txt(target.label),val=txt(target.value),h=fold(label),raw=fold(label+' '+val);
+   const plant=(data.systems||[]).find(x=>(x.tag&&raw.includes(fold(x.tag)))||(x.name&&x.name.length>7&&raw.includes(fold(x.name))));
+   if(plant){
+     const local=rows.filter(o=>o.tag===plant.tag),t=P.stats(local);
+     return result('Instalação · '+plant.name,
+       'Neste recorte, a instalação possui '+num(t.total)+' ordens, '+num(t.done)+' executadas e '+num(t.open)+' em aberto. O volume não prova maior incidência de falhas sem segmentação pelo tipo de manutenção.',
+       [{label:'TAG',value:plant.tag},{label:'Ordens',value:num(t.total)},{label:'Executadas',value:num(t.done)},{label:'Em aberto',value:num(t.open)}],
+       'Cadastro das instalações + Ordens SAP','Para analisar causa de uma ocorrência, consulte a OS e compare o QUEST correspondente quando estiver disponível.');
+   }
+   const assetMatch=(label+' '+val).match(/\b(?:THE|API|TMN)-A-\d{3,6}\b/i);
+   if(assetMatch){
+     const tag=assetMatch[0].toUpperCase(),local=rows.filter(o=>o.asset===tag),t=P.stats(local);
+     return result('Ativo · '+tag,
+       'O cadastro apresenta '+num(t.total)+' ordens para esse ativo no período, com '+num(t.done)+' executadas. Falhas recorrentes exigem confirmar o histórico de eventos, e não apenas o número de ordens.',
+       [{label:'TAG do ativo',value:tag},{label:'Ordens',value:num(t.total)},{label:'Executadas',value:num(t.done)}],
+       'Ordens SAP — TAG do ativo','Confira se o equipamento foi substituído mantendo a TAG; isso pode afetar a interpretação da reincidência.');
+   }
    if(/mttr|mtbf|aderencia|causa|medida|icm|ordens|execu|deslocamento|atendimento|plano/.test(h))return answer(ctx,label,null);
    return result('Dado selecionado · '+(label||'indicador'),
      'O painel apresenta '+(val||'este registro')+'. Não é possível concluir a causa operacional apenas por esse valor. Para uma verificação, compare o cadastro do ativo, a OS e as evidências técnicas.',
