@@ -33,6 +33,7 @@ jobs:
       - name: Check JavaScript syntax
         run: |
           node --check app.js
+          node --check pcm-neural-orb.js
           node --check inventory.js
           node --check ui.js
       - name: Run core tests
