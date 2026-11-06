@@ -1,10 +1,10 @@
 (function(root){
 'use strict';
-const MODEL='Qwen2.5-0.5B-Instruct (WebGPU local)';
+const MODEL='Qwen2.5-0.5B-Instruct (GPU ou CPU local)';
 function createClient(workerFactory){
- const factory=workerFactory||(()=>new Worker('pcm-neural-chat-worker.js?v=20261106-9',{type:'module'}));
+ const factory=workerFactory||(()=>new Worker('pcm-neural-chat-worker.js?v=20261106-11',{type:'module'}));
  let worker=null,active=null,serial=0,ready=false,unavailable='';
- const canRun=()=>typeof root.Worker==='function'&&!!root.navigator?.gpu;
+ const canRun=()=>typeof root.Worker==='function';
  const status=()=>({ready,busy:!!active,available:canRun()&&!unavailable,unavailable,model:MODEL});
  function stop(reason='Modelo interrompido'){
    if(worker){worker.terminate();worker=null;}
@@ -33,13 +33,13 @@ function createClient(workerFactory){
      }
    });
    worker.addEventListener('error',()=>{
-     unavailable='O código do modelo não pôde ser carregado. Verifique rede e WebGPU.';
+     unavailable='O código do modelo não pôde ser carregado. Verifique a conexao e recarregue a pagina.';
      stop(unavailable);
    });
    worker.addEventListener('messageerror',()=>stop('Erro de comunicação com o modelo local.'));
  }
  function ask(messages,callbacks={}){
-   if(!canRun())return Promise.reject(new Error('WebGPU indisponível. Use Chrome ou Edge atualizado com aceleração gráfica habilitada.'));
+   if(!canRun())return Promise.reject(new Error('Este navegador nao suporta Workers para executar o modelo local.'));
    if(unavailable)return Promise.reject(new Error(unavailable));
    if(active)return Promise.reject(new Error('Aguarde a consulta atual terminar.'));
    return new Promise((resolve,reject)=>{
