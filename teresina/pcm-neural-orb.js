@@ -74,6 +74,7 @@
       llm?.stop('Sessão ou dados atualizados');
       history.length=0;
       conversation?.clear();
+      window.PCM_NEURAL_EDITS?.apply?.({action:'reset',value:''});
       messages.replaceChildren();
       busy=false;
       root.querySelector('#pcm-neural-send').disabled=false;
@@ -156,7 +157,7 @@
     input.value='';
     const progress=make('div','pcm-neural-system-message','Preparando consulta…');
     messages.appendChild(progress);
-    let answer='',modelError='';
+    let answer='',modelError='',editProposal=null;
     try{
       // A análise numérica é somente contexto para o Qwen; não aparece como
       // resposta separada, etiqueta de fonte ou aviso técnico ao usuário.
@@ -167,9 +168,13 @@
       if(!llm?.status().available || !window.PCM_NEURAL_EVIDENCE) {
         throw Error('Este navegador não está oferecendo a aceleração necessária para iniciar a conversa.');
       }
-      const prepared=window.PCM_NEURAL_EVIDENCE.makePrompt(
-        ctx,q,target||null,trusted,conversation?.contextStatus?.(),history
-      );
+      const editor=window.PCM_NEURAL_EDITS;
+      const editRequest=!target && editor?.isEditRequest(q);
+      const prepared=editRequest
+        ? {messages:editor.prompt(q)}
+        : window.PCM_NEURAL_EVIDENCE.makePrompt(
+            ctx,q,target||null,trusted,conversation?.contextStatus?.(),history
+          );
       let streamed='',lastPaint=0,lastDownloadPaint=0;
       answer=await llm.ask(prepared.messages,{
         onProgress:p=>{
@@ -195,8 +200,15 @@
         }
       });
       if(!answer.trim())throw Error('Não recebi uma resposta do modelo.');
-      answer=answer.trim().slice(0,3500);
-      history.push({role:'user',content:subject},{role:'assistant',content:answer.slice(0,900)});
+      if(editRequest){
+        editProposal=editor.parse(answer);
+        answer=editProposal
+          ? editor.describe(editProposal)+'?'
+          : 'Posso ajustar o título, a cor, o tamanho do texto e o espaçamento do painel. Alterações em registros de manutenção não são permitidas pelo chat.';
+      }else{
+        answer=answer.trim().slice(0,3500);
+        history.push({role:'user',content:subject},{role:'assistant',content:answer.slice(0,900)});
+      }
       while(history.length>8)history.shift();
       if(run!==requestGeneration||identityKey!==(String(getContext()?.userId||'')+':'+String(getContext()?.revision||'')))return;
       updateState();
@@ -216,6 +228,36 @@
         'Não consegui responder agora. '+modelError));
     }else{
       card.appendChild(make('p','pcm-neural-answer-text',answer));
+      if(editProposal){
+        const controls=make('div','pcm-neural-edit-actions');
+        const apply=make('button','pcm-neural-edit-apply','Aplicar');
+        const cancel=make('button','pcm-neural-edit-cancel','Cancelar');
+        apply.type=cancel.type='button';
+        const freeze=()=>{apply.disabled=true;cancel.disabled=true;};
+        apply.addEventListener('click',()=>{
+          if(identityKey!==(String(getContext()?.userId||'')+':'+String(getContext()?.revision||'')))return;
+          freeze();
+          if(window.PCM_NEURAL_EDITS?.apply(editProposal)){
+            card.querySelector('.pcm-neural-answer-text').textContent='Alteração aplicada ao painel.';
+            const undo=make('button','pcm-neural-edit-cancel','Desfazer');
+            undo.type='button';
+            undo.addEventListener('click',()=>{
+              if(window.PCM_NEURAL_EDITS?.undo()){
+                card.querySelector('.pcm-neural-answer-text').textContent='Alteração desfeita.';
+                undo.disabled=true;
+              }
+            });
+            controls.replaceChildren(undo);
+          }
+        });
+        cancel.addEventListener('click',()=>{
+          freeze();
+          card.querySelector('.pcm-neural-answer-text').textContent='Alteração cancelada.';
+          controls.replaceChildren();
+        });
+        controls.append(apply,cancel);
+        card.appendChild(controls);
+      }
     }
     messages.appendChild(card);
     trimMessages();
