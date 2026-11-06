@@ -88,11 +88,11 @@ const metricsData={
  workLogs:[
   {order:'100',operation:'0010',worker:'TECNICO1',hours:1},
   {order:'100',operation:'0010',worker:'TECNICO2',hours:1},
-  {order:'100',operation:'0020',worker:'TECNICO1',hours:2},
-  {order:'100',operation:'0030',worker:'TECNICO2',hours:2},
+  {order:'100',operation:'0020',worker:'TECNICO1',hours:2,startDate:'2026-01-01',startTime:'10:00:00',endDate:'2026-01-01',endTime:'12:00:00'},
+  {order:'100',operation:'0030',worker:'TECNICO2',hours:2,startDate:'2026-01-01',startTime:'10:00:00',endDate:'2026-01-01',endTime:'12:00:00'},
   {order:'101',operation:'0010',worker:'TECNICO1',hours:0.5},
-  {order:'101',operation:'0020',worker:'TECNICO1',hours:1.5},
-  {order:'102',operation:'0020',worker:'TECNICO2',hours:1},
+  {order:'101',operation:'0020',worker:'TECNICO1',hours:1.5,startDate:'2026-01-03',startTime:'09:00:00',endDate:'2026-01-03',endTime:'10:00:00'},
+  {order:'102',operation:'0020',worker:'TECNICO2',hours:1,startDate:'2026-01-03',startTime:'11:00:00',endDate:'2026-01-03',endTime:'12:00:00'},
   {order:'100',operation:'0020',worker:'',hours:100}
  ]
 };
@@ -101,6 +101,7 @@ assert.equal(evt.length,3); // Uma ordem não é duplicada por ter duas notas.
 const first=evt.find(v=>v.order.id==='100');
 assert.equal(first.attributionHours,2);
 assert.equal(first.mttrHours,2);
+assert.equal(first.referenceMttrHours,2);
 assert.equal(first.stopHours,4);
 assert.equal(first.travelPeople,2);
 assert.equal(first.executionPeople,2);
@@ -127,7 +128,8 @@ const withoutClock=P.reliabilityByPlant({
  orders:[o('single',{type:'ZNTE',status:'ENTE',start:'2026-01-01',startTime:'10:00:00',date:'2026-01-01',referenceTime:'12:00:00'})],
  stoppageNotes:[{order:'single',flag:'X',date:'2026-01-01',tag:'T1',asset:'A1',noteType:'CE'}]
 },{from:'2026-01-01',to:'2026-01-31'});
-assert.equal(withoutClock[0].mttrHours,2);
+assert.equal(withoutClock[0].mttrHours,null);
+assert.equal(withoutClock[0].events,1);
 assert.equal(withoutClock[0].attributionHours,null);
 assert.equal(withoutClock[0].stopHours,null);
 assert.equal(withoutClock[0].mtbfHours,null);
@@ -135,7 +137,8 @@ const overnight=P.reliabilityByPlant({
  orders:[o('overnight',{type:'ZNTE',status:'ENTE',start:'2026-01-31',startTime:'23:30:00',date:'2026-02-01',referenceTime:'01:30:00'})],
  stoppageNotes:[{order:'overnight',flag:'X',date:'2026-01-31',createdTime:'23:00:00',tag:'T1',noteType:'CE'}]
 },{from:'2026-01-01',to:'2026-01-31'});
-assert.equal(overnight[0].mttrHours,2);
+assert.equal(overnight[0].mttrHours,null);
+assert.equal(overnight[0].events,1);
 assert.equal(overnight[0].attributionHours,0.5);
 assert.equal(overnight[0].stopHours,2.5);
 
@@ -164,6 +167,73 @@ assert.equal(onlyA2.total.mtbfHours,null);
 assert.equal(onlyA2.assets.length,1);
 assert.equal(onlyA2.assets[0].asset,'A2');
 assert.equal(P.maintenanceDashboard(metricsData,{from:'2026-04-01',to:'2026-04-30'}).total.mttrHours,null);
+
+
+const overlap=P.repairIntervals([
+ {operation:'0010',worker:'A',hours:1,startDate:'2026-01-01',startTime:'07:00:00',endDate:'2026-01-01',endTime:'08:00:00'},
+ {operation:'0020',worker:'A',hours:2,startDate:'2026-01-01',startTime:'08:00:00',endDate:'2026-01-01',endTime:'10:00:00'},
+ {operation:'0030',worker:'B',hours:2,startDate:'2026-01-01',startTime:'09:00:00',endDate:'2026-01-01',endTime:'11:00:00'},
+ {operation:'0020',worker:'',hours:1,startDate:'2026-01-01',startTime:'12:00:00',endDate:'2026-01-01',endTime:'13:00:00'},
+ {operation:'0020',worker:'A',hours:-1,startDate:'2026-01-01',startTime:'13:00:00',endDate:'2026-01-01',endTime:'14:00:00'},
+ {operation:'0020',worker:'A',hours:2,startDate:'2026-01-02',startTime:'18:00:00',endDate:'2026-01-02',endTime:'17:00:00'}
+]);
+assert.equal(overlap.hours,4); // 08h–11h (com sobreposição) + 12h–13h.
+assert.equal(overlap.spanHours,5);
+assert.equal(overlap.gapHours,1);
+assert.equal(P.repairIntervals([]).hours,null);
+assert.equal(P.repairIntervals([{operation:'0010',worker:'A',hours:3,startDate:'2026-01-01',startTime:'10:00:00',endDate:'2026-01-01',endTime:'13:00:00'}]).hours,null);
+assert.equal(P.repairIntervals([{operation:'0020',worker:'A',hours:1,startDate:'2026-01-31',startTime:'23:30:00',endDate:'2026-02-01',endTime:'00:30:00'}]).hours,1);
+
+const workBase={
+  systems:[{COD_INFORMACAO:'T1',NOME:'ETA Sul',COD_LATITUDE:'-5',COD_LONGITUDE:'-42'}],
+  orders:[
+   {Ordem:'CE1','TAG Planta':'T1',Centro:'PITE','Data de referência':'02/01/2026','Dta.início real':'01/01/2026','Data de entrada':'01/01/2026','Status do sistema':'ENTE','Plano de manutenção':'','Tipo de ordem':'ZNTE','TAG Ativo':'A1'},
+   {Ordem:'CE2','TAG Planta':'T1',Centro:'PITE','Data de referência':'02/01/2026','Dta.início real':'01/01/2026','Data de entrada':'01/01/2026','Status do sistema':'ENTE','Plano de manutenção':'','Tipo de ordem':'ZNTP','TAG Ativo':'A2'},
+   {Ordem:'PREV','TAG Planta':'T1',Centro:'PITE','Data de referência':'02/01/2026','Dta.início real':'01/01/2026','Data de entrada':'01/01/2026','Status do sistema':'ENTE','Plano de manutenção':'','Tipo de ordem':'ZTPF','TAG Ativo':'A3'}
+  ],
+  items:[{Ordem:'CE1'}],actions:[{Ordem:'CE1'}],
+  stoppageNotes:[
+   {Ordem:'CE1','Data da nota':'01/01/2026','TAG Planta':'T1',Parada:'X','Tipo de nota':'CE'},
+   {Ordem:'CE2','Data da nota':'01/01/2026','TAG Planta':'T1',Parada:'X','Tipo de nota':'CP'}
+  ],
+  workLogs:[]
+};
+const makeRaw=(order,operation,worker,hours,a,b)=>({
+ Ordem:order,Operação:operation,'ID SAP':worker,'Trabalho real':hours,
+ 'Data de início de execução real':'01/01/2026',
+ 'Hora de início de execução real':a,
+ 'Data real do fim de execução':'01/01/2026',
+ 'Hora real do fim de execução':b,
+ 'Criado em':'01/01/2026','Criado por':'TESTE'
+});
+const row1=makeRaw('CE1','0020','TEC1',2,'08:00:00','10:00:00');
+const row2=makeRaw('CE1','0030','TEC2',1,'09:00:00','10:00:00');
+workBase.workLogs=[
+ row1,row1, // Duplicata exata não pode somar horas da equipe duas vezes.
+ row2,makeRaw('CE1','0040','',0.5,'10:00:00','10:30:00'),
+ makeRaw('CE1','0010','TEC1',1,'07:00:00','08:00:00'),
+ makeRaw('CE1','0020','',1,'08:00:00','09:00:00'),
+ makeRaw('CE1','0020','',-1,'08:00:00','09:00:00'),
+ makeRaw('CE2','0010','TEC3',1,'07:00:00','08:00:00'),
+ makeRaw('PREV','0020','TEC3',10,'08:00:00','18:00:00')
+];
+const normalizedTimes=P.normalize(workBase,['s','o','i','a','n','apontamentos']);
+assert.equal(normalizedTimes.meta.maintenance.eligible,2);
+assert.equal(normalizedTimes.meta.maintenance.repair,1);
+assert.equal(normalizedTimes.meta.duplicateWorkRows,1);
+assert.equal(normalizedTimes.meta.negativeWorkRows,1);
+assert.equal(normalizedTimes.meta.reverseMatched,1);
+assert.equal(normalizedTimes.meta.missingWorkerRows,1);
+assert.equal(normalizedTimes.workLogs.length,5); // 3 exec CE1, 1 deslocamento CE1, 1 deslocamento CE2.
+assert.equal(normalizedTimes.workLogs.some(log=>log.order==='PREV'),false);
+const timeEvents=P.maintenanceEvents(normalizedTimes,{});
+assert.equal(timeEvents.length,2);
+assert.equal(timeEvents.find(e=>e.order.id==='CE1').mttrHours,2.5);
+assert.equal(timeEvents.find(e=>e.order.id==='CE1').executionHours,1.5);
+assert.equal(timeEvents.find(e=>e.order.id==='CE1').travelHours,1);
+assert.equal(timeEvents.find(e=>e.order.id==='CE2').mttrHours,null);
+assert.equal(P.maintenanceDashboard(normalizedTimes,{}).total.mttrHours,2.5);
+assert.equal(P.maintenanceDashboard(normalizedTimes,{}).total.mttrHoursCount,1);
 
 const t=P.timing([o('1',{due:'2026-01-11',finished:'2026-01-10'}),o('2',{due:'2026-01-10',finished:'2026-01-12'}),o('3',{status:'ABER',due:'2026-01-01'}),o('4')],'2026-01-15');
 assert.equal(t.onTime,1);assert.equal(t.late,1);assert.equal(t.overdue,1);assert.equal(t.unassessed,1);
