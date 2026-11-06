@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const file=p=>fs.readFileSync(require('node:path').join(__dirname,p),'utf8');
-const ui=file('pcm-neural-orb.js'),html=file('index.html'),app=file('app.js');
+const ui=file('pcm-neural-orb-cpu-v2.js'),html=file('index.html'),app=file('app.js');
 assert.doesNotMatch(ui,/type="file"|filePicker|Conectar modelo treinado|Trocar modelo local/);
 assert.doesNotMatch(html,/src="pcm-neural-local\.js/);
 assert.doesNotMatch(ui,/PCM_NEURAL_REMOTE/);
@@ -15,6 +15,6 @@ assert.match(app,/db\.auth\.getSession\(\)/);
 assert.match(app,/db\.functions\.invoke\(functionName/);
 assert.match(app,/if \(!functionName \|\| !db \|\| !user/);
 assert.doesNotMatch(app,/service_role|sb_secret_/);
-assert.ok(html.includes('pcm-neural-orb.js?v=20261106-10'));
+assert.ok(html.includes('pcm-neural-orb-cpu-v2.js?v=20261106-14'));
 assert.ok(html.includes('pcm-neural-prototype.js?v=20261106-6'));
 console.log('PCM Neural: Qwen redige as respostas sem etiquetas técnicas e edição visual requer aprovação.');
