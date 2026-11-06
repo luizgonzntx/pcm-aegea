@@ -1,11 +1,11 @@
-// PCM Neural: Qwen2.5-0.5B-Instruct executado na GPU do próprio navegador.
+// PCM Neural: Qwen2.5-0.5B-Instruct local, com GPU opcional e fallback para CPU/WASM.
 // Código e pesos públicos baixados apenas do CDN de distribuição e do Hugging Face.
-// Perguntas, dados SAP e ICM permanecem neste navegador.
+// As perguntas e os dados de manutencao permanecem no navegador.
 import {pipeline,TextStreamer,env} from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1';
 env.allowRemoteModels=true;
 env.allowLocalModels=false;
 env.useBrowserCache=true;
-// Limit context and tokens to keep GPU usage bounded on desktop.
+// Limit context and tokens to keep memory and computation bounded.
 const MODEL='onnx-community/Qwen2.5-0.5B-Instruct';
 let generator=null;
 let loading=null;
@@ -13,11 +13,9 @@ let occupied=false;
 const report=(type,id,data={})=>self.postMessage({type,id,...data});
 async function load(id){
   if(generator)return generator;
-  if(!self.navigator?.gpu)throw Error('Este navegador não oferece WebGPU para executar o modelo local.');
   if(!loading){
-    loading=pipeline('text-generation',MODEL,{
-      device:'webgpu',dtype:'q4',
-      progress_callback:p=>{
+    loading=(async()=>{
+      const reportProgress=p=>{
         if(!p)return;
         const pct=Number(p.progress);
         report('progress',id,{
@@ -25,8 +23,37 @@ async function load(id){
           status:String(p.status||''),
           percent:Number.isFinite(pct)?Math.max(0,Math.min(100,pct)):null
         });
+      };
+      // A GPU e opcional. Se ausente ou se a inicializacao falhar,
+      // ONNX Runtime Web executa no processador usando memoria RAM.
+      let hasGPU=false;
+      try{
+        if(self.navigator?.gpu){
+          const adapter=await self.navigator.gpu.requestAdapter();
+          hasGPU=!!adapter;
+        }
+      }catch(_){hasGPU=false;}
+      if(hasGPU){
+        try{
+          const gpu=await pipeline('text-generation',MODEL,{
+            device:'webgpu',dtype:'q4',progress_callback:reportProgress
+          });
+          report('backend',id,{device:'webgpu'});
+          return gpu;
+        }catch(err){
+          report('status',id,{status:'cpu-fallback'});
+        }
       }
-    }).then(g=>{generator=g;return g;}).catch(err=>{loading=null;throw err;});
+      try{
+        const cpu=await pipeline('text-generation',MODEL,{
+          device:'wasm',dtype:'q8',progress_callback:reportProgress
+        });
+        report('backend',id,{device:'wasm'});
+        return cpu;
+      }catch(err){
+        throw Error('Nao foi possivel carregar o modelo na CPU: '+String(err?.message||err));
+      }
+    })().then(g=>{generator=g;return g;}).catch(err=>{loading=null;throw err;});
   }
   return loading;
 }
