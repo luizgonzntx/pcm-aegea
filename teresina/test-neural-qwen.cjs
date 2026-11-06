@@ -66,7 +66,7 @@ client.ask(p.messages,{onProgress:x=>events.push(x.type),onToken:x=>events.push(
  assert.equal(output,'O motor precisa de inspeção.');
  assert.equal(client.status().ready,true);
  assert.ok(events.includes('progress'));
- assert.ok(events.some(x=>x.text==='O motor precisa '));
+ assert.ok(events.includes('O motor precisa '));
  client.stop();
  assert.equal(client.status().ready,false);
  console.log('PCM Neural Qwen: retrieval, grounding, progress and client response passed.');
