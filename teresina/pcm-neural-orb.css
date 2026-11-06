@@ -92,3 +92,11 @@
 #pcm-neural-panel .pcm-neural-followup:hover{background:#e2f4fa;border-color:#70b8d8}
 #pcm-neural-panel #pcm-neural-clear{font-size:20px;line-height:1;font-weight:600}
 #pcm-neural-panel #pcm-neural-clear:hover{background:#ffffff2d}
+
+/* Ações de personalização do painel propostas pelo Qwen. */
+.pcm-neural-edit-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+#pcm-neural-panel .pcm-neural-edit-actions button{padding:9px 13px;border-radius:10px;font-weight:700;font-size:11px}
+#pcm-neural-panel .pcm-neural-edit-apply{background:#074b9b;color:#fff;border-color:#074b9b}
+#pcm-neural-panel .pcm-neural-edit-cancel{background:#fff;color:#20456f;border-color:#c9d7eb}
+#pcm-neural-panel .pcm-neural-edit-actions button:disabled{opacity:.5;cursor:default}
+.pcm-neural-answer-error{border-color:#f4e2d4;background:#fffdfb}
