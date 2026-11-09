@@ -114,3 +114,168 @@
 #pcm-neural-panel .pcm-neural-answer-text{font-size:13px;line-height:1.68;color:#2f4661}
 #pcm-neural-panel .pcm-neural-system-message{position:relative;padding-left:34px}
 #pcm-neural-panel .pcm-neural-system-message:before{content:'🤖';position:absolute;left:10px;top:8px;font-size:15px}
+
+/* MANIX · identidade industrial premium */
+#pcm-neural-layer{
+  --manix-ink:#12202d;
+  --manix-navy:#123552;
+  --manix-navy-2:#174766;
+  --manix-steel:#587086;
+  --manix-line:#d8e1e8;
+  --manix-soft:#f3f6f8;
+  --manix-amber:#f0a52b;
+  --manix-green:#24956f;
+}
+#pcm-neural-orb{
+  height:52px;max-width:176px;padding:5px 16px 5px 6px;gap:10px;
+  border:1px solid #294e68;border-radius:15px;
+  background:linear-gradient(145deg,#112b3f 0%,#174866 100%);
+  box-shadow:0 14px 35px rgba(17,43,63,.28),0 2px 7px rgba(15,35,50,.16);
+}
+#pcm-neural-orb:hover{transform:translateY(-2px);box-shadow:0 18px 40px rgba(17,43,63,.34)}
+#pcm-neural-orb .manix-orb-mark,
+#pcm-neural-panel .manix-avatar{
+  position:relative;display:grid;place-items:center;background:#10293d!important;
+  border:1px solid #52738b!important;color:#fff!important;box-shadow:none!important;
+}
+#pcm-neural-orb .manix-orb-mark{width:39px;height:39px;border-radius:11px;font-size:17px!important}
+#pcm-neural-orb .manix-orb-mark b,.manix-avatar b{font-size:17px;font-weight:900;letter-spacing:-.05em}
+.manix-orb-mark i,.manix-avatar i{
+  position:absolute;width:7px;height:7px;border-radius:50%;right:5px;top:5px;
+  background:var(--manix-amber);box-shadow:0 0 0 3px rgba(240,165,43,.14)
+}
+#pcm-neural-orb .pcm-orb-caption{font-size:12px;font-weight:900;letter-spacing:.12em}
+
+#pcm-neural-panel{
+  width:min(470px,calc(100vw - 24px));max-height:min(735px,calc(100dvh - 104px));
+  border:1px solid #c7d2da;border-radius:20px;background:#f8fafb;color:var(--manix-ink);
+  box-shadow:0 32px 78px rgba(15,35,50,.27),0 4px 14px rgba(15,35,50,.09);
+}
+.pcm-neural-head{
+  min-height:88px;padding:17px 18px;border-bottom:0;
+  background:
+    linear-gradient(90deg,var(--manix-amber) 0 72px,transparent 72px) top left/100% 3px no-repeat,
+    linear-gradient(135deg,#10283b 0%,#163f5b 62%,#1b506e 100%);
+}
+#pcm-neural-panel .manix-avatar{width:44px;height:44px;border-radius:12px;flex:none}
+.pcm-neural-heading{min-width:0;display:flex;flex-direction:column;gap:3px}
+.pcm-neural-eyebrow{font-size:8.5px!important;font-weight:850!important;letter-spacing:.16em!important;color:#9fc1d4!important}
+#pcm-neural-title{font-size:17px!important;letter-spacing:-.025em!important;font-weight:820!important}
+#pcm-neural-source-state{
+  display:inline-flex;width:max-content;max-width:100%;align-items:center;gap:6px;
+  margin-top:2px;color:#d3e2ea!important;font-size:9.5px!important;font-weight:650!important;
+}
+#pcm-neural-source-state:before{
+  content:'';width:6px;height:6px;border-radius:50%;background:#5bc59b;
+  box-shadow:0 0 0 3px rgba(91,197,155,.12)
+}
+.pcm-neural-icon-button{
+  border-radius:10px!important;border:1px solid rgba(255,255,255,.13)!important;
+  background:rgba(255,255,255,.06)!important;
+}
+.pcm-neural-icon-button:hover{background:rgba(255,255,255,.12)!important}
+
+.pcm-neural-content{padding:20px 18px 8px!important;background:#f8fafb}
+.pcm-neural-welcome{text-align:left!important;padding:2px 2px 14px!important}
+.manix-welcome-kicker{
+  display:flex;align-items:center;gap:7px;margin-bottom:7px;
+  color:#657b8d;font-size:8.5px;font-weight:900;letter-spacing:.15em
+}
+.manix-welcome-kicker span{width:18px;height:2px;border-radius:2px;background:var(--manix-amber)}
+.pcm-neural-welcome h3{
+  margin:0 0 6px!important;color:#142d40!important;font-size:22px!important;
+  line-height:1.15!important;letter-spacing:-.035em!important;font-weight:820!important
+}
+.pcm-neural-welcome p{
+  max-width:390px!important;margin:0!important;color:#637486!important;
+  font-size:11.5px!important;line-height:1.58!important
+}
+.queen-intro-bot{display:none!important}
+
+#pcm-neural-panel .pcm-neural-prompts{
+  display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important;margin-top:3px!important
+}
+#pcm-neural-panel .pcm-neural-prompts button{
+  position:relative;display:grid!important;grid-template-columns:32px 1fr!important;
+  grid-template-rows:auto auto!important;column-gap:10px!important;row-gap:2px!important;
+  align-items:center!important;min-height:66px!important;padding:10px 11px!important;
+  border:1px solid #d7e0e7!important;border-radius:12px!important;background:#fff!important;
+  color:#263b4b!important;box-shadow:0 2px 7px rgba(30,55,75,.035)!important;
+  transition:border-color .16s,background .16s,transform .16s!important
+}
+#pcm-neural-panel .pcm-neural-prompts button:hover{
+  transform:translateY(-1px);border-color:#91adbe!important;background:#fafdff!important;color:#193b51!important
+}
+#pcm-neural-panel .pcm-neural-prompts button>span{
+  grid-row:1/3;display:grid;place-items:center;width:32px;height:32px;border-radius:9px!important;
+  background:#eef3f6!important;color:#1e5574!important;font-size:16px!important
+}
+#pcm-neural-panel .pcm-neural-prompts button>b{
+  align-self:end;text-align:left;font-size:10.5px;line-height:1.2;font-weight:800;color:#253d4e
+}
+#pcm-neural-panel .pcm-neural-prompts button>small{
+  align-self:start;text-align:left;color:#7b8d9b;font-size:8.5px;line-height:1.2;font-weight:600
+}
+.pcm-neural-prompts-used button>small{display:none}
+.pcm-neural-prompts-used button{min-height:45px!important;grid-template-rows:auto!important}
+.pcm-neural-prompts-used button>span{grid-row:1!important}
+
+.pcm-neural-bottom{
+  gap:9px!important;padding:12px 16px 14px!important;border-top:1px solid #dde5ea!important;background:#fff!important
+}
+.pcm-neural-tools{gap:8px!important}
+#pcm-neural-panel .pcm-neural-pick{
+  color:#365c74!important;font-size:9.5px!important;font-weight:800!important;letter-spacing:.01em
+}
+#pcm-neural-panel .pcm-neural-pick span{color:var(--manix-amber);font-size:16px!important}
+#pcm-neural-panel .pcm-neural-connect{
+  border:1px solid #cbd8e1!important;border-radius:10px!important;padding:8px 11px!important;
+  background:#f2f6f8!important;color:#25485f!important;font-size:9.5px!important;font-weight:850!important
+}
+#pcm-neural-panel .pcm-neural-connect:hover{border-color:#9fb7c7!important;background:#eaf1f5!important}
+.manix-connect-led{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--manix-amber)}
+#pcm-neural-panel .pcm-neural-is-connected{
+  border-color:#9ccdbb!important;background:#edf8f3!important;color:#19684d!important
+}
+#pcm-neural-panel .pcm-neural-is-connected .manix-connect-led{background:var(--manix-green)}
+
+#pcm-neural-form{
+  min-height:48px;padding:4px 5px 4px 14px!important;border:1px solid #c8d5de!important;
+  border-radius:12px!important;background:#fbfcfd!important
+}
+#pcm-neural-form:focus-within{border-color:#608ba5!important;box-shadow:0 0 0 3px rgba(70,122,153,.10)!important}
+#pcm-neural-form input{font-size:11.5px!important;color:#203b4e!important}
+#pcm-neural-panel #pcm-neural-send{
+  width:38px;height:38px;border-radius:9px!important;background:#173f5b!important;
+  box-shadow:inset 0 -1px 0 rgba(0,0,0,.12)
+}
+#pcm-neural-panel #pcm-neural-send:hover{background:#205777!important}
+.pcm-neural-bottom>small{color:#8a99a5!important;font-size:8.5px!important;letter-spacing:.005em!important}
+
+.pcm-neural-user-message{
+  border-radius:12px 12px 3px 12px!important;background:#173f5b!important;
+  font-size:11.5px!important;box-shadow:none!important
+}
+.pcm-neural-answer{
+  border:1px solid #dbe3e9!important;border-radius:13px 13px 13px 3px!important;
+  background:#fff!important;box-shadow:0 3px 12px rgba(31,54,72,.045)!important
+}
+.manix-answer-mark{
+  width:27px!important;height:27px!important;border-radius:8px!important;background:#173f5b!important;
+  border:0!important;color:#fff!important;font-size:11px!important;font-weight:900!important
+}
+.queen-answer-name{color:#244b64!important;font-size:9px!important;font-weight:900!important;letter-spacing:.13em!important}
+#pcm-neural-panel .pcm-neural-answer-text{color:#354c5d!important;font-size:12.2px!important;line-height:1.62!important}
+#pcm-neural-panel .pcm-neural-system-message{
+  border-color:#d7e3e8!important;background:#f1f6f7!important;color:#315669!important;padding-left:12px!important
+}
+#pcm-neural-panel .pcm-neural-system-message:before{display:none!important}
+
+@media(max-width:650px){
+  #pcm-neural-panel{height:min(84dvh,760px);border-radius:18px 18px 0 0}
+  .pcm-neural-head{min-height:77px;padding:13px 14px}
+  .pcm-neural-content{padding:17px 14px 7px!important}
+  .pcm-neural-welcome h3{font-size:20px!important}
+  #pcm-neural-panel .pcm-neural-prompts{gap:7px!important}
+  #pcm-neural-panel .pcm-neural-prompts button{min-height:62px!important;padding:9px!important}
+}
