@@ -1,19 +1,66 @@
 (function(root){
 'use strict';
-const MODEL='Qwen2.5-0.5B-Instruct (CPU/RAM local)';
+const FALLBACK_MODEL='Qwen2.5-0.5B-Instruct (CPU/RAM local)';
+const REAL_MODEL='Queen 1.5B treinada · DAPT + SFT';
+const onLocalHost=()=>['127.0.0.1','localhost'].includes(location.hostname);
+const localBase=()=>onLocalHost()?'':'http://127.0.0.1:8765';
+
 function createClient(workerFactory){
- const factory=workerFactory||(()=>new Worker('pcm-neural-chat-worker-cpu-v4.js?v=20261106-17',{type:'module'}));
- let worker=null,active=null,serial=0,ready=false,unavailable='';
+ const factory=workerFactory||(()=>new Worker('pcm-neural-chat-worker-cpu-v4.js?v=20261109-queen1',{type:'module'}));
+ let worker=null,active=null,serial=0,ready=false,unavailable='',realQueen=false,lastProbe=0;
  const canRun=()=>typeof root.Worker==='function';
- const status=()=>({ready,busy:!!active,available:canRun()&&!unavailable,unavailable,model:MODEL});
+ const status=()=>({
+   ready:realQueen||ready,
+   busy:!!active,
+   available:realQueen||canRun()&&!unavailable,
+   unavailable,
+   model:realQueen?REAL_MODEL:FALLBACK_MODEL,
+   realQueen
+ });
+
  function stop(reason='Modelo interrompido'){
-   // Compatibilidade defensiva: versões antigas da UI chamavam stop ao perder foco.
-   // Isso nunca deve interromper uma inferência CPU/RAM em andamento.
    if(/página em segundo plano|pagina em segundo plano/i.test(String(reason||'')))return;
    if(worker){worker.terminate();worker=null;}
    if(active){active.reject(new Error(reason));active=null;}
    ready=false;
  }
+
+ async function probeRealQueen(force=false){
+   const now=Date.now();
+   if(!force&&realQueen&&now-lastProbe<15000)return true;
+   lastProbe=now;
+   const controller=new AbortController();
+   const timer=setTimeout(()=>controller.abort(),onLocalHost()?2500:900);
+   try{
+     const res=await fetch(localBase()+'/health',{cache:'no-store',signal:controller.signal});
+     if(!res.ok)throw Error('health '+res.status);
+     const data=await res.json();
+     realQueen=!!data?.queen_real;
+     return realQueen;
+   }catch(_){
+     realQueen=false;
+     return false;
+   }finally{clearTimeout(timer);}
+ }
+
+ async function askRealQueen(messages,callbacks={}){
+   callbacks.onProgress?.({type:'status',status:'generating',backend:'queen-real'});
+   const res=await fetch(localBase()+'/api/chat',{
+     method:'POST',
+     headers:{'Content-Type':'application/json'},
+     body:JSON.stringify({messages,max_new_tokens:260})
+   });
+   if(!res.ok){
+     let detail='';
+     try{detail=(await res.json())?.detail||'';}catch(_){}
+     throw Error(detail||('Queen local respondeu HTTP '+res.status));
+   }
+   const data=await res.json();
+   const text=String(data?.text||'').trim();
+   if(!text)throw Error('Queen local retornou resposta vazia.');
+   return text;
+ }
+
  function init(){
    if(worker)return;
    worker=factory();
@@ -36,25 +83,39 @@ function createClient(workerFactory){
      }
    });
    worker.addEventListener('error',()=>{
-     unavailable='O código do modelo não pôde ser carregado. Verifique a conexao e recarregue a pagina.';
-     stop(unavailable);
+     unavailable='O código do modelo leve não pôde ser carregado. Verifique a conexão e recarregue a página.';
+     if(worker){worker.terminate();worker=null;}
+     ready=false;
    });
    worker.addEventListener('messageerror',()=>stop('Erro de comunicação com o modelo local.'));
  }
- function ask(messages,callbacks={}){
-   if(!canRun())return Promise.reject(new Error('Este navegador nao suporta Workers para executar o modelo local.'));
-   if(unavailable)return Promise.reject(new Error(unavailable));
+
+ async function ask(messages,callbacks={}){
    if(active)return Promise.reject(new Error('Aguarde a consulta atual terminar.'));
+   const id=++serial;
+   const localCallbacks={onProgress:callbacks.onProgress,onToken:callbacks.onToken};
+   const useReal=await probeRealQueen(true);
+   if(useReal){
+     return new Promise((resolve,reject)=>{
+       active={id,resolve,reject,progress:callbacks.onProgress,token:callbacks.onToken};
+       askRealQueen(messages,localCallbacks)
+        .then(text=>{const current=active;active=null;current?.resolve(text);})
+        .catch(err=>{realQueen=false;const current=active;active=null;current?.reject(err);});
+     });
+   }
+   if(!canRun())return Promise.reject(new Error('Este navegador não suporta o modelo local e o Queen real não foi detectado.'));
+   if(unavailable)return Promise.reject(new Error(unavailable));
    return new Promise((resolve,reject)=>{
-     const id=++serial;
      active={id,resolve,reject,progress:callbacks.onProgress,token:callbacks.onToken};
      try{init();worker.postMessage({id,type:'chat',messages});}
      catch(err){active=null;reject(err);}
    });
  }
- return {ask,status,stop};
+
+ probeRealQueen(false);
+ return {ask,status,stop,probeRealQueen};
 }
-const api={createClient,MODEL};
+const api={createClient,MODEL:FALLBACK_MODEL,REAL_MODEL};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;
 root.PCM_NEURAL_CHAT=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
