@@ -4,6 +4,7 @@ const FALLBACK_MODEL='Qwen2.5-0.5B-Instruct (CPU/RAM local)';
 const REAL_MODEL='Queen 1.5B treinada · DAPT + SFT';
 const onLocalHost=()=>['127.0.0.1','localhost'].includes(location.hostname);
 const localBase=()=>onLocalHost()?'':'http://127.0.0.1:8765';
+const localRequest=(url,options={})=>new Request(url,{mode:'cors',targetAddressSpace:'loopback',...options});
 
 function createClient(workerFactory){
  const factory=workerFactory||(()=>new Worker('pcm-neural-chat-worker-cpu-v4.js?v=20261109-queen1',{type:'module'}));
@@ -32,7 +33,7 @@ function createClient(workerFactory){
    const controller=new AbortController();
    const timer=setTimeout(()=>controller.abort(),onLocalHost()?2500:900);
    try{
-     const res=await fetch(localBase()+'/health',{cache:'no-store',signal:controller.signal});
+     const res=await fetch(localRequest(localBase()+'/health',{cache:'no-store',signal:controller.signal}));
      if(!res.ok)throw Error('health '+res.status);
      const data=await res.json();
      realQueen=!!data?.queen_real;
@@ -45,11 +46,11 @@ function createClient(workerFactory){
 
  async function askRealQueen(messages,callbacks={}){
    callbacks.onProgress?.({type:'status',status:'generating',backend:'queen-real'});
-   const res=await fetch(localBase()+'/api/chat',{
+   const res=await fetch(localRequest(localBase()+'/api/chat',{
      method:'POST',
      headers:{'Content-Type':'application/json'},
      body:JSON.stringify({messages,max_new_tokens:260})
-   });
+   }));
    if(!res.ok){
      let detail='';
      try{detail=(await res.json())?.detail||'';}catch(_){}
