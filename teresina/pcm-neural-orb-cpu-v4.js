@@ -6,8 +6,8 @@
   root.id = 'pcm-neural-layer';
   root.innerHTML = `
     <button type="button" id="pcm-neural-orb" aria-controls="pcm-neural-panel" aria-expanded="false" aria-label="Abrir Manix, inteligência de manutenção" title="Converse com a Manix ou arraste sobre um indicador">
-      <span class="pcm-orb-mark queen-orb-bot" aria-hidden="true">🤖</span>
-      <span class="pcm-orb-caption">Queen</span>
+      <span class="pcm-orb-mark queen-orb-bot manix-orb-mark" aria-hidden="true"><b>M</b><i></i></span>
+      <span class="pcm-orb-caption">MANIX</span>
     </button>
     <section id="pcm-neural-panel" role="dialog" aria-modal="false" aria-labelledby="pcm-neural-title" hidden>
       <header class="pcm-neural-head">
@@ -22,9 +22,9 @@
       </header>
       <div class="pcm-neural-content">
         <div class="pcm-neural-welcome">
-          <div class="pcm-neural-intro-icon queen-intro-bot" aria-hidden="true">🤖</div>
-          <h3>Oi, eu sou a Queen.</h3>
-          <p>Posso explicar indicadores, analisar sinais de falha e ajudar a estruturar uma investigação usando os dados disponíveis no painel.</p>
+          <div class="manix-welcome-kicker"><span></span> ASSISTENTE TÉCNICA</div>
+          <h3>O que vamos investigar?</h3>
+          <p>Analise indicadores, identifique recorrências e estruture diagnósticos com base nos dados disponíveis no painel.</p>
         </div>
         <div id="pcm-neural-prompts" class="pcm-neural-prompts" aria-label="Perguntas sugeridas">
           <button type="button" data-pcm-question="Quais ativos estão concentrando mais corretivas e o que devo investigar primeiro?"><span>▦</span><b>Ativos críticos</b><small>Prioridade e concentração</small></button>
