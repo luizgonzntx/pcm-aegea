@@ -5,16 +5,16 @@
   const root = document.createElement('div');
   root.id = 'pcm-neural-layer';
   root.innerHTML = `
-    <button type="button" id="pcm-neural-orb" aria-controls="pcm-neural-panel" aria-expanded="false" aria-label="Abrir Queen, assistente de manutenção" title="Converse com a Queen ou arraste sobre um indicador">
+    <button type="button" id="pcm-neural-orb" aria-controls="pcm-neural-panel" aria-expanded="false" aria-label="Abrir Manix, inteligência de manutenção" title="Converse com a Manix ou arraste sobre um indicador">
       <span class="pcm-orb-mark queen-orb-bot" aria-hidden="true">🤖</span>
       <span class="pcm-orb-caption">Queen</span>
     </button>
     <section id="pcm-neural-panel" role="dialog" aria-modal="false" aria-labelledby="pcm-neural-title" hidden>
       <header class="pcm-neural-head">
-        <div class="pcm-neural-avatar queen-avatar" aria-hidden="true">🤖</div>
+        <div class="pcm-neural-avatar queen-avatar manix-avatar" aria-hidden="true"><b>M</b><i></i></div>
         <div class="pcm-neural-heading">
-          <span class="pcm-neural-eyebrow">QUEEN · PREVIEW LOCAL</span>
-          <strong id="pcm-neural-title">Converse com a Queen</strong>
+          <span class="pcm-neural-eyebrow">MANIX · INTELIGÊNCIA DE MANUTENÇÃO</span>
+          <strong id="pcm-neural-title">Converse com a Manix</strong>
           <small id="pcm-neural-source-state">Pronta para conversar</small>
         </div>
         <button type="button" id="pcm-neural-clear" class="pcm-neural-icon-button" title="Nova investigação" aria-label="Limpar conversa e começar nova investigação">↺</button>
@@ -27,24 +27,24 @@
           <p>Posso explicar indicadores, analisar sinais de falha e ajudar a estruturar uma investigação usando os dados disponíveis no painel.</p>
         </div>
         <div id="pcm-neural-prompts" class="pcm-neural-prompts" aria-label="Perguntas sugeridas">
-          <button type="button" data-pcm-question="Quais ativos estão concentrando mais corretivas e o que devo investigar primeiro?"><span>▦</span>Priorizar ativos</button>
-          <button type="button" data-pcm-question="Quais sinais de recorrência aparecem nos dados e quais hipóteses devo verificar?"><span>◎</span>Investigar recorrência</button>
-          <button type="button" data-pcm-question="Explique MTBF e MTTR juntos e o que eles dizem sobre a operação."><span>◷</span>Entender indicadores</button>
-          <button type="button" data-pcm-question="Analise os dados disponíveis e me diga qual investigação técnica tem maior prioridade."><span>◇</span>Análise técnica</button>
+          <button type="button" data-pcm-question="Quais ativos estão concentrando mais corretivas e o que devo investigar primeiro?"><span>▦</span><b>Ativos críticos</b><small>Prioridade e concentração</small></button>
+          <button type="button" data-pcm-question="Quais sinais de recorrência aparecem nos dados e quais hipóteses devo verificar?"><span>↻</span><b>Falhas recorrentes</b><small>Padrões e hipóteses</small></button>
+          <button type="button" data-pcm-question="Explique MTBF e MTTR juntos e o que eles dizem sobre a operação."><span>∿</span><b>Indicadores</b><small>MTBF, MTTR e desempenho</small></button>
+          <button type="button" data-pcm-question="Analise os dados disponíveis e me diga qual investigação técnica tem maior prioridade."><span>◇</span><b>Diagnóstico técnico</b><small>Evidências e investigação</small></button>
         </div>
         <div id="pcm-neural-messages" class="pcm-neural-messages" role="log" aria-label="Histórico de perguntas e respostas" aria-live="polite"></div>
       </div>
       <div class="pcm-neural-bottom">
         <div class="pcm-neural-tools">
-          <button type="button" id="pcm-neural-pick" class="pcm-neural-pick"><span aria-hidden="true">⌖</span> Analisar um indicador da tela</button>
-          <button type="button" id="pcm-neural-connect-v3" class="pcm-neural-connect">🤖 Conectar Queen v3</button>
+          <button type="button" id="pcm-neural-pick" class="pcm-neural-pick"><span aria-hidden="true">⌖</span> Analisar indicador da tela</button>
+          <button type="button" id="pcm-neural-connect-v3" class="pcm-neural-connect"><span class="manix-connect-led"></span> Conectar Manix IA</button>
         </div>
         <form id="pcm-neural-form" autocomplete="off">
           <label class="pcm-neural-visually-hidden" for="pcm-neural-question">Escreva sua dúvida</label>
-          <input id="pcm-neural-question" maxlength="500" placeholder="Ex.: Explique a OS 900123456" required>
+          <input id="pcm-neural-question" maxlength="500" placeholder="Ex.: Analise a OS 900123456" required>
           <button type="submit" id="pcm-neural-send" aria-label="Enviar pergunta" title="Enviar pergunta">↑</button>
         </form>
-        <small>Preview local: a Queen usa o modelo leve do navegador e os dados já carregados no painel.</small>
+        <small>Modo local · a Manix usa o modelo leve do navegador e os dados já carregados no painel.</small>
       </div>
     </section>`;
   shell.appendChild(root);
@@ -98,10 +98,10 @@
       identityKey=current;
     }
     state.textContent=!ctx?'Aguardando seus dados':
-      local?.realQueen?'Queen 1.5B treinada · conectada':
-      local?.ready?'Queen Preview · modelo leve local':
-      local?.available?'Queen Preview disponível · o primeiro carregamento pode levar um pouco':
-      'Queen local indisponível neste navegador';
+      local?.realQueen?'Manix IA · modelo avançado conectado':
+      local?.ready?'Manix · modelo local ativo':
+      local?.available?'Manix local disponível · primeiro carregamento pode levar alguns instantes':
+      'Manix local indisponível neste navegador';
   }
   function openPanel(focus=false){
     selectMode=false;
@@ -171,7 +171,7 @@
     const subject=target?'Explique: '+(target.label||'dado selecionado')+(target.value?' · '+target.value:''):q;
     messages.appendChild(make('div','pcm-neural-user-message',subject));
     input.value='';
-    const progress=make('div','pcm-neural-system-message','Queen está analisando…');
+    const progress=make('div','pcm-neural-system-message','Manix está analisando…');
     messages.appendChild(progress);
     let answer='',modelError='',editProposal=null;
     try{
@@ -198,11 +198,11 @@
           const now=performance.now();
           if(p.type==='progress'&&now-lastDownloadPaint<180)return;
           if(p.type==='progress')lastDownloadPaint=now;
-          if(p.type==='status'&&p.status==='generating')progress.textContent='Queen está organizando a resposta…';
-          else if(p.type==='status')progress.textContent='Queen está preparando a análise…';
+          if(p.type==='status'&&p.status==='generating')progress.textContent='Manix está organizando a resposta…';
+          else if(p.type==='status')progress.textContent='Manix está preparando a análise…';
           else if(p.type==='progress'){
             const percent=Number.isFinite(p.percent)?' '+Math.round(p.percent)+'%':'';
-            progress.textContent='Carregando Queen'+percent+'…';
+            progress.textContent='Carregando Manix'+percent+'…';
           }
         },
         onToken:token=>{
@@ -240,7 +240,7 @@
     if(run!==requestGeneration)return;
     const card=make('article','pcm-neural-answer'+(modelError?' pcm-neural-answer-error':''));
     const author=make('div','pcm-neural-answer-author');
-    author.append(make('span','queen-answer-bot','🤖'),make('strong','queen-answer-name','Queen'));
+    author.append(make('span','queen-answer-bot manix-answer-mark','M'),make('strong','queen-answer-name','MANIX'));
     card.appendChild(author);
     if(modelError){
       card.appendChild(make('p','pcm-neural-answer-text',
@@ -286,25 +286,25 @@
   connectV3?.addEventListener('click',async()=>{
     const current=llm?.getBackend?.()||'';
     const url=window.prompt(
-      'Cole o endereço HTTPS mostrado pelo Colab (ex.: https://xxxx.trycloudflare.com).\n\nDeixe vazio para voltar ao Queen Preview.',
+      'Cole o endereço HTTPS do backend da Manix (ex.: https://xxxx.trycloudflare.com).\n\nDeixe vazio para voltar ao modo local.',
       current
     );
     if(url===null)return;
     connectV3.disabled=true;
-    state.textContent='Testando conexão com a Queen v3…';
+    state.textContent='Testando conexão com a Manix IA…';
     try{
       const ok=await llm?.setBackend?.(url);
       if(ok){
-        state.textContent='Queen v3 treinada · conectada';
-        connectV3.textContent='✓ Queen v3 conectada';
+        state.textContent='Manix IA · modelo avançado conectado';
+        connectV3.textContent='✓ Manix IA conectada';
         connectV3.classList.add('pcm-neural-is-connected');
       }else{
-        state.textContent=url?'Não consegui conectar à Queen v3':'Queen Preview disponível';
-        connectV3.textContent='🤖 Conectar Queen v3';
+        state.textContent=url?'Não consegui conectar à Manix IA':'Manix local disponível';
+        connectV3.innerHTML='<span class="manix-connect-led"></span> Conectar Manix IA';
         connectV3.classList.remove('pcm-neural-is-connected');
       }
     }catch(_){
-      state.textContent='Falha ao conectar à Queen v3';
+      state.textContent='Falha ao conectar à Manix IA';
     }finally{connectV3.disabled=false;}
   });
   form.addEventListener('submit',event=>{event.preventDefault();send(input.value);});
