@@ -94,7 +94,8 @@
       identityKey=current;
     }
     state.textContent=!ctx?'Aguardando seus dados':
-      local?.ready?'Queen pronta · modelo local':
+      local?.realQueen?'Queen 1.5B treinada · conectada':
+      local?.ready?'Queen Preview · modelo leve local':
       local?.available?'Queen Preview disponível · o primeiro carregamento pode levar um pouco':
       'Queen local indisponível neste navegador';
   }
