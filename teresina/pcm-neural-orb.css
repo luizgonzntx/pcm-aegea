@@ -102,3 +102,15 @@
 .pcm-neural-answer-error{border-color:#f4e2d4;background:#fffdfb}
 
 .pcm-neural-answer-text{white-space:pre-line}
+
+
+/* Queen Preview · identidade conversacional */
+#pcm-neural-orb .queen-orb-bot{font-size:24px;background:linear-gradient(145deg,#e8fbff,#bfe7ff);box-shadow:inset 0 0 0 1px #ffffff88,0 3px 10px #001e4f30}
+.queen-avatar{font-size:25px!important;background:linear-gradient(145deg,#ffffff20,#8be7ff20)!important;box-shadow:inset 0 0 0 1px #ffffff18}
+.queen-intro-bot{font-size:25px!important;background:linear-gradient(145deg,#effbff,#e8f8f2)!important}
+.pcm-neural-answer-author{display:flex;align-items:center;gap:8px;margin-bottom:-2px}
+.queen-answer-bot{display:grid;place-items:center;width:28px;height:28px;border-radius:9px;background:linear-gradient(145deg,#e9f8ff,#e8f8f1);border:1px solid #cfe9ef;font-size:16px}
+.queen-answer-name{font-size:11px;color:#0b4b83;letter-spacing:.01em}
+#pcm-neural-panel .pcm-neural-answer-text{font-size:13px;line-height:1.68;color:#2f4661}
+#pcm-neural-panel .pcm-neural-system-message{position:relative;padding-left:34px}
+#pcm-neural-panel .pcm-neural-system-message:before{content:'🤖';position:absolute;left:10px;top:8px;font-size:15px}
