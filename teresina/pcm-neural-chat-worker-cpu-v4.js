@@ -58,9 +58,9 @@ self.addEventListener('message',async event=>{
     ).map(m=>({role:m.role,content:m.content.slice(0,4500)}));
     if(!safe.length)throw Error('Pergunta vazia.');
     const result=await model(safe,{
-      max_new_tokens:160,
+      max_new_tokens:220,
       do_sample:false,
-      repetition_penalty:1.12,
+      repetition_penalty:1.03,
       streamer
     });
     const out=result?.[0]?.generated_text;
