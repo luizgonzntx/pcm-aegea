@@ -59,9 +59,16 @@ python -m pip install "torch>=2.5" "transformers==5.20.2" "accelerate==1.15.0" "
 copy /Y "%~dp0queen-local-server.py" "%ROOT%\queen-local-server.py" >nul
 
 echo.
+echo Iniciando Queen real...
+start "Queen Backend" "%ROOT%\.venv\Scripts\python.exe" "%ROOT%\queen-local-server.py" --model "%MODEL%" --port 8765
+
+echo Aguardando o servidor local...
+timeout /t 4 /nobreak >nul
+
 echo Abrindo Teresina com o Queen real...
 start "" "http://127.0.0.1:8765"
 
-python "%ROOT%\queen-local-server.py" --model "%MODEL%" --port 8765
-
+echo.
+echo Se a primeira pagina ainda estiver carregando, aguarde alguns segundos e atualize.
+echo O Queen carrega os pesos somente quando voce fizer a primeira pergunta.
 pause
