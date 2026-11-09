@@ -1,7 +1,7 @@
 (function(root){
 'use strict';
-const FALLBACK_MODEL='Qwen2.5-0.5B-Instruct (CPU/RAM local)';
-const REAL_MODEL='Queen 1.5B treinada · DAPT + SFT';
+const FALLBACK_MODEL='Manix Local · modelo leve';
+const REAL_MODEL='Manix IA · modelo treinado';
 const onLocalHost=()=>['127.0.0.1','localhost'].includes(location.hostname);
 const cleanBase=v=>String(v||'').trim().replace(/\/+$/,'');
 const queryBackend=()=>{
@@ -69,11 +69,11 @@ function createClient(workerFactory){
    if(!res.ok){
      let detail='';
      try{detail=(await res.json())?.detail||'';}catch(_){}
-     throw Error(detail||('Queen local respondeu HTTP '+res.status));
+     throw Error(detail||('Manix IA respondeu HTTP '+res.status));
    }
    const data=await res.json();
    const text=String(data?.text||'').trim();
-   if(!text)throw Error('Queen local retornou resposta vazia.');
+   if(!text)throw Error('Manix IA retornou resposta vazia.');
    return text;
  }
 
@@ -119,7 +119,7 @@ function createClient(workerFactory){
         .catch(err=>{realQueen=false;const current=active;active=null;current?.reject(err);});
      });
    }
-   if(!canRun())return Promise.reject(new Error('Este navegador não suporta o modelo local e o Queen real não foi detectado.'));
+   if(!canRun())return Promise.reject(new Error('Este navegador não suporta o modelo local e a Manix IA não foi detectada.'));
    if(unavailable)return Promise.reject(new Error(unavailable));
    return new Promise((resolve,reject)=>{
      active={id,resolve,reject,progress:callbacks.onProgress,token:callbacks.onToken};
