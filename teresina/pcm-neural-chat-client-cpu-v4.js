@@ -3,8 +3,23 @@
 const FALLBACK_MODEL='Qwen2.5-0.5B-Instruct (CPU/RAM local)';
 const REAL_MODEL='Queen 1.5B treinada · DAPT + SFT';
 const onLocalHost=()=>['127.0.0.1','localhost'].includes(location.hostname);
-const localBase=()=>onLocalHost()?'':'http://127.0.0.1:8765';
-const localRequest=(url,options={})=>new Request(url,{mode:'cors',targetAddressSpace:'loopback',...options});
+const cleanBase=v=>String(v||'').trim().replace(/\/+$/,'');
+const queryBackend=()=>{
+  try{return cleanBase(new URLSearchParams(location.search).get('queen_backend'));}catch(_){return '';}
+};
+const savedBackend=()=>{
+  try{return cleanBase(localStorage.getItem('queen_backend_url'));}catch(_){return '';}
+};
+let remoteBackend=queryBackend()||savedBackend();
+if(queryBackend()){try{localStorage.setItem('queen_backend_url',queryBackend());}catch(_){}}
+const backendBase=()=>remoteBackend||(onLocalHost()?'':'http://127.0.0.1:8765');
+const isLoopback=url=>/^http:\/\/(127\.0\.0\.1|localhost)(?::\d+)?/i.test(url);
+const backendRequest=(path,options={})=>{
+  const url=backendBase()+path;
+  return isLoopback(url)
+    ? new Request(url,{mode:'cors',targetAddressSpace:'loopback',...options})
+    : new Request(url,{mode:'cors',...options});
+};
 
 function createClient(workerFactory){
  const factory=workerFactory||(()=>new Worker('pcm-neural-chat-worker-cpu-v4.js?v=20261109-queen1',{type:'module'}));
@@ -31,9 +46,9 @@ function createClient(workerFactory){
    if(!force&&realQueen&&now-lastProbe<15000)return true;
    lastProbe=now;
    const controller=new AbortController();
-   const timer=setTimeout(()=>controller.abort(),onLocalHost()?2500:900);
+   const timer=setTimeout(()=>controller.abort(),remoteBackend?5000:(onLocalHost()?2500:900));
    try{
-     const res=await fetch(localRequest(localBase()+'/health',{cache:'no-store',signal:controller.signal}));
+     const res=await fetch(backendRequest('/health',{cache:'no-store',signal:controller.signal}));
      if(!res.ok)throw Error('health '+res.status);
      const data=await res.json();
      realQueen=!!data?.queen_real;
@@ -46,7 +61,7 @@ function createClient(workerFactory){
 
  async function askRealQueen(messages,callbacks={}){
    callbacks.onProgress?.({type:'status',status:'generating',backend:'queen-real'});
-   const res=await fetch(localRequest(localBase()+'/api/chat',{
+   const res=await fetch(backendRequest('/api/chat',{
      method:'POST',
      headers:{'Content-Type':'application/json'},
      body:JSON.stringify({messages,max_new_tokens:260})
@@ -113,8 +128,19 @@ function createClient(workerFactory){
    });
  }
 
+ function setBackend(url){
+   remoteBackend=cleanBase(url);
+   try{
+     if(remoteBackend)localStorage.setItem('queen_backend_url',remoteBackend);
+     else localStorage.removeItem('queen_backend_url');
+   }catch(_){}
+   realQueen=false;
+   lastProbe=0;
+   return probeRealQueen(true);
+ }
+ function getBackend(){return remoteBackend;}
  probeRealQueen(false);
- return {ask,status,stop,probeRealQueen};
+ return {ask,status,stop,probeRealQueen,setBackend,getBackend};
 }
 const api={createClient,MODEL:FALLBACK_MODEL,REAL_MODEL};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;
