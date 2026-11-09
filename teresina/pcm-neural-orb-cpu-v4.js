@@ -35,7 +35,10 @@
         <div id="pcm-neural-messages" class="pcm-neural-messages" role="log" aria-label="Histórico de perguntas e respostas" aria-live="polite"></div>
       </div>
       <div class="pcm-neural-bottom">
-        <div class="pcm-neural-tools"><button type="button" id="pcm-neural-pick" class="pcm-neural-pick"><span aria-hidden="true">⌖</span> Analisar um indicador da tela</button></div>
+        <div class="pcm-neural-tools">
+          <button type="button" id="pcm-neural-pick" class="pcm-neural-pick"><span aria-hidden="true">⌖</span> Analisar um indicador da tela</button>
+          <button type="button" id="pcm-neural-connect-v3" class="pcm-neural-connect">🤖 Conectar Queen v3</button>
+        </div>
         <form id="pcm-neural-form" autocomplete="off">
           <label class="pcm-neural-visually-hidden" for="pcm-neural-question">Escreva sua dúvida</label>
           <input id="pcm-neural-question" maxlength="500" placeholder="Ex.: Explique a OS 900123456" required>
@@ -59,6 +62,7 @@
   const messages=root.querySelector('#pcm-neural-messages');
   const prompts=root.querySelector('#pcm-neural-prompts');
   const pick=root.querySelector('#pcm-neural-pick');
+  const connectV3=root.querySelector('#pcm-neural-connect-v3');
   const state=root.querySelector('#pcm-neural-source-state');
   const TARGETS='#kpis .kpi,#icmSummary .kpi,#deadlineCards .kpi,#engKpis .kpi,#maintenanceOverview .maintenance-step,#icmCards .card,.table-wrap tbody tr,.plant-summary>div';
   let drag=null,selectMode=false,highlight=null;
@@ -279,6 +283,30 @@
     messages.lastElementChild.scrollIntoView({behavior:'smooth',block:'nearest'});
   }
   root.querySelectorAll('[data-pcm-question]').forEach(button=>button.addEventListener('click',()=>send(button.dataset.pcmQuestion)));
+  connectV3?.addEventListener('click',async()=>{
+    const current=llm?.getBackend?.()||'';
+    const url=window.prompt(
+      'Cole o endereço HTTPS mostrado pelo Colab (ex.: https://xxxx.trycloudflare.com).\n\nDeixe vazio para voltar ao Queen Preview.',
+      current
+    );
+    if(url===null)return;
+    connectV3.disabled=true;
+    state.textContent='Testando conexão com a Queen v3…';
+    try{
+      const ok=await llm?.setBackend?.(url);
+      if(ok){
+        state.textContent='Queen v3 treinada · conectada';
+        connectV3.textContent='✓ Queen v3 conectada';
+        connectV3.classList.add('pcm-neural-is-connected');
+      }else{
+        state.textContent=url?'Não consegui conectar à Queen v3':'Queen Preview disponível';
+        connectV3.textContent='🤖 Conectar Queen v3';
+        connectV3.classList.remove('pcm-neural-is-connected');
+      }
+    }catch(_){
+      state.textContent='Falha ao conectar à Queen v3';
+    }finally{connectV3.disabled=false;}
+  });
   form.addEventListener('submit',event=>{event.preventDefault();send(input.value);});
   clear.addEventListener('click',()=>{
     requestGeneration++;
