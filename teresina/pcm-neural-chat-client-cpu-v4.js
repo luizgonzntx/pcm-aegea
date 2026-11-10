@@ -52,7 +52,7 @@ function createClient(workerFactory){
      const res=await fetch(backendRequest('/health',{cache:'no-store',signal:controller.signal}));
      if(!res.ok)throw Error('health '+res.status);
      const data=await res.json();
-     realQueen=!!data?.queen_real;
+     realQueen=!!(data?.manix_real||data?.queen_real);
      return realQueen;
    }catch(_){
      realQueen=false;
