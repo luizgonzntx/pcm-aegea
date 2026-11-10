@@ -22,7 +22,7 @@ const backendRequest=(path,options={})=>{
 };
 
 function createClient(workerFactory){
- const factory=workerFactory||(()=>new Worker('pcm-neural-chat-worker-cpu-v4.js?v=20261109-queen1',{type:'module'}));
+ const factory=workerFactory||(()=>new Worker('pcm-neural-chat-worker-cpu-v4.js?v=20261109-manixai1',{type:'module'}));
  let worker=null,active=null,serial=0,ready=false,loading=false,unavailable='',realQueen=false,lastProbe=0;
  const canRun=()=>typeof root.Worker==='function';
  const status=()=>({
