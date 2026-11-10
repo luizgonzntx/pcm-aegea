@@ -110,6 +110,32 @@
     }));
   };
 
+  // Inferência central da MANIX. O navegador envia somente o prompt já preparado
+  // para uma Edge Function autenticada; os pesos do modelo ficam no servidor.
+  window.PCM_MANIX_REMOTE_CHAT = async (messages) => {
+    const functionName = window.PCM_CONFIG?.manixFunction;
+    if (!functionName || !db || !user || $('#shell')?.hidden) return null;
+    const auth = await db.auth.getSession();
+    if (!auth.data?.session) throw Error('Sessão expirada. Entre novamente.');
+    const safe = (Array.isArray(messages) ? messages : []).slice(-9).map(m => ({
+      role: String(m?.role || '').slice(0, 20),
+      content: String(m?.content || '').slice(0, 6000)
+    }));
+    const { data: response, error } = await db.functions.invoke(functionName, {
+      body: { messages: safe }
+    });
+    if (error) {
+      const e = new Error(error.message || 'Backend central indisponível.');
+      e.code = 'MANIX_REMOTE_UNAVAILABLE';
+      throw e;
+    }
+    if (!response || typeof response.text !== 'string' || !response.text.trim()) {
+      throw Error('Resposta inválida do backend central da Manix.');
+    }
+    return { text: response.text.trim(), model: String(response.model || 'Manix central') };
+  };
+
+
   const emptyHTML = '<div class="no-data">Sem registros para os filtros selecionados.</div>';
 
   const filterLabels = {
