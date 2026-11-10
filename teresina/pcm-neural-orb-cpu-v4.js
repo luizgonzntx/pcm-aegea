@@ -37,14 +37,14 @@
       <div class="pcm-neural-bottom">
         <div class="pcm-neural-tools">
           <button type="button" id="pcm-neural-pick" class="pcm-neural-pick"><span aria-hidden="true">⌖</span> Analisar indicador da tela</button>
-          <button type="button" id="pcm-neural-connect-v3" class="pcm-neural-connect"><span class="manix-connect-led"></span> Conectar Manix IA</button>
+          <button type="button" id="pcm-neural-connect-v3" class="pcm-neural-connect"><span class="manix-connect-led"></span> Usar modelo treinado</button>
         </div>
         <form id="pcm-neural-form" autocomplete="off">
           <label class="pcm-neural-visually-hidden" for="pcm-neural-question">Escreva sua dúvida</label>
           <input id="pcm-neural-question" maxlength="500" placeholder="Ex.: Analise a OS 900123456" required>
           <button type="submit" id="pcm-neural-send" aria-label="Enviar pergunta" title="Enviar pergunta">↑</button>
         </form>
-        <small>Modo local · a Manix usa o modelo leve do navegador e os dados já carregados no painel.</small>
+        <small>A Manix IA local carrega no navegador. O modelo treinado é opcional e exige o servidor local.</small>
       </div>
     </section>`;
   shell.appendChild(root);
@@ -98,9 +98,10 @@
       identityKey=current;
     }
     state.textContent=!ctx?'Aguardando seus dados':
-      local?.realQueen?'Manix IA · modelo avançado conectado':
-      local?.ready?'Manix · modelo local ativo':
-      local?.available?'Manix local disponível · primeiro carregamento pode levar alguns instantes':
+      local?.realQueen?'Manix IA · modelo treinado conectado':
+      local?.ready?'Manix IA · modelo local conectado':
+      local?.loading?'Manix IA · carregando modelo local…':
+      local?.available?'Manix IA local disponível · preparando ao abrir':
       'Manix local indisponível neste navegador';
   }
   function openPanel(focus=false){
@@ -109,6 +110,14 @@
     panel.hidden=false;
     orb.setAttribute('aria-expanded','true');
     updateState();
+    const local=llm?.status?.();
+    if(local?.available&&!local.ready&&!local.realQueen&&!local.loading){
+      llm.preload?.({onProgress:updateState}).then(updateState).catch(error=>{
+        console.warn('Pré-carregamento da Manix local falhou:',error?.message||error);
+        updateState();
+      });
+      updateState();
+    }
     if(focus)input.focus();
   }
   function closePanel(){
