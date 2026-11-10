@@ -81,6 +81,35 @@
     };
   };
 
+  // Busca autenticada na Biblioteca Técnica MANIX. Usa a mesma sessão/RLS do painel.
+  window.PCM_MANIX_RAG_SEARCH = async (question, options = {}) => {
+    if (!db || !user || !data || $('#shell')?.hidden) return [];
+    const query = String(question || '').trim().slice(0, 500);
+    if (!query) return [];
+    const count = Math.min(Math.max(Number(options.count) || 6, 1), 8);
+    const domain = options.domain ? String(options.domain).slice(0, 80) : null;
+    const { data: ragRows, error } = await db.rpc('manix_search_chunks', {
+      query_text: query,
+      match_count: count,
+      filter_domain: domain
+    });
+    if (error) {
+      console.warn('Biblioteca MANIX indisponível:', error.message);
+      return [];
+    }
+    return (ragRows || []).slice(0, count).map(row => ({
+      sourceKey: String(row.source_key || ''),
+      title: String(row.title || '').slice(0, 220),
+      publisher: String(row.publisher || '').slice(0, 100),
+      sourceUrl: String(row.source_url || '').slice(0, 600),
+      heading: String(row.heading || '').slice(0, 180),
+      content: String(row.content || '').slice(0, 900),
+      pageStart: row.page_start == null ? null : Number(row.page_start),
+      pageEnd: row.page_end == null ? null : Number(row.page_end),
+      relevance: Number(row.relevance || 0)
+    }));
+  };
+
   const emptyHTML = '<div class="no-data">Sem registros para os filtros selecionados.</div>';
 
   const filterLabels = {
