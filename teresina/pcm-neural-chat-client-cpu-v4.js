@@ -23,11 +23,12 @@ const backendRequest=(path,options={})=>{
 
 function createClient(workerFactory){
  const factory=workerFactory||(()=>new Worker('pcm-neural-chat-worker-cpu-v4.js?v=20261109-queen1',{type:'module'}));
- let worker=null,active=null,serial=0,ready=false,unavailable='',realQueen=false,lastProbe=0;
+ let worker=null,active=null,serial=0,ready=false,loading=false,unavailable='',realQueen=false,lastProbe=0;
  const canRun=()=>typeof root.Worker==='function';
  const status=()=>({
    ready:realQueen||ready,
    busy:!!active,
+   loading,
    available:realQueen||canRun()&&!unavailable,
    unavailable,
    model:realQueen?REAL_MODEL:FALLBACK_MODEL,
@@ -84,16 +85,23 @@ function createClient(workerFactory){
      const msg=event.data||{};
      if(!active||msg.id!==active.id)return;
      if(msg.type==='progress'){
+       loading=true;
        active.progress?.(msg);
      }else if(msg.type==='token'){
        active.token?.(String(msg.text||''));
      }else if(msg.type==='status'){
        if(msg.status==='generating')ready=true;
        active.progress?.(msg);
+     }else if(msg.type==='ready'){
+       ready=true;loading=false;
+       const current=active;active=null;
+       current.resolve(true);
      }else if(msg.type==='done'){
+       ready=true;loading=false;
        const current=active;active=null;
        current.resolve(String(msg.text||''));
      }else if(msg.type==='error'){
+       loading=false;
        const current=active;active=null;
        current.reject(new Error(String(msg.error||'Falha na geração')));
      }
@@ -101,9 +109,24 @@ function createClient(workerFactory){
    worker.addEventListener('error',()=>{
      unavailable='O código do modelo leve não pôde ser carregado. Verifique a conexão e recarregue a página.';
      if(worker){worker.terminate();worker=null;}
-     ready=false;
+     ready=false;loading=false;
    });
    worker.addEventListener('messageerror',()=>stop('Erro de comunicação com o modelo local.'));
+ }
+
+ async function preload(callbacks={}){
+   if(realQueen||ready)return true;
+   const useReal=await probeRealQueen(false);
+   if(useReal)return true;
+   if(!canRun()||unavailable)return false;
+   if(active)return false;
+   const id=++serial;
+   loading=true;
+   return new Promise((resolve,reject)=>{
+     active={id,resolve,reject,progress:callbacks.onProgress,token:null};
+     try{init();worker.postMessage({id,type:'preload'});}
+     catch(err){loading=false;active=null;reject(err);}
+   });
  }
 
  async function ask(messages,callbacks={}){
@@ -140,7 +163,7 @@ function createClient(workerFactory){
  }
  function getBackend(){return remoteBackend;}
  probeRealQueen(false);
- return {ask,status,stop,probeRealQueen,setBackend,getBackend};
+ return {ask,preload,status,stop,probeRealQueen,setBackend,getBackend};
 }
 const api={createClient,MODEL:FALLBACK_MODEL,REAL_MODEL};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;
