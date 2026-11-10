@@ -37,14 +37,13 @@
       <div class="pcm-neural-bottom">
         <div class="pcm-neural-tools">
           <button type="button" id="pcm-neural-pick" class="pcm-neural-pick"><span aria-hidden="true">⌖</span> Analisar indicador da tela</button>
-          <button type="button" id="pcm-neural-connect-v3" class="pcm-neural-connect"><span class="manix-connect-led"></span> Usar modelo treinado</button>
         </div>
         <form id="pcm-neural-form" autocomplete="off">
           <label class="pcm-neural-visually-hidden" for="pcm-neural-question">Escreva sua dúvida</label>
           <input id="pcm-neural-question" maxlength="500" placeholder="Ex.: Analise a OS 900123456" required>
           <button type="submit" id="pcm-neural-send" aria-label="Enviar pergunta" title="Enviar pergunta">↑</button>
         </form>
-        <small>A Manix IA local carrega no navegador. O modelo treinado é opcional e exige o servidor local.</small>
+        <small>A Manix usa o servidor central quando disponível e mantém um modelo leve no navegador como contingência.</small>
       </div>
     </section>`;
   shell.appendChild(root);
@@ -62,7 +61,7 @@
   const messages=root.querySelector('#pcm-neural-messages');
   const prompts=root.querySelector('#pcm-neural-prompts');
   const pick=root.querySelector('#pcm-neural-pick');
-  const connectV3=root.querySelector('#pcm-neural-connect-v3');
+  const connectV3=null;
   const state=root.querySelector('#pcm-neural-source-state');
   const TARGETS='#kpis .kpi,#icmSummary .kpi,#deadlineCards .kpi,#engKpis .kpi,#maintenanceOverview .maintenance-step,#icmCards .card,.table-wrap tbody tr,.plant-summary>div';
   let drag=null,selectMode=false,highlight=null;
@@ -98,11 +97,8 @@
       identityKey=current;
     }
     state.textContent=!ctx?'Aguardando seus dados':
-      local?.realQueen?'Manix IA · modelo treinado conectado':
-      local?.ready?'Manix IA · modelo local conectado':
-      local?.loading?'Manix IA · carregando modelo local…':
-      local?.available?'Manix IA local disponível · preparando ao abrir':
-      'Manix local indisponível neste navegador';
+      local?.loading?'Manix IA · preparando contingência local…':
+      'Manix IA · pronta para consultar';
   }
   function openPanel(focus=false){
     selectMode=false;
@@ -110,14 +106,6 @@
     panel.hidden=false;
     orb.setAttribute('aria-expanded','true');
     updateState();
-    const local=llm?.status?.();
-    if(local?.available&&!local.ready&&!local.realQueen&&!local.loading){
-      llm.preload?.({onProgress:updateState}).then(updateState).catch(error=>{
-        console.warn('Pré-carregamento da Manix local falhou:',error?.message||error);
-        updateState();
-      });
-      updateState();
-    }
     if(focus)input.focus();
   }
   function closePanel(){
@@ -210,7 +198,21 @@
             ctx,q,target||null,trusted,conversation?.contextStatus?.(),history,knowledge
           );
       let streamed='',lastPaint=0,lastDownloadPaint=0;
-      answer=await llm.ask(prepared.messages,{
+      let central=null;
+      if(window.PCM_MANIX_REMOTE_CHAT){
+        try{
+          progress.textContent='Manix está consultando o modelo central…';
+          central=await window.PCM_MANIX_REMOTE_CHAT(prepared.messages);
+        }catch(error){
+          console.warn('Modelo central indisponível; usando contingência local:',error?.message||error);
+        }
+      }
+      if(central?.text){
+        answer=central.text;
+        state.textContent='Manix IA · modelo central conectado';
+      }else{
+        progress.textContent='Manix está carregando a contingência local…';
+        answer=await llm.ask(prepared.messages,{
         onProgress:p=>{
           if(run!==requestGeneration)return;
           const now=performance.now();
@@ -233,6 +235,8 @@
           }
         }
       });
+        state.textContent='Manix IA · modo navegador';
+      }
       if(!answer.trim())throw Error('Não recebi uma resposta do modelo.');
       if(editRequest){
         editProposal=editor.parse(answer);
@@ -301,25 +305,7 @@
     messages.lastElementChild.scrollIntoView({behavior:'smooth',block:'nearest'});
   }
   root.querySelectorAll('[data-pcm-question]').forEach(button=>button.addEventListener('click',()=>send(button.dataset.pcmQuestion)));
-  connectV3?.addEventListener('click',async()=>{
-    connectV3.disabled=true;
-    state.textContent='Procurando a Manix treinada neste PC…';
-    try{
-      const ok=await llm?.setBackend?.('http://127.0.0.1:8765');
-      if(ok){
-        state.textContent='Manix IA · modelo treinado conectado';
-        connectV3.textContent='✓ Modelo treinado conectado';
-        connectV3.classList.add('pcm-neural-is-connected');
-      }else{
-        state.textContent='Modelo treinado não está aberto neste PC · Manix local continua disponível';
-        connectV3.innerHTML='<span class="manix-connect-led"></span> Usar modelo treinado';
-        connectV3.classList.remove('pcm-neural-is-connected');
-      }
-    }catch(_){
-      state.textContent='Modelo treinado não está aberto neste PC · Manix local continua disponível';
-    }finally{connectV3.disabled=false;}
-  });
-  form.addEventListener('submit',event=>{event.preventDefault();send(input.value);});
+    form.addEventListener('submit',event=>{event.preventDefault();send(input.value);});
   clear.addEventListener('click',()=>{
     requestGeneration++;
     llm?.stop('Nova investigação iniciada');
