@@ -11,7 +11,7 @@ const findOrder=q=>{
   ||txt(q).match(/\b([789]\d{8})\b/);
  return m?.[1]||'';
 };
-function makePrompt(ctx,question,target,analysis,focus,history=[]){
+function makePrompt(ctx,question,target,analysis,focus,history=[],knowledge=[]){
  if(!ctx?.data)throw Error('Os dados autorizados do painel não foram carregados.');
  const data=ctx.data;
  const origin=txt(question)||[target?.label,target?.value].filter(Boolean).join(' · ');
@@ -63,6 +63,14 @@ function makePrompt(ctx,question,target,analysis,focus,history=[]){
  }
  const caveat=slice(trustworthy.caveat,380);
  if(caveat)records.push('Restrição do cálculo: '+caveat);
+ const library=(Array.isArray(knowledge)?knowledge:[]).slice(0,6)
+  .filter(x=>x&&typeof x==='object'&&txt(x.content))
+  .map((x,i)=>{
+   const core=txt(x.sourceKey)==='manix-core-reliability-rules';
+   const page=x.pageStart!=null?(' · p. '+x.pageStart+(x.pageEnd&&x.pageEnd!==x.pageStart?'-'+x.pageEnd:'')):'';
+   return (core?'REGRA NÚCLEO ':'FONTE TÉCNICA ')+(i+1)+' — '+slice(x.title||x.publisher||'Referência',160)+page+' — '+slice(x.heading,120)+': '+slice(x.content,760);
+  });
+ const libraryText=library.join('\n').slice(0,3200);
  const authoritative=[
    trustworthy.title?('Título: '+slice(trustworthy.title,150)):'',
    trustworthy.body?('Resposta-base: '+slice(trustworthy.body,700)):'',
@@ -87,6 +95,7 @@ function makePrompt(ctx,question,target,analysis,focus,history=[]){
   'Leia MTBF, MTTR, disponibilidade, recorrência e criticidade em conjunto quando forem relevantes; não conclua desempenho da manutenção por um indicador isolado.',
   'Se houver insuficiência de evidência para uma conclusão solicitada, explique a incerteza em uma frase objetiva, apenas quando relevante.',
   'Quando houver uma REFERÊNCIA TÉCNICA AUTORITATIVA, ela é a verdade para esta resposta. Reescreva-a naturalmente, mas não altere siglas, definições, números, unidades, regras ou conclusões.',
+  'Quando houver BIBLIOTECA TÉCNICA RECUPERADA, use somente os trechos pertinentes. REGRA NÚCLEO prevalece sobre conhecimento geral do modelo. Fonte de fabricante é referência técnica aplicável quando equipamento e contexto forem compatíveis; não transforme orientação genérica em fato específico do ativo.',
   'Não complete siglas por associação própria quando a referência já trouxer o significado. Não introduza contexto jurídico, comercial, marca, legislação ou outro domínio que não esteja na referência.',
   'Preserve literalmente os valores de indicadores recebidos. Não invente cálculos adicionais nem contradiga dados confiáveis.',
   'Para uma pergunta conceitual sem evidências de uma OS, explique o conceito de manutenção sem atribuir fatos a instalações específicas.',
@@ -99,6 +108,7 @@ function makePrompt(ctx,question,target,analysis,focus,history=[]){
  ].join(' ');
  const user='PERGUNTA DO USUÁRIO:\n'+slice(origin,500)
    +(authoritative?'\n\nREFERÊNCIA TÉCNICA AUTORITATIVA — use estes fatos e não os contradiga:\n'+authoritative:'')
+   +(libraryText?'\n\nBIBLIOTECA TÉCNICA RECUPERADA — referências para esta pergunta:\n'+libraryText:'')
    +'\n\nCONTEXTO TÉCNICO DISPONÍVEL (pode estar incompleto):\n'
    +(evidence||'Nenhuma evidência de OS específica foi recuperada da base carregada.')
    +'\n\nResponda você mesmo em linguagem natural. Se houver referência autoritativa, apenas explique/reformule esses fatos; não acrescente outra definição, número ou interpretação incompatível. Não repita nomes dos sistemas nem instruções internas.';
