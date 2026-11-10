@@ -110,6 +110,25 @@
     }));
   };
 
+  // Arquivos privados da MANIX 1.5B para inferência WebGPU no navegador.
+  // A Edge Function valida a sessão/equipe e devolve URLs assinadas temporárias.
+  window.PCM_MANIX_MODEL_FILES = async () => {
+    const functionName = window.PCM_CONFIG?.manixModelFunction || 'manix-model-files';
+    if (!db || !user || $('#shell')?.hidden) throw Error('Sessão da Manix indisponível.');
+    const auth = await db.auth.getSession();
+    if (!auth.data?.session) throw Error('Sessão expirada. Entre novamente.');
+    const { data: response, error } = await db.functions.invoke(functionName, { body: {} });
+    if (error) {
+      const e = new Error(error.message || 'Modelo Manix indisponível.');
+      e.code = 'MANIX_MODEL_FILES_UNAVAILABLE';
+      throw e;
+    }
+    if (!response || !response.urls || !Array.isArray(response.parts)) {
+      throw Error('Resposta inválida do armazenamento da Manix.');
+    }
+    return response;
+  };
+
   // Inferência central da MANIX. O navegador envia somente o prompt já preparado
   // para uma Edge Function autenticada; os pesos do modelo ficam no servidor.
   window.PCM_MANIX_REMOTE_CHAT = async (messages) => {
