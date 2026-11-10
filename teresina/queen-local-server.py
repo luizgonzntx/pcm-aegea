@@ -29,7 +29,7 @@ if not os.path.isfile(os.path.join(MODEL_PATH, "config.json")):
 if not any(name.endswith(".safetensors") for name in os.listdir(MODEL_PATH)):
     raise SystemExit("Pesos .safetensors não encontrados na pasta do Queen.")
 
-app = FastAPI(title="Queen Local")
+app = FastAPI(title="Manix Local")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -82,8 +82,8 @@ def load_queen():
 def health():
     return {
         "ok": True,
-        "queen_real": True,
-        "model": "Queen 1.5B treinada · DAPT + SFT",
+        "queen_real": True,\n        "manix_real": True,
+        "model": "Manix 1.5B treinada · DAPT + SFT",
         "loaded": _model is not None,
         "device": _device or ("cuda" if torch.cuda.is_available() else "cpu"),
     }
@@ -132,7 +132,7 @@ async def chat(request: Request):
 
     new_tokens = out[0][inputs["input_ids"].shape[-1]:]
     text = _tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
-    return {"text": text, "model": "Queen 1.5B treinada · DAPT + SFT"}
+    return {"text": text, "model": "Manix 1.5B treinada · DAPT + SFT"}
 
 def proxy(path: str):
     target = urljoin(SITE_BASE, path or "")
