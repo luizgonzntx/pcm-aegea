@@ -43,7 +43,7 @@
           <input id="pcm-neural-question" maxlength="500" placeholder="Ex.: Analise a OS 900123456" required>
           <button type="submit" id="pcm-neural-send" aria-label="Enviar pergunta" title="Enviar pergunta">↑</button>
         </form>
-        <small>A Manix usa o servidor central quando disponível e mantém um modelo leve no navegador como contingência.</small>
+
       </div>
     </section>`;
   shell.appendChild(root);
@@ -96,9 +96,9 @@
       root.querySelector('.pcm-neural-welcome').hidden=false;
       identityKey=current;
     }
-    state.textContent=!ctx?'Aguardando seus dados':
-      local?.loading?'Manix IA · preparando contingência local…':
-      'Manix IA · pronta para consultar';
+    state.textContent=!ctx?'Aguardando dados':
+      local?.loading?'Preparando…':
+      'Pronta';
   }
   function openPanel(focus=false){
     selectMode=false;
@@ -201,7 +201,7 @@
       let central=null;
       if(window.PCM_MANIX_REMOTE_CHAT){
         try{
-          progress.textContent='Manix está consultando o modelo central…';
+          progress.textContent='Analisando…';
           central=await window.PCM_MANIX_REMOTE_CHAT(prepared.messages);
         }catch(error){
           console.warn('Modelo central indisponível; usando contingência local:',error?.message||error);
@@ -209,9 +209,9 @@
       }
       if(central?.text){
         answer=central.text;
-        state.textContent='Manix IA · modelo central conectado';
+        state.textContent='Pronta';
       }else{
-        progress.textContent='Manix está carregando a contingência local…';
+        progress.textContent='Preparando…';
         answer=await llm.ask(prepared.messages,{
         onProgress:p=>{
           if(run!==requestGeneration)return;
@@ -235,7 +235,7 @@
           }
         }
       });
-        state.textContent='Manix IA · modo navegador';
+        state.textContent='Pronta';
       }
       if(!answer.trim())throw Error('Não recebi uma resposta do modelo.');
       if(editRequest){
