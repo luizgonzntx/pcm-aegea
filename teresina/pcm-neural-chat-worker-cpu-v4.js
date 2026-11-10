@@ -42,12 +42,16 @@ async function load(id){
 }
 self.addEventListener('message',async event=>{
   const {id,type,messages}=event.data||{};
-  if(type!=='chat'||!Number.isInteger(id))return;
+  if(!['chat','preload'].includes(type)||!Number.isInteger(id))return;
   if(occupied){report('error',id,{error:'Existe outra consulta em processamento.'});return;}
   occupied=true;
   try{
     report('status',id,{status:'initializing'});
     const model=await load(id);
+    if(type==='preload'){
+      report('ready',id,{model:MODEL});
+      return;
+    }
     report('status',id,{status:'generating'});
     const streamer=new TextStreamer(model.tokenizer,{
       skip_prompt:true,skip_special_tokens:true,
