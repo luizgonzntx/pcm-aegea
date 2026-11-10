@@ -12,7 +12,8 @@ const savedBackend=()=>{
 };
 let remoteBackend=queryBackend()||savedBackend();
 if(queryBackend()){try{localStorage.setItem('queen_backend_url',queryBackend());}catch(_){}}
-const backendBase=()=>remoteBackend||(onLocalHost()?'':'http://127.0.0.1:8765');
+const shouldProbeTrained=()=>!!remoteBackend||onLocalHost();
+const backendBase=()=>remoteBackend||(onLocalHost()?'http://127.0.0.1:8765':'');
 const isLoopback=url=>/^http:\/\/(127\.0\.0\.1|localhost)(?::\d+)?/i.test(url);
 const backendRequest=(path,options={})=>{
   const url=backendBase()+path;
@@ -133,7 +134,7 @@ function createClient(workerFactory){
    if(active)return Promise.reject(new Error('Aguarde a consulta atual terminar.'));
    const id=++serial;
    const localCallbacks={onProgress:callbacks.onProgress,onToken:callbacks.onToken};
-   const useReal=await probeRealQueen(true);
+   const useReal=shouldProbeTrained()?await probeRealQueen(true):false;
    if(useReal){
      return new Promise((resolve,reject)=>{
        active={id,resolve,reject,progress:callbacks.onProgress,token:callbacks.onToken};
@@ -162,7 +163,7 @@ function createClient(workerFactory){
    return probeRealQueen(true);
  }
  function getBackend(){return remoteBackend;}
- probeRealQueen(false);
+ if(shouldProbeTrained())probeRealQueen(false);
  return {ask,preload,status,stop,probeRealQueen,setBackend,getBackend};
 }
 const api={createClient,MODEL:FALLBACK_MODEL,REAL_MODEL};
