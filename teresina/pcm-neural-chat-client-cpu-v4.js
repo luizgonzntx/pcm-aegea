@@ -1,172 +1,122 @@
 (function(root){
 'use strict';
-const FALLBACK_MODEL='Manix Local · modelo leve';
-const REAL_MODEL='Manix IA · modelo treinado';
-const onLocalHost=()=>['127.0.0.1','localhost'].includes(location.hostname);
-const cleanBase=v=>String(v||'').trim().replace(/\/+$/,'');
-const queryBackend=()=>{
-  try{return cleanBase(new URLSearchParams(location.search).get('queen_backend'));}catch(_){return '';}
-};
-const savedBackend=()=>{
-  try{return cleanBase(localStorage.getItem('queen_backend_url'));}catch(_){return '';}
-};
-let remoteBackend=queryBackend()||savedBackend();
-if(queryBackend()){try{localStorage.setItem('queen_backend_url',queryBackend());}catch(_){}}
-const shouldProbeTrained=()=>!!remoteBackend||onLocalHost();
-const backendBase=()=>remoteBackend||(onLocalHost()?'http://127.0.0.1:8765':'');
-const isLoopback=url=>/^http:\/\/(127\.0\.0\.1|localhost)(?::\d+)?/i.test(url);
-const backendRequest=(path,options={})=>{
-  const url=backendBase()+path;
-  return isLoopback(url)
-    ? new Request(url,{mode:'cors',targetAddressSpace:'loopback',...options})
-    : new Request(url,{mode:'cors',...options});
-};
+
+const MODEL='Manix 1.5B · INT4 WebGPU';
 
 function createClient(workerFactory){
- const factory=workerFactory||(()=>new Worker('pcm-neural-chat-worker-cpu-v4.js?v=20261109-manixai1',{type:'module'}));
- let worker=null,active=null,serial=0,ready=false,loading=false,unavailable='',realQueen=false,lastProbe=0;
- const canRun=()=>typeof root.Worker==='function';
- const status=()=>({
-   ready:realQueen||ready,
-   busy:!!active,
-   loading,
-   available:realQueen||canRun()&&!unavailable,
-   unavailable,
-   model:realQueen?REAL_MODEL:FALLBACK_MODEL,
-   realQueen
- });
+  const factory=workerFactory||(()=>new Worker('pcm-manix-webgpu-worker.js?v=20261110-webgpu1',{type:'module'}));
+  let worker=null,active=null,serial=0,ready=false,loading=false,unavailable='',modelFiles=null,lastMetrics=null;
 
- function stop(reason='Modelo interrompido'){
-   if(/página em segundo plano|pagina em segundo plano/i.test(String(reason||'')))return;
-   if(worker){worker.terminate();worker=null;}
-   if(active){active.reject(new Error(reason));active=null;}
-   ready=false;
- }
+  const capable=()=>typeof root.Worker==='function'&&!!root.navigator?.gpu&&typeof WebAssembly?.Suspending==='function';
+  const status=()=>({
+    ready,
+    busy:!!active,
+    loading,
+    available:capable()&&!unavailable,
+    unavailable,
+    model:MODEL,
+    realQueen:true,
+    webgpu:true,
+    metrics:lastMetrics
+  });
 
- async function probeRealQueen(force=false){
-   const now=Date.now();
-   if(!force&&realQueen&&now-lastProbe<15000)return true;
-   lastProbe=now;
-   const controller=new AbortController();
-   const timer=setTimeout(()=>controller.abort(),remoteBackend?5000:(onLocalHost()?2500:900));
-   try{
-     const res=await fetch(backendRequest('/health',{cache:'no-store',signal:controller.signal}));
-     if(!res.ok)throw Error('health '+res.status);
-     const data=await res.json();
-     realQueen=!!(data?.manix_real||data?.queen_real);
-     return realQueen;
-   }catch(_){
-     realQueen=false;
-     return false;
-   }finally{clearTimeout(timer);}
- }
+  function init(){
+    if(worker)return;
+    worker=factory();
+    worker.addEventListener('message',event=>{
+      const msg=event.data||{};
+      if(!active||msg.id!==active.id)return;
+      if(msg.type==='progress'){
+        loading=true;
+        active.progress?.({type:'progress',percent:Number(msg.percent)||0,message:String(msg.message||'')});
+      }else if(msg.type==='status'){
+        active.progress?.({type:'status',status:String(msg.status||'')});
+      }else if(msg.type==='token'){
+        active.token?.(String(msg.text||''));
+      }else if(msg.type==='ready'){
+        ready=true;loading=false;
+        const current=active;active=null;
+        current?.resolve(true);
+      }else if(msg.type==='done'){
+        ready=true;loading=false;lastMetrics=msg.metrics||null;
+        const current=active;active=null;
+        current?.resolve(String(msg.text||''));
+      }else if(msg.type==='error'){
+        loading=false;
+        const current=active;active=null;
+        current?.reject(new Error(String(msg.error||'Falha na Manix')));
+      }
+    });
+    worker.addEventListener('error',event=>{
+      unavailable=String(event?.message||'Falha ao carregar o mecanismo WebGPU.');
+      const current=active;active=null;
+      current?.reject(new Error(unavailable));
+      try{worker?.terminate();}catch(_){}
+      worker=null;ready=false;loading=false;
+    });
+    worker.addEventListener('messageerror',()=>{
+      const current=active;active=null;
+      current?.reject(new Error('Falha de comunicação com a Manix.'));
+    });
+  }
 
- async function askRealQueen(messages,callbacks={}){
-   callbacks.onProgress?.({type:'status',status:'generating',backend:'queen-real'});
-   const res=await fetch(backendRequest('/api/chat',{
-     method:'POST',
-     headers:{'Content-Type':'application/json'},
-     body:JSON.stringify({messages,max_new_tokens:260})
-   }));
-   if(!res.ok){
-     let detail='';
-     try{detail=(await res.json())?.detail||'';}catch(_){}
-     throw Error(detail||('Manix IA respondeu HTTP '+res.status));
-   }
-   const data=await res.json();
-   const text=String(data?.text||'').trim();
-   if(!text)throw Error('Manix IA retornou resposta vazia.');
-   return text;
- }
+  async function getFiles(force=false){
+    if(modelFiles&&!force)return modelFiles;
+    if(typeof root.PCM_MANIX_MODEL_FILES!=='function')throw new Error('Arquivos da Manix indisponíveis.');
+    modelFiles=await root.PCM_MANIX_MODEL_FILES();
+    if(!modelFiles?.urls?.['model.onnx']||!Array.isArray(modelFiles?.parts)||!modelFiles.parts.length){
+      throw new Error('Modelo Manix ainda não foi publicado.');
+    }
+    return modelFiles;
+  }
 
- function init(){
-   if(worker)return;
-   worker=factory();
-   worker.addEventListener('message',event=>{
-     const msg=event.data||{};
-     if(!active||msg.id!==active.id)return;
-     if(msg.type==='progress'){
-       loading=true;
-       active.progress?.(msg);
-     }else if(msg.type==='token'){
-       active.token?.(String(msg.text||''));
-     }else if(msg.type==='status'){
-       if(msg.status==='generating')ready=true;
-       active.progress?.(msg);
-     }else if(msg.type==='ready'){
-       ready=true;loading=false;
-       const current=active;active=null;
-       current.resolve(true);
-     }else if(msg.type==='done'){
-       ready=true;loading=false;
-       const current=active;active=null;
-       current.resolve(String(msg.text||''));
-     }else if(msg.type==='error'){
-       loading=false;
-       const current=active;active=null;
-       current.reject(new Error(String(msg.error||'Falha na geração')));
-     }
-   });
-   worker.addEventListener('error',()=>{
-     unavailable='O código do modelo leve não pôde ser carregado. Verifique a conexão e recarregue a página.';
-     if(worker){worker.terminate();worker=null;}
-     ready=false;loading=false;
-   });
-   worker.addEventListener('messageerror',()=>stop('Erro de comunicação com o modelo local.'));
- }
+  async function preload(callbacks={}){
+    if(ready)return true;
+    if(!capable())return false;
+    if(active)return false;
+    const id=++serial;
+    loading=true;
+    return new Promise(async(resolve,reject)=>{
+      active={id,resolve,reject,progress:callbacks.onProgress,token:null};
+      try{
+        const files=await getFiles();
+        init();
+        worker.postMessage({id,type:'load',files});
+      }catch(err){
+        loading=false;active=null;reject(err);
+      }
+    });
+  }
 
- async function preload(callbacks={}){
-   if(realQueen||ready)return true;
-   const useReal=await probeRealQueen(false);
-   if(useReal)return true;
-   if(!canRun()||unavailable)return false;
-   if(active)return false;
-   const id=++serial;
-   loading=true;
-   return new Promise((resolve,reject)=>{
-     active={id,resolve,reject,progress:callbacks.onProgress,token:null};
-     try{init();worker.postMessage({id,type:'preload'});}
-     catch(err){loading=false;active=null;reject(err);}
-   });
- }
+  async function ask(messages,callbacks={}){
+    if(active)return Promise.reject(new Error('Aguarde a consulta atual terminar.'));
+    if(!capable())return Promise.reject(new Error('Este navegador não oferece WebGPU compatível com a Manix.'));
+    if(unavailable)return Promise.reject(new Error(unavailable));
 
- async function ask(messages,callbacks={}){
-   if(active)return Promise.reject(new Error('Aguarde a consulta atual terminar.'));
-   const id=++serial;
-   const localCallbacks={onProgress:callbacks.onProgress,onToken:callbacks.onToken};
-   const useReal=shouldProbeTrained()?await probeRealQueen(true):false;
-   if(useReal){
-     return new Promise((resolve,reject)=>{
-       active={id,resolve,reject,progress:callbacks.onProgress,token:callbacks.onToken};
-       askRealQueen(messages,localCallbacks)
-        .then(text=>{const current=active;active=null;current?.resolve(text);})
-        .catch(err=>{realQueen=false;const current=active;active=null;current?.reject(err);});
-     });
-   }
-   if(!canRun())return Promise.reject(new Error('Este navegador não suporta o modelo local e a Manix IA não foi detectada.'));
-   if(unavailable)return Promise.reject(new Error(unavailable));
-   return new Promise((resolve,reject)=>{
-     active={id,resolve,reject,progress:callbacks.onProgress,token:callbacks.onToken};
-     try{init();worker.postMessage({id,type:'chat',messages});}
-     catch(err){active=null;reject(err);}
-   });
- }
+    const id=++serial;
+    loading=!ready;
+    return new Promise(async(resolve,reject)=>{
+      active={id,resolve,reject,progress:callbacks.onProgress,token:callbacks.onToken};
+      try{
+        const files=await getFiles(!ready);
+        init();
+        worker.postMessage({id,type:'chat',messages,files,maxTokens:240});
+      }catch(err){
+        loading=false;active=null;reject(err);
+      }
+    });
+  }
 
- function setBackend(url){
-   remoteBackend=cleanBase(url);
-   try{
-     if(remoteBackend)localStorage.setItem('queen_backend_url',remoteBackend);
-     else localStorage.removeItem('queen_backend_url');
-   }catch(_){}
-   realQueen=false;
-   lastProbe=0;
-   return probeRealQueen(true);
- }
- function getBackend(){return remoteBackend;}
- if(shouldProbeTrained())probeRealQueen(false);
- return {ask,preload,status,stop,probeRealQueen,setBackend,getBackend};
+  function stop(reason='Interrompido'){
+    if(worker){try{worker.terminate();}catch(_){} worker=null;}
+    if(active){active.reject(new Error(reason));active=null;}
+    ready=false;loading=false;modelFiles=null;
+  }
+
+  return {ask,preload,status,stop};
 }
-const api={createClient,MODEL:FALLBACK_MODEL,REAL_MODEL};
+
+const api={createClient,MODEL};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;
 root.PCM_NEURAL_CHAT=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
