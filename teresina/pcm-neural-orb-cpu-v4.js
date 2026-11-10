@@ -186,10 +186,19 @@
       }
       const editor=window.PCM_NEURAL_EDITS;
       const editRequest=!target && editor?.isEditRequest(q);
+      let knowledge=[];
+      if(!editRequest&&window.PCM_MANIX_RAG_SEARCH){
+        try{
+          progress.textContent='Manix está consultando a biblioteca técnica…';
+          knowledge=await window.PCM_MANIX_RAG_SEARCH(subject,{count:6})||[];
+        }catch(error){
+          console.warn('Consulta à Biblioteca MANIX falhou:',error?.message||error);
+        }
+      }
       const prepared=editRequest
         ? {messages:editor.prompt(q)}
         : window.PCM_NEURAL_EVIDENCE.makePrompt(
-            ctx,q,target||null,trusted,conversation?.contextStatus?.(),history
+            ctx,q,target||null,trusted,conversation?.contextStatus?.(),history,knowledge
           );
       let streamed='',lastPaint=0,lastDownloadPaint=0;
       answer=await llm.ask(prepared.messages,{
