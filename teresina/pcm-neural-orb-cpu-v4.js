@@ -302,27 +302,21 @@
   }
   root.querySelectorAll('[data-pcm-question]').forEach(button=>button.addEventListener('click',()=>send(button.dataset.pcmQuestion)));
   connectV3?.addEventListener('click',async()=>{
-    const current=llm?.getBackend?.()||'';
-    const url=window.prompt(
-      'Cole o endereço HTTPS do backend da Manix (ex.: https://xxxx.trycloudflare.com).\n\nDeixe vazio para voltar ao modo local.',
-      current
-    );
-    if(url===null)return;
     connectV3.disabled=true;
-    state.textContent='Testando conexão com a Manix IA…';
+    state.textContent='Procurando a Manix treinada neste PC…';
     try{
-      const ok=await llm?.setBackend?.(url);
+      const ok=await llm?.setBackend?.('http://127.0.0.1:8765');
       if(ok){
-        state.textContent='Manix IA · modelo avançado conectado';
-        connectV3.textContent='✓ Manix IA conectada';
+        state.textContent='Manix IA · modelo treinado conectado';
+        connectV3.textContent='✓ Modelo treinado conectado';
         connectV3.classList.add('pcm-neural-is-connected');
       }else{
-        state.textContent=url?'Não consegui conectar à Manix IA':'Manix local disponível';
-        connectV3.innerHTML='<span class="manix-connect-led"></span> Conectar Manix IA';
+        state.textContent='Modelo treinado não está aberto neste PC · Manix local continua disponível';
+        connectV3.innerHTML='<span class="manix-connect-led"></span> Usar modelo treinado';
         connectV3.classList.remove('pcm-neural-is-connected');
       }
     }catch(_){
-      state.textContent='Falha ao conectar à Manix IA';
+      state.textContent='Modelo treinado não está aberto neste PC · Manix local continua disponível';
     }finally{connectV3.disabled=false;}
   });
   form.addEventListener('submit',event=>{event.preventDefault();send(input.value);});
