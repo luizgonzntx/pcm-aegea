@@ -198,31 +198,17 @@
             ctx,q,target||null,trusted,conversation?.contextStatus?.(),history,knowledge
           );
       let streamed='',lastPaint=0,lastDownloadPaint=0;
-      let central=null;
-      if(window.PCM_MANIX_REMOTE_CHAT){
-        try{
-          progress.textContent='Analisando…';
-          central=await window.PCM_MANIX_REMOTE_CHAT(prepared.messages);
-        }catch(error){
-          console.warn('Modelo central indisponível; usando contingência local:',error?.message||error);
-        }
-      }
-      if(central?.text){
-        answer=central.text;
-        state.textContent='Pronta';
-      }else{
-        progress.textContent='Preparando…';
-        answer=await llm.ask(prepared.messages,{
+      progress.textContent='Preparando…';
+      answer=await llm.ask(prepared.messages,{
         onProgress:p=>{
           if(run!==requestGeneration)return;
           const now=performance.now();
           if(p.type==='progress'&&now-lastDownloadPaint<180)return;
           if(p.type==='progress')lastDownloadPaint=now;
-          if(p.type==='status'&&p.status==='generating')progress.textContent='Manix está organizando a resposta…';
-          else if(p.type==='status')progress.textContent='Manix está preparando a análise…';
+          if(p.type==='status'&&p.status==='generating')progress.textContent='Analisando…';
           else if(p.type==='progress'){
             const percent=Number.isFinite(p.percent)?' '+Math.round(p.percent)+'%':'';
-            progress.textContent='Carregando Manix'+percent+'…';
+            progress.textContent=(p.message||'Preparando')+percent+'…';
           }
         },
         onToken:token=>{
@@ -235,8 +221,7 @@
           }
         }
       });
-        state.textContent='Pronta';
-      }
+      state.textContent='Pronta';
       if(!answer.trim())throw Error('Não recebi uma resposta do modelo.');
       if(editRequest){
         editProposal=editor.parse(answer);
