@@ -239,7 +239,7 @@ class MainActivity : AppCompatActivity() {
         }
         prompt = EditText(this).apply {
             hint = "Pergunte sobre a ocorrência…"
-            setHintTextColor(hint)
+            setHintTextColor(hintColor)
             setTextColor(textMain)
             textSize = 15f
             minLines = 1
@@ -396,7 +396,7 @@ class MainActivity : AppCompatActivity() {
     private fun field(hintText: String, type: Int): EditText = EditText(this).apply {
         hint = hintText
         inputType = type
-        setHintTextColor(hint)
+        setHintTextColor(hintColor)
         setTextColor(textMain)
         textSize = 15f
         setPadding(dp(16), 0, dp(16), 0)
@@ -421,7 +421,7 @@ class MainActivity : AppCompatActivity() {
         private val emerald = Color.rgb(75, 224, 163)
         private val textMain = Color.rgb(238, 244, 241)
         private val textMuted = Color.rgb(139, 160, 152)
-        private val hint = Color.rgb(104, 126, 118)
+        private val hintColor = Color.rgb(104, 126, 118)
 
         private const val SYSTEM_PROMPT = """
 Você é MANIX, uma assistente especializada em manutenção industrial, PCM e confiabilidade.
