@@ -45,12 +45,12 @@ jobs:
           third_party/llama.cpp/examples/llama.android/gradlew --project-dir "$PWD" :app:assembleDebug --no-daemon --stacktrace
 
       - name: Rename APK
-        run: cp android/manix/app/build/outputs/apk/debug/app-debug.apk MANIX-PCM-v0.2-debug.apk
+        run: cp android/manix/app/build/outputs/apk/debug/app-debug.apk MANIX-PCM-v0.3-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v6
         with:
-          name: MANIX-PCM-v0.2-APK
-          path: MANIX-PCM-v0.2-debug.apk
+          name: MANIX-PCM-v0.3-APK
+          path: MANIX-PCM-v0.3-debug.apk
           if-no-files-found: error
           retention-days: 14
