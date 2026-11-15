@@ -3,21 +3,16 @@ package br.com.pcm.manix
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
-import android.net.Uri
 import android.os.Bundle
-import android.provider.OpenableColumns
 import android.text.InputType
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
-import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.arm.aichat.AiChat
 import com.arm.aichat.InferenceEngine
@@ -30,7 +25,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.io.FileOutputStream
 import kotlin.math.roundToInt
 
 class MainActivity : AppCompatActivity() {
@@ -38,39 +32,30 @@ class MainActivity : AppCompatActivity() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val engine by lazy { AiChat.getInferenceEngine(applicationContext) }
     private val knowledge by lazy { KnowledgeStore(applicationContext) }
-
-    private lateinit var status: TextView
-    private lateinit var chat: TextView
-    private lateinit var prompt: EditText
-    private lateinit var progress: ProgressBar
-    private lateinit var sendButton: Button
-    private lateinit var baseCount: TextView
-    private lateinit var chatScroll: ScrollView
+    private val cloud by lazy { ManixCloud(applicationContext) }
 
     private var generationJob: Job? = null
     private var modelReady = false
+
+    private lateinit var status: TextView
+    private lateinit var syncLabel: TextView
+    private lateinit var chat: TextView
+    private lateinit var chatScroll: ScrollView
+    private lateinit var prompt: EditText
+    private lateinit var sendButton: Button
+    private lateinit var progress: ProgressBar
+
     private val modelFile by lazy { File(filesDir, "models/manix-1.5b-q4_k_m.gguf") }
-
-    private val pickModel = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) importModel(uri)
-    }
-
-    private val pickKnowledge = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) importKnowledge(uri)
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        buildUi()
-        refreshBaseCount()
-        scope.launch {
-            try {
-                awaitEngineInitialized()
-                if (modelFile.exists()) loadModel(modelFile)
-                else setStatus("Selecione o arquivo MANIX .gguf para ativar a IA local.")
-            } catch (e: Exception) {
-                showError("Falha ao inicializar o motor local", e)
-            }
+        window.statusBarColor = bg
+        window.navigationBarColor = bg
+        if (cloud.hasSession()) {
+            showChatUi()
+            prepareManix()
+        } else {
+            showLoginUi()
         }
     }
 
@@ -80,84 +65,170 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
-    private fun buildUi() {
-        window.statusBarColor = bg
-        window.navigationBarColor = bg
-
+    private fun showLoginUi() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(16), dp(18), dp(14))
+            gravity = Gravity.CENTER
+            setPadding(dp(28), dp(28), dp(28), dp(28))
             setBackgroundColor(bg)
         }
 
-        val brand = TextView(this).apply {
-            text = "MANIX"
-            setTextColor(emerald)
-            textSize = 26f
+        val mark = TextView(this).apply {
+            text = "M"
+            gravity = Gravity.CENTER
+            textSize = 34f
             typeface = Typeface.DEFAULT_BOLD
-            letterSpacing = 0.12f
+            setTextColor(bg)
+            background = rounded(emerald, 28f)
         }
-        root.addView(brand)
+        root.addView(mark, LinearLayout.LayoutParams(dp(74), dp(74)).apply { bottomMargin = dp(24) })
 
-        val subtitle = TextView(this).apply {
-            text = "Inteligência local para manutenção"
+        root.addView(TextView(this).apply {
+            text = "MANIX"
+            textSize = 30f
+            letterSpacing = 0.12f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(textMain)
+            gravity = Gravity.CENTER
+        })
+
+        root.addView(TextView(this).apply {
+            text = "Inteligência de manutenção"
+            textSize = 14f
             setTextColor(textMuted)
-            textSize = 13f
-            setPadding(0, 0, 0, dp(14))
+            gravity = Gravity.CENTER
+            setPadding(0, dp(6), 0, dp(28))
+        })
+
+        val email = field("E-mail", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS)
+        val password = field("Senha", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
+        root.addView(email, LinearLayout.LayoutParams(-1, dp(56)).apply { bottomMargin = dp(10) })
+        root.addView(password, LinearLayout.LayoutParams(-1, dp(56)).apply { bottomMargin = dp(16) })
+
+        val feedback = TextView(this).apply {
+            setTextColor(textMuted)
+            textSize = 12f
+            gravity = Gravity.CENTER
+            visibility = View.GONE
         }
-        root.addView(subtitle)
+        val enter = Button(this).apply {
+            text = "Entrar"
+            isAllCaps = false
+            textSize = 15f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(bg)
+            background = rounded(emerald, 18f)
+            setOnClickListener {
+                val e = email.text.toString().trim()
+                val p = password.text.toString()
+                if (e.isBlank() || p.isBlank()) return@setOnClickListener
+                isEnabled = false
+                feedback.visibility = View.VISIBLE
+                feedback.text = "Validando acesso…"
+                scope.launch {
+                    try {
+                        cloud.signIn(e, p)
+                        showChatUi()
+                        prepareManix()
+                    } catch (ex: Exception) {
+                        feedback.text = ex.message ?: "Não foi possível entrar."
+                        isEnabled = true
+                    }
+                }
+            }
+        }
+        root.addView(enter, LinearLayout.LayoutParams(-1, dp(56)).apply { bottomMargin = dp(12) })
+        root.addView(feedback)
+
+        setContentView(root)
+    }
+
+    private fun showChatUi() {
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(14), dp(18), dp(14))
+            setBackgroundColor(bg)
+        }
+
+        val top = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val titleBox = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        titleBox.addView(TextView(this).apply {
+            text = "MANIX"
+            setTextColor(textMain)
+            textSize = 24f
+            typeface = Typeface.DEFAULT_BOLD
+            letterSpacing = 0.10f
+        })
+        titleBox.addView(TextView(this).apply {
+            text = "Diagnóstico • PCM • confiabilidade"
+            setTextColor(textMuted)
+            textSize = 12f
+        })
+        top.addView(titleBox, LinearLayout.LayoutParams(0, -2, 1f))
+
+        val logout = TextView(this).apply {
+            text = "Sair"
+            textSize = 12f
+            setTextColor(textMuted)
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+            background = rounded(card2, 14f, border)
+            setOnClickListener {
+                cloud.signOut()
+                modelReady = false
+                showLoginUi()
+            }
+        }
+        top.addView(logout)
+        root.addView(top, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) })
 
         val statusCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(14), dp(12), dp(14), dp(12))
-            background = rounded(card, 16f)
+            setPadding(dp(15), dp(13), dp(15), dp(13))
+            background = rounded(card, 18f, border)
+        }
+        val statusRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
         }
         status = TextView(this).apply {
-            text = "Inicializando motor local…"
+            text = "Preparando MANIX…"
             setTextColor(textMain)
             textSize = 14f
+            typeface = Typeface.DEFAULT_BOLD
         }
-        baseCount = TextView(this).apply {
-            setTextColor(textMuted)
-            textSize = 12f
-            setPadding(0, dp(4), 0, 0)
+        syncLabel = TextView(this).apply {
+            text = "ONLINE"
+            setTextColor(emerald)
+            textSize = 10f
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.END
         }
+        statusRow.addView(status, LinearLayout.LayoutParams(0, -2, 1f))
+        statusRow.addView(syncLabel)
+        statusCard.addView(statusRow)
+
         progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
             isIndeterminate = true
             max = 100
-            setPadding(0, dp(8), 0, 0)
         }
-        statusCard.addView(status)
-        statusCard.addView(baseCount)
-        statusCard.addView(progress, LinearLayout.LayoutParams(-1, dp(14)))
-        root.addView(statusCard, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
-
-        val actionsScroll = HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false }
-        val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-
-        val modelButton = actionButton("Carregar MANIX") {
-            pickModel.launch(arrayOf("application/octet-stream", "*/*"))
-        }
-        val baseButton = actionButton("Importar base PCM") {
-            pickKnowledge.launch(arrayOf("text/plain", "text/csv", "application/csv", "*/*"))
-        }
-        val clearButton = actionButton("Limpar base") { confirmClearBase() }
-        actions.addView(modelButton)
-        actions.addView(baseButton)
-        actions.addView(clearButton)
-        actionsScroll.addView(actions)
-        root.addView(actionsScroll, LinearLayout.LayoutParams(-1, dp(48)).apply { bottomMargin = dp(8) })
+        statusCard.addView(progress, LinearLayout.LayoutParams(-1, dp(12)).apply { topMargin = dp(10) })
+        root.addView(statusCard, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
 
         chatScroll = ScrollView(this).apply {
             isFillViewport = true
-            background = rounded(card, 18f)
+            background = rounded(card, 20f, border)
         }
         chat = TextView(this).apply {
-            text = "A MANIX roda no aparelho. Carregue o modelo uma vez e, depois, a conversa funciona offline.\n"
+            text = "MANIX\nDescreva o equipamento, o sintoma e o que já foi verificado. Vou cruzar a base disponível e separar evidências de hipóteses.\n"
             setTextColor(textMain)
             textSize = 15f
-            setLineSpacing(0f, 1.12f)
-            setPadding(dp(16), dp(16), dp(16), dp(16))
+            setLineSpacing(0f, 1.16f)
+            setPadding(dp(18), dp(18), dp(18), dp(18))
         }
         chatScroll.addView(chat)
         root.addView(chatScroll, LinearLayout.LayoutParams(-1, 0, 1f).apply { bottomMargin = dp(10) })
@@ -167,15 +238,15 @@ class MainActivity : AppCompatActivity() {
             gravity = Gravity.BOTTOM
         }
         prompt = EditText(this).apply {
-            hint = "Descreva a falha, sintoma ou dúvida…"
-            setHintTextColor(Color.rgb(113, 130, 124))
+            hint = "Pergunte sobre a ocorrência…"
+            setHintTextColor(hint)
             setTextColor(textMain)
             textSize = 15f
-            minLines = 2
+            minLines = 1
             maxLines = 5
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
-            setPadding(dp(14), dp(10), dp(14), dp(10))
-            background = rounded(card2, 16f, strokeColor = Color.rgb(42, 75, 64))
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+            background = rounded(card2, 17f, border)
         }
         composer.addView(prompt, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(8) })
 
@@ -183,26 +254,68 @@ class MainActivity : AppCompatActivity() {
             text = "Enviar"
             isAllCaps = false
             textSize = 14f
-            setTextColor(Color.rgb(5, 30, 23))
-            background = rounded(emerald, 16f)
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(bg)
+            background = rounded(emerald, 17f)
+            isEnabled = false
             setOnClickListener { sendPrompt() }
         }
-        composer.addView(sendButton, LinearLayout.LayoutParams(dp(86), dp(54)))
+        composer.addView(sendButton, LinearLayout.LayoutParams(dp(88), dp(54)))
         root.addView(composer)
 
         setContentView(root)
     }
 
-    private fun actionButton(label: String, onClick: () -> Unit): Button = Button(this).apply {
-        text = label
-        isAllCaps = false
-        textSize = 13f
-        setTextColor(textMain)
-        background = rounded(card2, 14f, strokeColor = Color.rgb(43, 68, 60))
-        setPadding(dp(14), 0, dp(14), 0)
-        setOnClickListener { onClick() }
-    }.also { button ->
-        button.layoutParams = LinearLayout.LayoutParams(-2, dp(42)).apply { marginEnd = dp(8) }
+    private fun prepareManix() {
+        scope.launch {
+            modelReady = false
+            sendButton.isEnabled = false
+            progress.isIndeterminate = true
+            setStatus("Sincronizando conhecimento…")
+            try {
+                awaitEngineInitialized()
+
+                val syncResult = runCatching { cloud.syncKnowledge(knowledge) }
+                val count = withContext(Dispatchers.IO) { knowledge.count() }
+                syncLabel.text = if (syncResult.isSuccess) "SINCRONIZADO · " + count else "OFFLINE · " + count
+
+                val info = runCatching { cloud.fetchModelInfo() }.getOrNull()
+                if (info == null) {
+                    if (modelFile.exists()) {
+                        loadModel(modelFile)
+                    } else {
+                        setUnavailable("Sem conexão para preparar a MANIX.")
+                    }
+                    return@launch
+                }
+
+                val cached = cloud.cachedModelVersion()
+                val needsDownload = !modelFile.exists() || (info.version != "pending" && cached != info.version)
+
+                if (needsDownload) {
+                    if (info.url == null) {
+                        setUnavailable("MANIX aguardando publicação do modelo.")
+                        return@launch
+                    }
+                    progress.isIndeterminate = false
+                    setStatus("Preparando MANIX no aparelho…")
+                    cloud.downloadModel(info, modelFile) { pct ->
+                        runOnUiThread {
+                            progress.progress = pct
+                            status.text = "Preparando MANIX… " + pct + "%"
+                        }
+                    }
+                }
+                loadModel(modelFile)
+            } catch (ex: Exception) {
+                if (modelFile.exists()) {
+                    runCatching { loadModel(modelFile) }
+                        .onFailure { setUnavailable(it.message ?: "MANIX indisponível.") }
+                } else {
+                    setUnavailable(ex.message ?: "MANIX indisponível.")
+                }
+            }
+        }
     }
 
     private suspend fun awaitEngineInitialized() {
@@ -212,180 +325,63 @@ class MainActivity : AppCompatActivity() {
         if (state is InferenceEngine.State.Error) throw state.exception
     }
 
-    private suspend fun awaitEngineInitializedIfNeeded() {
-        when (engine.state.value) {
-            is InferenceEngine.State.Uninitialized,
-            is InferenceEngine.State.Initializing -> awaitEngineInitialized()
-            else -> Unit
-        }
-    }
-
-    private fun importModel(uri: Uri) {
-        generationJob?.cancel()
-        scope.launch {
-            modelReady = false
-            sendButton.isEnabled = false
-            progress.isIndeterminate = false
-            progress.progress = 0
-            setStatus("Copiando o modelo para o armazenamento privado…")
-            try {
-                awaitEngineInitializedIfNeeded()
-                if (engine.state.value !is InferenceEngine.State.Initialized) {
-                    engine.cleanUp()
-                    engine.state.first { it is InferenceEngine.State.Initialized || it is InferenceEngine.State.Error }
-                }
-
-                val total = querySize(uri)
-                modelFile.parentFile?.mkdirs()
-                withContext(Dispatchers.IO) {
-                    contentResolver.openInputStream(uri).use { input ->
-                        requireNotNull(input) { "Não foi possível abrir o arquivo." }
-                        FileOutputStream(modelFile).use { output ->
-                            val buffer = ByteArray(1024 * 1024)
-                            var copied = 0L
-                            var read: Int
-                            var lastPct = -1
-                            while (input.read(buffer).also { read = it } >= 0) {
-                                if (read == 0) continue
-                                output.write(buffer, 0, read)
-                                copied += read
-                                if (total > 0L) {
-                                    val pct = ((copied * 100.0) / total).roundToInt().coerceIn(0, 100)
-                                    if (pct >= lastPct + 2) {
-                                        lastPct = pct
-                                        withContext(Dispatchers.Main) {
-                                            progress.progress = pct
-                                            status.text = "Copiando MANIX… $pct%"
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                loadModel(modelFile)
-            } catch (e: Exception) {
-                modelFile.delete()
-                showError("Falha ao importar o modelo", e)
-            } finally {
-                progress.isIndeterminate = false
-                sendButton.isEnabled = true
-            }
-        }
-    }
-
     private suspend fun loadModel(file: File) {
-        setStatus("Carregando MANIX na memória…")
+        setStatus("Carregando inteligência local…")
         progress.isIndeterminate = true
-        sendButton.isEnabled = false
-        try {
-            awaitEngineInitializedIfNeeded()
-            if (engine.state.value !is InferenceEngine.State.Initialized) {
-                try { engine.cleanUp() } catch (_: Exception) {}
-                engine.state.first { it is InferenceEngine.State.Initialized || it is InferenceEngine.State.Error }
-            }
-            engine.loadModel(file.absolutePath)
-            engine.setSystemPrompt(SYSTEM_PROMPT)
-            modelReady = true
-            setStatus("MANIX pronta · inferência local")
-        } catch (e: Exception) {
-            modelReady = false
-            showError("Não foi possível carregar a MANIX", e)
-        } finally {
-            progress.isIndeterminate = false
-            progress.progress = if (modelReady) 100 else 0
-            sendButton.isEnabled = true
+        if (engine.state.value !is InferenceEngine.State.Initialized) {
+            runCatching { engine.cleanUp() }
+            engine.state.first { it is InferenceEngine.State.Initialized || it is InferenceEngine.State.Error }
         }
-    }
-
-    private fun importKnowledge(uri: Uri) {
-        scope.launch {
-            progress.isIndeterminate = true
-            setStatus("Indexando a base PCM no aparelho…")
-            try {
-                val name = queryName(uri) ?: "base_pcm"
-                val inserted = withContext(Dispatchers.IO) {
-                    contentResolver.openInputStream(uri).use { input ->
-                        requireNotNull(input) { "Não foi possível abrir a base." }
-                        knowledge.importText(name, input)
-                    }
-                }
-                refreshBaseCount()
-                setStatus("Base PCM atualizada · $inserted novos blocos")
-            } catch (e: Exception) {
-                showError("Falha ao importar a base PCM", e)
-            } finally {
-                progress.isIndeterminate = false
-            }
-        }
+        engine.loadModel(file.absolutePath)
+        engine.setSystemPrompt(SYSTEM_PROMPT)
+        modelReady = true
+        progress.isIndeterminate = false
+        progress.progress = 100
+        setStatus("MANIX pronta")
+        syncLabel.text = "LOCAL + SYNC"
+        sendButton.isEnabled = true
     }
 
     private fun sendPrompt() {
         val question = prompt.text.toString().trim()
-        if (question.isBlank()) return
-        if (!modelReady) {
-            setStatus("Carregue a MANIX antes de enviar a pergunta.")
-            return
-        }
-        if (generationJob?.isActive == true) return
-
+        if (question.isBlank() || !modelReady || generationJob?.isActive == true) return
         prompt.setText("")
-        appendChat("\nVOCÊ\n$question\n\nMANIX\n")
+        appendChat("\n\nVOCÊ\n" + question + "\n\nMANIX\n")
         generationJob = scope.launch {
             sendButton.isEnabled = false
             progress.isIndeterminate = true
-            setStatus("Analisando…")
+            setStatus("Analisando ocorrência…")
             try {
                 val localContext = withContext(Dispatchers.IO) { knowledge.buildContext(question) }
                 val message = if (localContext.isBlank()) {
                     question
                 } else {
-                    """
-                    Use os trechos técnicos locais abaixo apenas quando forem pertinentes. Não invente correlação e não mencione nomes de sistemas, tabelas ou campos de origem.
-
-                    CONTEXTO LOCAL:
-                    $localContext
-
-                    PERGUNTA DO USUÁRIO:
-                    $question
-                    """.trimIndent()
+                    "Use as evidências locais abaixo somente quando forem pertinentes. " +
+                        "Não mencione nomes de sistemas, tabelas ou campos de origem.\n\n" +
+                        "EVIDÊNCIAS LOCAIS:\n" + localContext +
+                        "\n\nPERGUNTA:\n" + question
                 }
-
-                engine.sendUserPrompt(message, 640).collect { token ->
-                    appendChat(token)
-                }
+                engine.sendUserPrompt(message, 700).collect { token -> appendChat(token) }
                 appendChat("\n")
-                setStatus("MANIX pronta · inferência local")
-            } catch (e: Exception) {
-                appendChat("\n[Erro de geração]\n")
-                showError("Falha durante a resposta", e)
+                setStatus("MANIX pronta")
+            } catch (ex: Exception) {
+                appendChat("\nNão consegui concluir essa análise. Tente novamente.\n")
+                setStatus("Falha na análise")
             } finally {
                 progress.isIndeterminate = false
-                sendButton.isEnabled = true
+                progress.progress = 100
+                sendButton.isEnabled = modelReady
             }
         }
     }
 
-    private fun confirmClearBase() {
-        AlertDialog.Builder(this)
-            .setTitle("Limpar base PCM?")
-            .setMessage("Os trechos importados serão apagados do aparelho. O modelo MANIX não será removido.")
-            .setNegativeButton("Cancelar", null)
-            .setPositiveButton("Limpar") { _, _ ->
-                scope.launch {
-                    withContext(Dispatchers.IO) { knowledge.clear() }
-                    refreshBaseCount()
-                    setStatus("Base PCM local limpa.")
-                }
-            }
-            .show()
-    }
-
-    private fun refreshBaseCount() {
-        scope.launch {
-            val count = withContext(Dispatchers.IO) { knowledge.count() }
-            baseCount.text = "Base PCM local: $count blocos indexados"
-        }
+    private fun setUnavailable(message: String) {
+        modelReady = false
+        sendButton.isEnabled = false
+        progress.isIndeterminate = false
+        progress.progress = 0
+        setStatus(message)
+        syncLabel.text = "INDISPONÍVEL"
     }
 
     private fun appendChat(value: String) {
@@ -397,56 +393,45 @@ class MainActivity : AppCompatActivity() {
         status.text = value
     }
 
-    private fun showError(title: String, e: Throwable) {
-        val message = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
-        setStatus("$title: $message")
-        AlertDialog.Builder(this)
-            .setTitle(title)
-            .setMessage(message)
-            .setPositiveButton("OK", null)
-            .show()
+    private fun field(hintText: String, type: Int): EditText = EditText(this).apply {
+        hint = hintText
+        inputType = type
+        setHintTextColor(hint)
+        setTextColor(textMain)
+        textSize = 15f
+        setPadding(dp(16), 0, dp(16), 0)
+        background = rounded(card2, 17f, border)
     }
 
-    private fun querySize(uri: Uri): Long {
-        return contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
-            val index = cursor.getColumnIndex(OpenableColumns.SIZE)
-            if (cursor.moveToFirst() && index >= 0 && !cursor.isNull(index)) cursor.getLong(index) else -1L
-        } ?: -1L
-    }
-
-    private fun queryName(uri: Uri): String? {
-        return contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
-            val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-            if (cursor.moveToFirst() && index >= 0) cursor.getString(index) else null
+    private fun rounded(fill: Int, radiusDp: Float, strokeColor: Int? = null): GradientDrawable =
+        GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            setColor(fill)
+            cornerRadius = dp(radiusDp.toInt()).toFloat()
+            strokeColor?.let { setStroke(dp(1), it) }
         }
-    }
-
-    private fun rounded(fill: Int, radiusDp: Float, strokeColor: Int? = null): GradientDrawable = GradientDrawable().apply {
-        shape = GradientDrawable.RECTANGLE
-        setColor(fill)
-        cornerRadius = dp(radiusDp.toInt()).toFloat()
-        strokeColor?.let { setStroke(dp(1), it) }
-    }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).roundToInt()
 
     companion object {
-        private val bg = Color.rgb(8, 20, 17)
-        private val card = Color.rgb(14, 32, 27)
-        private val card2 = Color.rgb(19, 41, 35)
-        private val emerald = Color.rgb(65, 211, 157)
-        private val textMain = Color.rgb(236, 242, 239)
-        private val textMuted = Color.rgb(150, 169, 162)
+        private val bg = Color.rgb(6, 15, 13)
+        private val card = Color.rgb(12, 27, 23)
+        private val card2 = Color.rgb(17, 35, 30)
+        private val border = Color.rgb(35, 66, 56)
+        private val emerald = Color.rgb(75, 224, 163)
+        private val textMain = Color.rgb(238, 244, 241)
+        private val textMuted = Color.rgb(139, 160, 152)
+        private val hint = Color.rgb(104, 126, 118)
 
         private const val SYSTEM_PROMPT = """
-Você é MANIX, uma assistente especializada em manutenção industrial e gestão de manutenção.
-Responda em português do Brasil, com linguagem técnica clara e objetiva.
-Analise sintomas, falhas, histórico de ocorrências, causas prováveis, medidas, inspeções e coerência técnica.
-Diferencie fatos observados de hipóteses. Não invente medições, eventos, causas ou resultados.
-Quando faltarem dados relevantes, diga exatamente quais dados ajudariam a discriminar as hipóteses.
+Você é MANIX, uma assistente especializada em manutenção industrial, PCM e confiabilidade.
+Responda em português do Brasil, com linguagem técnica clara, objetiva e natural.
+Analise sintomas, falhas, histórico, causas prováveis, medidas, inspeções e coerência técnica.
+Diferencie explicitamente fatos observados de hipóteses. Não invente medições, eventos, causas ou resultados.
+Quando faltarem dados, informe quais verificações discriminam melhor as hipóteses.
 Priorize segurança, diagnóstico e verificações de menor risco antes de sugerir intervenções invasivas.
-Não exponha nomes de sistemas corporativos, tabelas, campos de banco, JSON, SAP, ICM ou detalhes de integração, salvo se o usuário pedir explicitamente.
-Quando receber contexto técnico local, trate-o como evidência histórica potencial e use apenas os trechos pertinentes à pergunta.
+Não exponha nomes de sistemas corporativos, tabelas, campos, JSON, SAP, ICM ou detalhes de integração, salvo se o usuário pedir explicitamente.
+Quando receber contexto técnico local, use apenas evidências pertinentes e não force correlações.
 """
     }
 }
