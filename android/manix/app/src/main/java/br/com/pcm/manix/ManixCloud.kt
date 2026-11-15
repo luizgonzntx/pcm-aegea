@@ -13,7 +13,13 @@ import java.security.MessageDigest
 
 class ManixCloud(private val context: Context) {
     data class Session(val accessToken: String, val refreshToken: String, val expiresAt: Long)
-    data class ModelInfo(val version: String, val sha256: String, val url: String?)
+    data class ModelPart(val index: Int, val size: Long, val url: String)
+    data class ModelInfo(
+        val version: String,
+        val sha256: String,
+        val sizeBytes: Long,
+        val parts: List<ModelPart>
+    )
 
     private val prefs = context.getSharedPreferences("manix_cloud", Context.MODE_PRIVATE)
 
@@ -61,10 +67,24 @@ class ManixCloud(private val context: Context) {
             authHeaders(token)
         )
         val model = json.getJSONObject("model")
+        val partsJson = model.optJSONArray("parts") ?: JSONArray()
+        val parts = ArrayList<ModelPart>(partsJson.length())
+        for (i in 0 until partsJson.length()) {
+            val p = partsJson.getJSONObject(i)
+            val url = p.optString("url")
+            if (url.isBlank() || url == "null") continue
+            parts += ModelPart(
+                index = p.optInt("index", i),
+                size = p.optLong("size", 0L),
+                url = url
+            )
+        }
+
         ModelInfo(
             version = model.optString("version", "pending"),
             sha256 = model.optString("sha256", ""),
-            url = model.optString("url").takeIf { it.isNotBlank() && it != "null" }
+            sizeBytes = model.optLong("size_bytes", 0L),
+            parts = parts.sortedBy { it.index }
         )
     }
 
@@ -85,40 +105,65 @@ class ManixCloud(private val context: Context) {
 
     suspend fun downloadModel(info: ModelInfo, destination: File, onProgress: (Int) -> Unit) =
         withContext(Dispatchers.IO) {
-            val modelUrl = info.url ?: throw IllegalStateException("Modelo MANIX ainda não foi publicado.")
+            if (info.parts.isEmpty()) throw IllegalStateException("Modelo MANIX ainda não foi publicado.")
+
             destination.parentFile?.mkdirs()
             val temp = File(destination.parentFile, destination.name + ".part")
-            val conn = (URL(modelUrl).openConnection() as HttpURLConnection).apply {
-                connectTimeout = 20_000
-                readTimeout = 120_000
-                instanceFollowRedirects = true
-            }
-            conn.connect()
-            if (conn.responseCode !in 200..299) {
-                throw IllegalStateException("Falha ao obter modelo (" + conn.responseCode + ").")
-            }
-            val total = conn.contentLengthLong
-            var copied = 0L
-            var last = -1
-            conn.inputStream.use { input ->
-                FileOutputStream(temp).use { output ->
-                    val buffer = ByteArray(1024 * 1024)
-                    while (true) {
-                        val n = input.read(buffer)
-                        if (n < 0) break
-                        output.write(buffer, 0, n)
-                        copied += n
-                        if (total > 0L) {
-                            val pct = ((copied * 100L) / total).toInt().coerceIn(0, 100)
-                            if (pct != last) {
-                                last = pct
-                                onProgress(pct)
+            if (temp.exists()) temp.delete()
+
+            val totalExpected = if (info.sizeBytes > 0L) info.sizeBytes else info.parts.sumOf { it.size }
+            var copiedTotal = 0L
+            var lastPct = -1
+
+            FileOutputStream(temp, false).use { output ->
+                for (part in info.parts) {
+                    val conn = (URL(part.url).openConnection() as HttpURLConnection).apply {
+                        connectTimeout = 20_000
+                        readTimeout = 120_000
+                        instanceFollowRedirects = true
+                    }
+                    conn.connect()
+                    if (conn.responseCode !in 200..299) {
+                        conn.disconnect()
+                        temp.delete()
+                        throw IllegalStateException(
+                            "Falha ao obter parte " + (part.index + 1) + " do modelo (" + conn.responseCode + ")."
+                        )
+                    }
+
+                    var copiedPart = 0L
+                    conn.inputStream.use { input ->
+                        val buffer = ByteArray(1024 * 1024)
+                        while (true) {
+                            val n = input.read(buffer)
+                            if (n < 0) break
+                            output.write(buffer, 0, n)
+                            copiedPart += n
+                            copiedTotal += n
+
+                            if (totalExpected > 0L) {
+                                val pct = ((copiedTotal * 100L) / totalExpected).toInt().coerceIn(0, 100)
+                                if (pct != lastPct) {
+                                    lastPct = pct
+                                    onProgress(pct)
+                                }
                             }
                         }
                     }
+                    conn.disconnect()
+
+                    if (part.size > 0L && copiedPart != part.size) {
+                        temp.delete()
+                        throw IllegalStateException("Parte " + (part.index + 1) + " incompleta.")
+                    }
                 }
+                output.fd.sync()
             }
-            conn.disconnect()
+
+            if (totalExpected > 0L && temp.length() != totalExpected) {
+                temp.delete()
+                throw IllegalStateException("Tamanho final do modelo inválido.")
+            }
 
             if (info.sha256.isNotBlank()) {
                 val actual = sha256(temp)
@@ -127,12 +172,15 @@ class ManixCloud(private val context: Context) {
                     throw IllegalStateException("Falha de integridade do modelo.")
                 }
             }
+
             if (destination.exists()) destination.delete()
             if (!temp.renameTo(destination)) {
                 temp.copyTo(destination, overwrite = true)
                 temp.delete()
             }
+
             prefs.edit().putString("model_version", info.version).apply()
+            onProgress(100)
         }
 
     fun cachedModelVersion(): String? = prefs.getString("model_version", null)
