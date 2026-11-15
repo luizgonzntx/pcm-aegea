@@ -1,0 +1,54 @@
+name: Build MANIX Android
+
+on:
+  push:
+    branches: [manix-android]
+    paths:
+      - 'android/manix/**'
+      - '.github/workflows/build-manix-android.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android toolchain
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;29.0.13113456" "cmake;3.31.6"
+
+      - name: Fetch llama.cpp
+        working-directory: android/manix
+        run: |
+          rm -rf third_party/llama.cpp
+          git clone --depth 1 https://github.com/ggml-org/llama.cpp.git third_party/llama.cpp
+
+      - name: Build debug APK
+        working-directory: android/manix
+        run: |
+          chmod +x third_party/llama.cpp/examples/llama.android/gradlew
+          third_party/llama.cpp/examples/llama.android/gradlew --project-dir "$PWD" :app:assembleDebug --no-daemon --stacktrace
+
+      - name: Rename APK
+        run: cp android/manix/app/build/outputs/apk/debug/app-debug.apk MANIX-PCM-v0.1-debug.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v6
+        with:
+          name: MANIX-PCM-APK
+          path: MANIX-PCM-v0.1-debug.apk
+          if-no-files-found: error
+          retention-days: 14
