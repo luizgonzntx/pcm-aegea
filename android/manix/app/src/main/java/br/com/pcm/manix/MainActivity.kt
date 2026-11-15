@@ -293,7 +293,7 @@ class MainActivity : AppCompatActivity() {
                 val needsDownload = !modelFile.exists() || (info.version != "pending" && cached != info.version)
 
                 if (needsDownload) {
-                    if (info.url == null) {
+                    if (info.parts.isEmpty()) {
                         setUnavailable("MANIX aguardando publicação do modelo.")
                         return@launch
                     }
