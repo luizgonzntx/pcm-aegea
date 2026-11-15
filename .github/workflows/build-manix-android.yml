@@ -25,7 +25,6 @@ jobs:
       - name: Install Android toolchain
         shell: bash
         run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
           echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" "ndk;29.0.13113456" "cmake;3.31.6"
@@ -35,6 +34,7 @@ jobs:
         run: |
           rm -rf third_party/llama.cpp
           git clone --depth 1 https://github.com/ggml-org/llama.cpp.git third_party/llama.cpp
+          git -C third_party/llama.cpp rev-parse HEAD
 
       - name: Build debug APK
         working-directory: android/manix
@@ -45,12 +45,12 @@ jobs:
           third_party/llama.cpp/examples/llama.android/gradlew --project-dir "$PWD" :app:assembleDebug --no-daemon --stacktrace
 
       - name: Rename APK
-        run: cp android/manix/app/build/outputs/apk/debug/app-debug.apk MANIX-PCM-v0.1-debug.apk
+        run: cp android/manix/app/build/outputs/apk/debug/app-debug.apk MANIX-PCM-v0.2-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v6
         with:
-          name: MANIX-PCM-APK
-          path: MANIX-PCM-v0.1-debug.apk
+          name: MANIX-PCM-v0.2-APK
+          path: MANIX-PCM-v0.2-debug.apk
           if-no-files-found: error
           retention-days: 14
