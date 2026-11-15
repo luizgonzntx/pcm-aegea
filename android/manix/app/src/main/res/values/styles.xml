@@ -1,0 +1,10 @@
+<resources>
+    <style name="Theme.Manix" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:navigationBarColor">#0A1512</item>
+        <item name="android:statusBarColor">#0A1512</item>
+        <item name="colorPrimary">#41D39D</item>
+        <item name="colorSecondary">#D7B15A</item>
+    </style>
+</resources>
